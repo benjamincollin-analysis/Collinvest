@@ -24,3 +24,16 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* ── ANDROID AMBER FIX ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Force true amber on all devices — overrides Android gradient fallback */
+@media screen {
+  [style*="background: #f59e0b"],
+  [style*="background:#f59e0b"] {
+    background: #f59e0b !important;
+  }
+}
+
