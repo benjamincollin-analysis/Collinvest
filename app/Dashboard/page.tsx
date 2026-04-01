@@ -130,7 +130,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"portfolio" | "map" | "projections" | "market">("portfolio");
+  const [activeTab, setActiveTab] = useState<"portfolio" | "map" | "projections" | "finances" | "market">("portfolio");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -211,7 +211,7 @@ export default function Dashboard() {
           <span style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>GOLDSTREAM</span>
           <span style={{ fontSize: "9px", fontWeight: "600", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>BETA</span>
         </div>
-        <div className="gs-tabs">{(["portfolio", "map", "projections", "market"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
+        <div className="gs-tabs">{(["portfolio", "map", "projections", "finances", "market"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
           <button onClick={() => setShowSettings(true)} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "6px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>⚙ Goals</button>
@@ -264,6 +264,7 @@ export default function Dashboard() {
         </>}
 
         {activeTab === "market" && <MarketInline />}
+{activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
       </div>
 
       {confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
@@ -521,6 +522,180 @@ function MarketInline() {
       </div>
 
       <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.15)", textAlign: "center" }}>Sources: FRED · Zillow Research · Global Property Guide · Knight Frank · JLL · Gulf News · HousingWire · Property Week · Updated automatically</p>
+    </div>
+  );
+}
+function FinancesTab({ properties, user }: { properties: Property[]; user: any }) {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false });
+
+  const CATEGORIES = ["Mortgage", "Insurance", "Property Tax", "Repairs", "Management", "Utilities", "CapEx", "Other"];
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("expenses").select("*").eq("user_id", user.id).order("date", { ascending: false })
+      .then(({ data }) => { setExpenses(data || []); setLoading(false); });
+  }, [user]);
+
+  async function handleAddExpense() {
+    if (!form.amount || !form.property_id) return;
+    const newExp = { user_id: user.id, property_id: parseInt(form.property_id), category: form.category, amount: parseFloat(form.amount), date: form.date, note: form.note, recurring: form.recurring };
+    const { data, error } = await supabase.from("expenses").insert(newExp).select().single();
+    if (!error && data) { setExpenses([data, ...expenses]); setShowForm(false); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }
+  }
+
+  async function handleDelete(id: number) {
+    await supabase.from("expenses").delete().eq("id", id);
+    setExpenses(expenses.filter(e => e.id !== id));
+  }
+
+  const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+
+  // P&L per property
+  const propPnL = properties.map(p => {
+    const propExpenses = expenses.filter(e => e.property_id === p.id);
+    const totalLogged = propExpenses.reduce((s: number, e: any) => s + e.amount, 0);
+    const rent = p.occupancyStatus === "occupied" ? p.rent : 0;
+    const monthlyExp = p.expenses;
+    const annualRent = rent * 12;
+    const annualExp = monthlyExp * 12;
+    const annualNet = annualRent - annualExp;
+    return { ...p, propExpenses, totalLogged, annualRent, annualExp, annualNet };
+  });
+
+  const totalAnnualRent = propPnL.reduce((s, p) => s + p.annualRent, 0);
+  const totalAnnualExp = propPnL.reduce((s, p) => s + p.annualExp, 0);
+  const totalAnnualNet = totalAnnualRent - totalAnnualExp;
+
+  // Category breakdown
+  const catTotals: Record<string, number> = {};
+  expenses.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
+
+  const CAT_COLORS: Record<string, string> = { Mortgage: "#f59e0b", Insurance: "#60a5fa", "Property Tax": "#a78bfa", Repairs: "#f87171", Management: "#34d399", Utilities: "#fb923c", CapEx: "#e879f9", Other: "rgba(255,255,255,0.4)" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s infinite" }} />
+            <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Financial Intelligence · P&L + Expense Tracking</span>
+          </div>
+          <h2 style={{ fontSize: "22px", fontWeight: "900", letterSpacing: "-0.5px" }}>Finances</h2>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "3px" }}>P&L per property · Annual summary · Expense history</p>
+        </div>
+        <button onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#f59e0b", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ Log Expense</button>
+      </div>
+
+      {/* Annual Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "24px" }}>
+        {[{ label: "Annual Gross Income", value: fmtFull(totalAnnualRent), color: "#34d399" }, { label: "Annual Expenses", value: fmtFull(totalAnnualExp), color: "#f87171" }, { label: "Annual Net P&L", value: (totalAnnualNet >= 0 ? "+" : "") + fmtFull(totalAnnualNet), color: totalAnnualNet >= 0 ? "#34d399" : "#f87171" }].map(m => (
+          <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "20px" }}>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>{m.label}</p>
+            <p style={{ fontSize: "24px", fontWeight: "800", color: m.color }}>{m.value}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>Based on current monthly rates × 12</p>
+          </div>
+        ))}
+      </div>
+
+      {/* P&L per property */}
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600", marginBottom: "12px" }}>📊 P&L Per Property</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+        {propPnL.map(p => (
+          <div key={p.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+              <div><h4 style={{ fontSize: "14px", fontWeight: "800" }}>{p.name}</h4><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{p.type}</p></div>
+              <span style={{ fontSize: "16px", fontWeight: "800", color: p.annualNet >= 0 ? "#34d399" : "#f87171" }}>{p.annualNet >= 0 ? "+" : ""}{fmtFull(p.annualNet)}/yr</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px", marginBottom: "12px" }}>
+              {[{ label: "Annual Income", value: fmtFull(p.annualRent), color: "#34d399" }, { label: "Annual Expenses", value: fmtFull(p.annualExp), color: "#f87171" }, { label: "Logged Costs", value: fmtFull(p.totalLogged), color: "#f59e0b" }].map(m => (
+                <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "10px", padding: "12px" }}>
+                  <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{m.label}</p>
+                  <p style={{ fontSize: "14px", fontWeight: "700", color: m.color }}>{m.value}</p>
+                </div>
+              ))}
+            </div>
+            {/* Income vs expense bar */}
+            <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.min(100, p.annualRent > 0 ? (p.annualExp / p.annualRent) * 100 : 100)}%`, background: "#f87171", borderRadius: "999px" }} />
+            </div>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>Expense ratio: {p.annualRent > 0 ? ((p.annualExp / p.annualRent) * 100).toFixed(1) : "—"}%</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Category Breakdown */}
+      {Object.keys(catTotals).length > 0 && <>
+        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600", marginBottom: "12px" }}>🏷️ Expense Breakdown by Category</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px", marginBottom: "24px" }}>
+          {Object.entries(catTotals).map(([cat, total]) => (
+            <div key={cat} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${CAT_COLORS[cat] || "rgba(255,255,255,0.08)"}22`, borderRadius: "12px", padding: "14px" }}>
+              <p style={{ fontSize: "9px", color: CAT_COLORS[cat] || "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "6px" }}>{cat}</p>
+              <p style={{ fontSize: "16px", fontWeight: "800", color: "#fff" }}>{fmtFull(total)}</p>
+            </div>
+          ))}
+        </div>
+      </>}
+
+      {/* Expense History */}
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600", marginBottom: "12px" }}>📋 Expense History</p>
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", overflow: "hidden", marginBottom: "24px" }}>
+        {loading ? <p style={{ padding: "24px", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Loading...</p> : expenses.length === 0 ? (
+          <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px" }}>No expenses logged yet. Click "+ Log Expense" to start.</div>
+        ) : (
+          <table style={{ width: "100%", fontSize: "13px", borderCollapse: "collapse" }}>
+            <thead><tr style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", letterSpacing: "1px", textTransform: "uppercase" }}>
+              {["Date", "Property", "Category", "Amount", "Note", ""].map(h => <th key={h} style={{ textAlign: h === "Amount" ? "right" : "left", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {expenses.map((e: any) => {
+                const prop = properties.find(p => p.id === e.property_id);
+                return (
+                  <tr key={e.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.4)" }}>{e.date}</td>
+                    <td style={{ padding: "12px 16px", fontWeight: "600" }}>{prop?.name || "—"}</td>
+                    <td style={{ padding: "12px 16px" }}><span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: `${CAT_COLORS[e.category] || "rgba(255,255,255,0.1)"}22`, color: CAT_COLORS[e.category] || "rgba(255,255,255,0.5)", fontWeight: "700" }}>{e.category}</span></td>
+                    <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: "700", color: "#f87171" }}>{fmtFull(e.amount)}</td>
+                    <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>{e.note || "—"}</td>
+                    <td style={{ padding: "12px 10px" }}><button onClick={() => handleDelete(e.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Add Expense Modal */}
+      {showForm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, padding: "120px 20px 20px" }}>
+          <div style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "460px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "17px", fontWeight: "800" }}>Log Expense</h2>
+              <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <Field label="Property"><select value={form.property_id} onChange={e => setForm({ ...form, property_id: e.target.value })} style={IS}><option value="">Select property...</option>{properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+              <Field label="Category"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={IS}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <Field label="Amount ($)"><input type="number" placeholder="e.g. 1200" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} style={IS} /></Field>
+                <Field label="Date"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={IS} /></Field>
+              </div>
+              <Field label="Note (optional)"><input type="text" placeholder="e.g. Roof repair after storm" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} style={IS} /></Field>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <input type="checkbox" id="recurring" checked={form.recurring} onChange={e => setForm({ ...form, recurring: e.target.checked })} />
+                <label htmlFor="recurring" style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>Recurring monthly expense</label>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
+              <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
+              <button onClick={handleAddExpense} style={{ flex: 1, padding: "12px", background: "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Log Expense</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
