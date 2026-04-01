@@ -214,6 +214,7 @@ export default function Dashboard() {
         <div className="gs-tabs">{(["portfolio", "map", "projections", "finances", "market"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
+          <NotificationBell user={user} properties={properties} />
           <button onClick={() => setShowSettings(true)} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "6px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>⚙ Goals</button>
           <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", fontWeight: "800", fontSize: "11px" }}>{(settings.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}</div>
           <button onClick={handleLogout} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "600" }}>Log out</button>
@@ -698,5 +699,139 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
         </div>
       )}
       </div>
+  );
+}
+function NotificationBell({ user, properties }: { user: any; properties: Property[] }) {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unread, setUnread] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    loadNotifications();
+    generateAlerts();
+  }, [user, properties]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  async function loadNotifications() {
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30);
+    setNotifications(data || []);
+    setUnread((data || []).filter((n: any) => !n.read).length);
+  }
+
+  async function generateAlerts() {
+    if (!properties.length) return;
+    const existing = await supabase.from("notifications").select("type, message").eq("user_id", user.id);
+    const existingKeys = new Set((existing.data || []).map((n: any) => `${n.type}:${n.message}`));
+    const toInsert: any[] = [];
+
+    // Vacant property alert
+    properties.filter(p => p.occupancyStatus === "vacant").forEach(p => {
+      const key = `alert_vacant:${p.name} is vacant`;
+      if (!existingKeys.has(key)) toInsert.push({ user_id: user.id, type: "alert_vacant", title: "Vacant Property", message: `${p.name} is vacant`, read: false });
+    });
+
+    // Negative cash flow
+    properties.filter(p => propCashFlow(p) < 0).forEach(p => {
+      const key = `alert_cashflow:${p.name} has negative cash flow`;
+      if (!existingKeys.has(key)) toInsert.push({ user_id: user.id, type: "alert_cashflow", title: "Negative Cash Flow", message: `${p.name} has negative cash flow`, read: false });
+    });
+
+    // Lease expiring within 30 days
+    properties.filter(p => p.occupancyStatus === "planned" && p.plannedDate).forEach(p => {
+      const days = Math.ceil((new Date(p.plannedDate).getTime() - Date.now()) / 86400000);
+      if (days <= 30 && days >= 0) {
+        const key = `alert_lease:${p.name} lease starts in ${days} days`;
+        if (!existingKeys.has(key)) toInsert.push({ user_id: user.id, type: "alert_lease", title: "Lease Starting Soon", message: `${p.name} lease starts in ${days} days`, read: false });
+      }
+    });
+
+    // Achievements (one-time)
+    const achievements = [
+      { condition: properties.length >= 1, type: "achievement", title: "🏆 First Property!", message: "You added your first property. The journey begins." },
+      { condition: properties.length >= 3, type: "achievement", title: "🏆 Portfolio Builder", message: "3 properties tracked. You're building something real." },
+      { condition: properties.reduce((s, p) => s + p.value, 0) >= 1_000_000, type: "achievement", title: "🏆 Millionaire Portfolio", message: "Your portfolio crossed $1M. Most never get here." },
+      { condition: properties.reduce((s, p) => s + propCashFlow(p), 0) > 0, type: "achievement", title: "🏆 Cash Flow Positive", message: "Your portfolio generates positive cash flow. You're ahead." },
+    ];
+    achievements.forEach(a => {
+      if (a.condition) {
+        const key = `${a.type}:${a.message}`;
+        if (!existingKeys.has(key)) toInsert.push({ user_id: user.id, type: a.type, title: a.title, message: a.message, read: false });
+      }
+    });
+
+    if (toInsert.length > 0) {
+      await supabase.from("notifications").insert(toInsert);
+      loadNotifications();
+    }
+  }
+
+  async function markAllRead() {
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    setUnread(0);
+  }
+
+  async function clearAll() {
+    await supabase.from("notifications").delete().eq("user_id", user.id);
+    setNotifications([]); setUnread(0);
+  }
+
+  function notifColor(type: string) {
+    if (type === "achievement") return { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" };
+    if (type === "alert_cashflow") return { color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" };
+    return { color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.2)" };
+  }
+
+  function timeAgo(date: string) {
+    const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+    if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ago`; return `${Math.floor(s/86400)}d ago`;
+  }
+
+  const badgeColor = notifications.some(n => !n.read && n.type === "alert_cashflow") ? "#f87171" : "#60a5fa";
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button onClick={() => { setOpen(!open); if (!open && unread > 0) markAllRead(); }} style={{ position: "relative", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: "15px" }}>
+        🔔
+        {unread > 0 && <span style={{ position: "absolute", top: "-4px", right: "-4px", background: badgeColor, color: "#fff", borderRadius: "999px", fontSize: "9px", fontWeight: "800", minWidth: "16px", height: "16px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", boxShadow: `0 0 8px ${badgeColor}88` }}>{unread > 9 ? "9+" : unread}</span>}
+      </button>
+
+      {open && (
+        <div style={{ position: "absolute", top: "40px", right: 0, width: "340px", background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", zIndex: 200, overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "13px", fontWeight: "700" }}>Notifications</span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {unread > 0 && <button onClick={markAllRead} style={{ fontSize: "10px", color: "#60a5fa", background: "none", border: "none", cursor: "pointer" }}>Mark all read</button>}
+              {notifications.length > 0 && <button onClick={clearAll} style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", background: "none", border: "none", cursor: "pointer" }}>Clear all</button>}
+            </div>
+          </div>
+          <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: "32px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>No notifications yet</div>
+            ) : notifications.map(n => {
+              const c = notifColor(n.type);
+              return (
+                <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)", background: n.read ? "transparent" : "rgba(96,165,250,0.03)", display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: n.read ? "transparent" : c.color, flexShrink: 0, marginTop: "5px", boxShadow: n.read ? "none" : `0 0 6px ${c.color}` }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "12px", fontWeight: "700", color: c.color, marginBottom: "2px" }}>{n.title}</p>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", lineHeight: "1.4" }}>{n.message}</p>
+                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{timeAgo(n.created_at)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
