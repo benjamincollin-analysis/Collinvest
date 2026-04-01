@@ -540,9 +540,10 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   }, [user]);
 
   async function handleAddExpense() {
-    if (!form.amount || !form.property_id) return;
+    if (!form.amount || !form.property_id) { alert("Please select a property and enter an amount."); return; }
     const newExp = { user_id: user.id, property_id: parseInt(form.property_id), category: form.category, amount: parseFloat(form.amount), date: form.date, note: form.note, recurring: form.recurring };
     const { data, error } = await supabase.from("expenses").insert(newExp).select().single();
+    console.log("INSERT RESULT:", data, "ERROR:", error);
     if (!error && data) { setExpenses([data, ...expenses]); setShowForm(false); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }
   }
 
@@ -691,11 +692,11 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
             </div>
             <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
               <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
-              <button onClick={handleAddExpense} style={{ flex: 1, padding: "12px", background: "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Log Expense</button>
+              <button onClick={() => handleAddExpense()} style={{ flex: 1, padding: "12px", background: "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Log Expense</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+      </div>
   );
 }
