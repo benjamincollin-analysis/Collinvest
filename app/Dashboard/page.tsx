@@ -529,6 +529,9 @@ function MarketInline() {
 }
 function FinancesTab({ properties, user }: { properties: Property[]; user: any }) {
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-indexed
+  const todayDayOfYear = Math.floor((Date.now() - new Date(currentYear, 0, 0).getTime()) / 86400000);
+
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -541,6 +544,20 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   const CATEGORIES = ["Mortgage", "Insurance", "Property Tax", "Repairs", "Management", "Utilities", "CapEx", "Other"];
   const CAT_COLORS: Record<string, string> = { Mortgage: "#f59e0b", Insurance: "#60a5fa", "Property Tax": "#a78bfa", Repairs: "#f87171", Management: "#34d399", Utilities: "#fb923c", CapEx: "#e879f9", Other: "rgba(255,255,255,0.4)" };
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+
+  // Number formatting — max 2 decimals, clear K/M labels
+  function fmtMoney(n: number) {
+    const abs = Math.abs(n);
+    const sign = n < 0 ? "-" : "";
+    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 10_000) return `${sign}$${Math.round(abs).toLocaleString("en-US")}`;
+    if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}$${abs.toFixed(2)}`;
+  }
+  function fmtMoneyFull(n: number) {
+    const sign = n < 0 ? "-$" : "$";
+    return sign + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -570,12 +587,9 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   async function handleDelete(id: number) { await supabase.from("expenses").delete().eq("id", id); setExpenses(expenses.filter(e => e.id !== id)); }
 
   const years = Array.from(new Set([currentYear, currentYear - 1, currentYear - 2, ...expenses.map(e => e.year || currentYear)])).sort((a, b) => b - a);
-
-  // Split by year
   const curExpenses = expenses.filter(e => (e.year || currentYear) === filterYear);
   const prevExpenses = expenses.filter(e => (e.year || currentYear) === filterYear - 1);
 
-  // Per-property P&L
   const propPnL = properties.map(p => {
     const cur = curExpenses.filter(e => e.property_id === p.id);
     const prev = prevExpenses.filter(e => e.property_id === p.id);
@@ -583,17 +597,19 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
     const prevAnnualExp = prev.reduce((s: number, e: any) => s + e.amount, 0);
     const rent = p.occupancyStatus === "occupied" ? p.rent : 0;
     const annualRent = rent * 12;
-    const dailyRent = annualRent / 365;
-    const dailyExp = annualExp / 365;
-    const monthlyExp = annualExp / 12;
     const annualNet = annualRent - annualExp;
-    const dailyNet = annualNet / 365;
     const monthlyNet = annualNet / 12;
-    const prevNet = annualRent * 12 - prevAnnualExp; // rough prev year net
+    const dailyNet = annualNet / 365;
     const yoyDelta = prevAnnualExp > 0 ? annualExp - prevAnnualExp : null;
-    const margin = annualRent > 0 ? ((annualNet / annualRent) * 100) : null;
-    const expenseRatio = annualRent > 0 ? ((annualExp / annualRent) * 100) : null;
-    return { ...p, cur, prev, annualExp, prevAnnualExp, annualRent, dailyRent, dailyExp, monthlyExp, annualNet, dailyNet, monthlyNet, yoyDelta, margin, expenseRatio };
+    const margin = annualRent > 0 ? (annualNet / annualRent) * 100 : null;
+    const expenseRatio = annualRent > 0 ? (annualExp / annualRent) * 100 : null;
+    // NOI = Revenue - Operating Expenses (excluding mortgage/debt)
+    const mortgageExp = cur.filter((e: any) => e.category === "Mortgage").reduce((s: number, e: any) => s + e.amount, 0);
+    const noi = annualRent - (annualExp - mortgageExp);
+    // Cash reserve: months of expenses covered (assumes 3 months savings rule)
+    const monthlyExp = annualExp / 12;
+    const cashReserveMonths = monthlyExp > 0 ? Math.floor(p.mortgage > 0 ? (p.value - p.mortgage) * 0.05 / monthlyExp : annualRent * 0.1 / monthlyExp) : null;
+    return { ...p, cur, prev, annualExp, prevAnnualExp, annualRent, annualNet, monthlyNet, dailyNet, monthlyExp, yoyDelta, margin, expenseRatio, noi, cashReserveMonths };
   });
 
   const totalAnnualRent = propPnL.reduce((s, p) => s + p.annualRent, 0);
@@ -602,6 +618,20 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   const totalDailyNet = totalAnnualNet / 365;
   const totalMonthlyNet = totalAnnualNet / 12;
   const totalMargin = totalAnnualRent > 0 ? ((totalAnnualNet / totalAnnualRent) * 100).toFixed(1) : null;
+  const totalNOI = propPnL.reduce((s, p) => s + p.noi, 0);
+  // Today's earnings: daily rate × days elapsed this year
+  const todayEarnings = totalDailyNet * todayDayOfYear;
+
+  // 12-month data
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthlyData = MONTHS.map((label, i) => {
+    const monthExp = curExpenses.filter((e: any) => { const d = new Date(e.date); return d.getMonth() === i; }).reduce((s: number, e: any) => s + e.amount, 0);
+    const monthRent = totalAnnualRent / 12;
+    const net = i <= currentMonth ? monthRent - monthExp : null; // null = future
+    const projected = i > currentMonth ? monthRent - (totalAnnualExp / 12) : null;
+    return { label, monthExp, monthRent, net, projected, isFuture: i > currentMonth, isCurrent: i === currentMonth };
+  });
+  const maxBarVal = Math.max(...monthlyData.map(m => Math.abs(m.net ?? m.projected ?? 0)), 1);
 
   const catTotals: Record<string, number> = {};
   curExpenses.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
@@ -619,6 +649,13 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
     return "At risk";
   }
 
+  // Period color scheme
+  const PERIOD_THEME = {
+    daily:   { label: "DAILY",   accent: "#60a5fa", bg: "rgba(96,165,250,0.06)",   border: "rgba(96,165,250,0.15)",   desc: "per day" },
+    monthly: { label: "MONTHLY", accent: "#f59e0b", bg: "rgba(245,158,11,0.06)",   border: "rgba(245,158,11,0.15)",   desc: "per month" },
+    annual:  { label: "ANNUAL",  accent: "#34d399", bg: "rgba(52,211,153,0.06)",   border: "rgba(52,211,153,0.15)",   desc: "per year" },
+  };
+
   return (
     <div>
       {/* Header */}
@@ -632,7 +669,6 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "3px" }}>Daily · Monthly · Annual · YoY comparison</p>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* Year filter */}
           <select value={filterYear} onChange={e => setFilterYear(parseInt(e.target.value))} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", color: "#fff", cursor: "pointer", fontWeight: "700", outline: "none" }}>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -640,45 +676,94 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
         </div>
       </div>
 
-      {/* Summary KPI strip — Daily / Monthly / Annual */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1px", background: "rgba(255,255,255,0.06)", borderRadius: "16px", overflow: "hidden", marginBottom: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
-        {[
-          { period: "Daily", income: totalAnnualRent / 365, exp: totalAnnualExp / 365, net: totalDailyNet },
-          { period: "Monthly", income: totalAnnualRent / 12, exp: totalAnnualExp / 12, net: totalMonthlyNet },
-          { period: "Annual", income: totalAnnualRent, exp: totalAnnualExp, net: totalAnnualNet },
-        ].map(({ period, income, exp, net }) => (
-          <div key={period} style={{ background: "#0d0d0d", padding: "20px 22px" }}>
-            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>{period}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {/* Today's Earnings Counter */}
+      <div style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.08), rgba(52,211,153,0.05))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "16px", padding: "18px 24px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        <div>
+          <p style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>📈 YTD Earnings Counter <span style={{ color: "rgba(255,255,255,0.2)", fontWeight: "400", letterSpacing: "0" }}>· income accumulated since Jan 1</span></p>
+          <p style={{ fontSize: "32px", fontWeight: "900", color: todayEarnings >= 0 ? "#34d399" : "#f87171", letterSpacing: "-1px" }}>{todayEarnings >= 0 ? "+" : ""}{fmtMoneyFull(todayEarnings)}</p>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>Day {todayDayOfYear} of {filterYear} · {fmtMoney(totalDailyNet)}/day net rate</p>
+        </div>
+        <div style={{ display: "flex", gap: "20px" }}>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "3px" }}>NOI <span style={{ color: "rgba(255,255,255,0.2)" }}>· Net Operating Income</span></p>
+            <p style={{ fontSize: "18px", fontWeight: "800", color: "#f59e0b" }}>{fmtMoneyFull(totalNOI)}/yr</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "3px" }}>Profit Margin</p>
+            <p style={{ fontSize: "18px", fontWeight: "800", color: totalMargin !== null ? healthColor(parseFloat(totalMargin)) : "rgba(255,255,255,0.3)" }}>{totalMargin !== null ? `${totalMargin}%` : "—"}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Color-coded Daily / Monthly / Annual strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
+        {([
+          { theme: PERIOD_THEME.daily,   income: totalAnnualRent / 365, exp: totalAnnualExp / 365, net: totalDailyNet },
+          { theme: PERIOD_THEME.monthly, income: totalAnnualRent / 12,  exp: totalAnnualExp / 12,  net: totalMonthlyNet },
+          { theme: PERIOD_THEME.annual,  income: totalAnnualRent,        exp: totalAnnualExp,        net: totalAnnualNet },
+        ] as const).map(({ theme, income, exp, net }) => (
+          <div key={theme.label} style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <span style={{ fontSize: "10px", fontWeight: "800", color: theme.accent, letterSpacing: "1.5px" }}>{theme.label}</span>
+              <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", fontWeight: "600" }}>{theme.desc}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Income</span>
-                <span style={{ fontSize: "13px", fontWeight: "700", color: "#34d399" }}>{fmtFull(income)}</span>
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>Income</span>
+                <span style={{ fontSize: "14px", fontWeight: "700", color: "#34d399" }}>{fmtMoney(income)}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Expenses</span>
-                <span style={{ fontSize: "13px", fontWeight: "700", color: "#f87171" }}>{fmtFull(exp)}</span>
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>Expenses</span>
+                <span style={{ fontSize: "14px", fontWeight: "700", color: "#f87171" }}>{fmtMoney(exp)}</span>
               </div>
-              <div style={{ height: "1px", background: "rgba(255,255,255,0.05)", margin: "4px 0" }} />
+              <div style={{ height: "1px", background: `${theme.accent}33` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "700" }}>Net</span>
-                <span style={{ fontSize: "15px", fontWeight: "800", color: net >= 0 ? "#34d399" : "#f87171" }}>{net >= 0 ? "+" : ""}{fmtFull(net)}</span>
+                <span style={{ fontSize: "10px", color: theme.accent, fontWeight: "700" }}>Net</span>
+                <span style={{ fontSize: "18px", fontWeight: "900", color: net >= 0 ? "#34d399" : "#f87171", letterSpacing: "-0.5px" }}>{net >= 0 ? "+" : ""}{fmtMoney(net)}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
+      {/* 12-Month Bar Chart */}
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600", marginBottom: "12px" }}>📅 12-Month Net P&L <span style={{ color: "rgba(255,255,255,0.2)", fontWeight: "400", letterSpacing: "0", textTransform: "none" }}>· past months real · future projected</span></p>
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "120px", justifyContent: "space-between" }}>
+          {monthlyData.map((m, i) => {
+            const val = m.net ?? m.projected ?? 0;
+            const barH = Math.max(4, (Math.abs(val) / maxBarVal) * 100);
+            const color = m.isFuture ? "rgba(96,165,250,0.3)" : val >= 0 ? "#34d399" : "#f87171";
+            const borderColor = m.isCurrent ? "#f59e0b" : "transparent";
+            return (
+              <div key={m.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", height: "100%" }}>
+                <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
+                  <div title={`${m.label}: ${fmtMoney(val)}`} style={{ width: "100%", height: `${barH}%`, background: color, borderRadius: "4px 4px 0 0", border: `1px solid ${borderColor}`, boxShadow: m.isCurrent ? `0 0 8px rgba(245,158,11,0.4)` : "none", transition: "all 0.3s", cursor: "default", position: "relative" }} />
+                </div>
+                <span style={{ fontSize: "9px", color: m.isCurrent ? "#f59e0b" : "rgba(255,255,255,0.25)", fontWeight: m.isCurrent ? "800" : "400", whiteSpace: "nowrap" }}>{m.label}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: "16px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "10px", height: "10px", borderRadius: "2px", background: "#34d399" }} /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Positive month</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "10px", height: "10px", borderRadius: "2px", background: "rgba(96,165,250,0.3)" }} /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Projected</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "10px", height: "10px", borderRadius: "2px", background: "#f87171" }} /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Negative month</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><div style={{ width: "10px", height: "10px", borderRadius: "2px", background: "transparent", border: "1px solid #f59e0b" }} /><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Current month</span></div>
+        </div>
+      </div>
+
       {/* KPI row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "24px" }}>
         {[
-          { label: "Profit Margin", value: totalMargin !== null ? `${totalMargin}%` : "—", color: totalMargin !== null ? healthColor(parseFloat(totalMargin)) : "rgba(255,255,255,0.3)", sub: "Net ÷ Gross income" },
-          { label: "Expense Ratio", value: totalAnnualRent > 0 ? `${((totalAnnualExp / totalAnnualRent) * 100).toFixed(1)}%` : "—", color: "#f59e0b", sub: "Expenses ÷ Revenue" },
-          { label: `vs ${filterYear - 1}`, value: (() => { const prevTot = prevExpenses.reduce((s: number, e: any) => s + e.amount, 0); return prevTot > 0 ? `${totalAnnualExp >= prevTot ? "+" : ""}${((totalAnnualExp - prevTot) / prevTot * 100).toFixed(1)}%` : "No prior data"; })(), color: (() => { const p = prevExpenses.reduce((s: number, e: any) => s + e.amount, 0); return p > 0 && totalAnnualExp < p ? "#34d399" : "#f87171"; })(), sub: "Expense change YoY" },
+          { label: "Expense Ratio", sublabel: "expenses ÷ revenue", value: totalAnnualRent > 0 ? `${((totalAnnualExp / totalAnnualRent) * 100).toFixed(1)}%` : "—", color: "#f59e0b" },
+          { label: "YoY Expenses", sublabel: `vs ${filterYear - 1}`, value: (() => { const p = prevExpenses.reduce((s: number, e: any) => s + e.amount, 0); return p > 0 ? `${totalAnnualExp >= p ? "+" : ""}${((totalAnnualExp - p) / p * 100).toFixed(1)}%` : "No prior data"; })(), color: (() => { const p = prevExpenses.reduce((s: number, e: any) => s + e.amount, 0); return p > 0 && totalAnnualExp < p ? "#34d399" : "#f87171"; })() },
+          { label: "Break-Even Occ.", sublabel: "min occupancy to cover costs", value: totalAnnualRent > 0 ? `${Math.min(100, (totalAnnualExp / totalAnnualRent) * 100).toFixed(0)}%` : "—", color: "#a78bfa" },
         ].map(m => (
           <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px 20px" }}>
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px", fontWeight: "600" }}>{m.label}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "2px", fontWeight: "600" }}>{m.label}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "8px" }}>{m.sublabel}</p>
             <p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p>
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{m.sub}</p>
           </div>
         ))}
       </div>
@@ -690,7 +775,6 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
           const hc = healthColor(p.margin);
           return (
             <div key={p.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${hc}22`, borderRadius: "16px", overflow: "hidden" }}>
-              {/* Property header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap", gap: "8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: hc, boxShadow: `0 0 6px ${hc}` }} />
@@ -699,44 +783,52 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
                     <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>{p.type} · <span style={{ color: hc, fontWeight: "700" }}>{healthLabel(p.margin)}</span>{p.margin !== null ? ` · ${p.margin.toFixed(1)}% margin` : ""}</p>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  {p.yoyDelta !== null && (
-                    <span style={{ fontSize: "11px", fontWeight: "700", color: p.yoyDelta <= 0 ? "#34d399" : "#f87171", background: p.yoyDelta <= 0 ? "rgba(52,211,153,0.08)" : "rgba(248,113,113,0.08)", padding: "3px 10px", borderRadius: "999px", border: `1px solid ${p.yoyDelta <= 0 ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}` }}>
-                      {p.yoyDelta <= 0 ? "▼" : "▲"} {Math.abs(p.yoyDelta).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} vs {filterYear - 1}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  {/* Cash Reserve */}
+                  {p.cashReserveMonths !== null && (
+                    <span title="Cash Reserve: estimated months of expenses covered by equity buffer" style={{ fontSize: "10px", color: p.cashReserveMonths >= 6 ? "#34d399" : p.cashReserveMonths >= 3 ? "#f59e0b" : "#f87171", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", padding: "3px 10px", borderRadius: "999px", fontWeight: "700" }}>
+                      🛡 {p.cashReserveMonths}mo reserve <span style={{ fontWeight: "400", color: "rgba(255,255,255,0.2)" }}>· vacancy buffer</span>
                     </span>
                   )}
-                  <span style={{ fontSize: "16px", fontWeight: "800", color: p.annualNet >= 0 ? "#34d399" : "#f87171" }}>{p.annualNet >= 0 ? "+" : ""}{fmtFull(p.annualNet)}/yr</span>
+                  {p.yoyDelta !== null && (
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: p.yoyDelta <= 0 ? "#34d399" : "#f87171", background: p.yoyDelta <= 0 ? "rgba(52,211,153,0.08)" : "rgba(248,113,113,0.08)", padding: "3px 10px", borderRadius: "999px", border: `1px solid ${p.yoyDelta <= 0 ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}` }}>
+                      {p.yoyDelta <= 0 ? "▼" : "▲"} {fmtMoney(Math.abs(p.yoyDelta))} exp vs {filterYear - 1}
+                    </span>
+                  )}
+                  <span style={{ fontSize: "16px", fontWeight: "800", color: p.annualNet >= 0 ? "#34d399" : "#f87171" }}>{p.annualNet >= 0 ? "+" : ""}{fmtMoney(p.annualNet)}/yr</span>
                   <button onClick={() => toggleProp(p.id)} style={{ fontSize: "10px", padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontWeight: "600" }}>{expandedProps.has(p.id) ? "▲ Hide" : "▼ Expenses"}</button>
                 </div>
               </div>
 
-              {/* Daily / Monthly / Annual grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0px" }}>
-                {[
-                  { period: "Daily", income: p.dailyRent, exp: p.dailyExp, net: p.dailyNet },
-                  { period: "Monthly", income: p.annualRent / 12, exp: p.monthlyExp, net: p.monthlyNet },
-                  { period: "Annual", income: p.annualRent, exp: p.annualExp, net: p.annualNet },
-                ].map(({ period, income, exp, net }, idx) => (
-                  <div key={period} style={{ padding: "14px 16px", borderRight: idx < 2 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "700", marginBottom: "8px" }}>{period}</p>
+              {/* Daily / Monthly / Annual per property */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                {([
+                  { theme: PERIOD_THEME.daily,   income: p.annualRent / 365, exp: p.annualExp / 365, net: p.dailyNet },
+                  { theme: PERIOD_THEME.monthly, income: p.annualRent / 12,  exp: p.monthlyExp,      net: p.monthlyNet },
+                  { theme: PERIOD_THEME.annual,  income: p.annualRent,        exp: p.annualExp,        net: p.annualNet },
+                ] as const).map(({ theme, income, exp, net }, idx) => (
+                  <div key={theme.label} style={{ padding: "14px 16px", borderRight: idx < 2 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                    <p style={{ fontSize: "9px", color: theme.accent, letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "800", marginBottom: "8px" }}>{theme.label}</p>
                     <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)" }}>In</span><span style={{ fontSize: "12px", fontWeight: "700", color: "#34d399" }}>{fmtFull(income)}</span></div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)" }}>Out</span><span style={{ fontSize: "12px", fontWeight: "700", color: "#f87171" }}>{fmtFull(exp)}</span></div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px", paddingTop: "3px", borderTop: "1px solid rgba(255,255,255,0.04)" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "700" }}>Net</span><span style={{ fontSize: "13px", fontWeight: "800", color: net >= 0 ? "#34d399" : "#f87171" }}>{net >= 0 ? "+" : ""}{fmtFull(net)}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)" }}>In</span><span style={{ fontSize: "12px", fontWeight: "700", color: "#34d399" }}>{fmtMoney(income)}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)" }}>Out</span><span style={{ fontSize: "12px", fontWeight: "700", color: "#f87171" }}>{fmtMoney(exp)}</span></div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px", paddingTop: "3px", borderTop: `1px solid ${theme.accent}22` }}><span style={{ fontSize: "9px", color: theme.accent, fontWeight: "700" }}>Net</span><span style={{ fontSize: "14px", fontWeight: "800", color: net >= 0 ? "#34d399" : "#f87171" }}>{net >= 0 ? "+" : ""}{fmtMoney(net)}</span></div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Expense ratio bar */}
-              <div style={{ padding: "0 16px 14px" }}>
-                <div style={{ height: "4px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, p.expenseRatio ?? 0)}%`, background: hc, borderRadius: "999px", transition: "width 0.6s" }} />
+              {/* NOI per property */}
+              <div style={{ padding: "10px 16px", background: "rgba(245,158,11,0.03)", borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", gap: "20px", alignItems: "center", flexWrap: "wrap" }}>
+                <div><span style={{ fontSize: "9px", color: "rgba(245,158,11,0.6)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>NOI </span><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)" }}>· Net Operating Income (excl. mortgage)</span><span style={{ fontSize: "13px", fontWeight: "800", color: "#f59e0b", marginLeft: "8px" }}>{fmtMoney(p.noi)}/yr</span></div>
+                <div style={{ flex: 1, minWidth: "120px" }}>
+                  <div style={{ height: "4px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, p.expenseRatio ?? 0)}%`, background: healthColor(p.margin), borderRadius: "999px" }} />
+                  </div>
+                  <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", marginTop: "3px" }}>Expense ratio: {p.expenseRatio !== null ? `${p.expenseRatio.toFixed(1)}%` : "—"} · Break-even: {p.annualRent > 0 ? `${Math.min(100, (p.annualExp / p.annualRent) * 100).toFixed(0)}%` : "—"} occupancy</p>
                 </div>
-                <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>Expense ratio: {p.expenseRatio !== null ? `${p.expenseRatio.toFixed(1)}%` : "—"}</p>
               </div>
 
-              {/* Expandable expense list */}
               {expandedProps.has(p.id) && (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px", background: "rgba(0,0,0,0.2)" }}>
                   {p.cur.length === 0
@@ -749,7 +841,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
                           {e.note && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>{e.note}</span>}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#f87171" }}>{fmtFull(e.amount)}</span>
+                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#f87171" }}>{fmtMoneyFull(e.amount)}</span>
                           <button onClick={() => openEditExpense(e)} style={{ fontSize: "10px", padding: "2px 7px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>Edit</button>
                           <button onClick={() => handleDelete(e.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button>
                         </div>
@@ -770,7 +862,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
           {Object.entries(catTotals).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
             <div key={cat} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${CAT_COLORS[cat] || "rgba(255,255,255,0.08)"}33`, borderRadius: "12px", padding: "14px" }}>
               <p style={{ fontSize: "9px", color: CAT_COLORS[cat] || "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "6px" }}>{cat}</p>
-              <p style={{ fontSize: "16px", fontWeight: "800", color: "#fff" }}>{fmtFull(total)}</p>
+              <p style={{ fontSize: "16px", fontWeight: "800", color: "#fff" }}>{fmtMoneyFull(total)}</p>
               <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "3px" }}>{totalAnnualExp > 0 ? `${((total / totalAnnualExp) * 100).toFixed(1)}% of total` : ""}</p>
             </div>
           ))}
@@ -794,7 +886,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
                     <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.4)" }}>{e.date}</td>
                     <td style={{ padding: "12px 16px", fontWeight: "600" }}>{prop?.name || "—"}</td>
                     <td style={{ padding: "12px 16px" }}><span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: `${CAT_COLORS[e.category] || "rgba(255,255,255,0.1)"}22`, color: CAT_COLORS[e.category] || "rgba(255,255,255,0.5)", fontWeight: "700" }}>{e.category}</span></td>
-                    <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: "700", color: "#f87171" }}>{fmtFull(e.amount)}</td>
+                    <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: "700", color: "#f87171" }}>{fmtMoneyFull(e.amount)}</td>
                     <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>{e.note || "—"}</td>
                     <td style={{ padding: "12px 10px" }}><div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
                       <button onClick={() => openEditExpense(e)} style={{ fontSize: "10px", padding: "3px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>Edit</button>
@@ -807,7 +899,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
           </table>}
       </div>
 
-      {/* Add/Edit Expense Modal */}
+      {/* Log Expense Modal */}
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, padding: "100px 20px 20px" }}>
           <div style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "460px" }}>
