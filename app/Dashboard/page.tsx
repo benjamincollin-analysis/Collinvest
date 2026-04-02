@@ -533,6 +533,8 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false });
   const [expenseErrors, setExpenseErrors] = useState<Record<string, boolean>>({});
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+  const [expandedProps, setExpandedProps] = useState<Set<number>>(new Set());
 
   const CATEGORIES = ["Mortgage", "Insurance", "Property Tax", "Repairs", "Management", "Utilities", "CapEx", "Other"];
 
@@ -545,10 +547,16 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
   async function handleAddExpense() {
     const errs: Record<string, boolean> = {}; if (!form.property_id) errs.property_id = true; if (!form.amount) errs.amount = true; if (Object.keys(errs).length > 0) { setExpenseErrors(errs); return; } setExpenseErrors({});
     const newExp = { user_id: user.id, property_id: parseInt(form.property_id), category: form.category, amount: parseFloat(form.amount), date: form.date, note: form.note, recurring: form.recurring };
-    const { data, error } = await supabase.from("expenses").insert(newExp).select().single();
-    console.log("INSERT RESULT:", data, "ERROR:", error);
-    if (!error && data) { setExpenses([data, ...expenses]); setShowForm(false); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }
+    if (editingExpenseId !== null) {
+      const { error } = await supabase.from("expenses").update(newExp).eq("id", editingExpenseId);
+      if (!error) { setExpenses(expenses.map(e => e.id === editingExpenseId ? { ...e, ...newExp, id: editingExpenseId } : e)); setShowForm(false); setEditingExpenseId(null); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }
+    } else {
+      const { data, error } = await supabase.from("expenses").insert(newExp).select().single();
+      if (!error && data) { setExpenses([data, ...expenses]); setShowForm(false); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }
+    }
   }
+  function openEditExpense(e: any) { setEditingExpenseId(e.id); setForm({ property_id: String(e.property_id), category: e.category, amount: String(e.amount), date: e.date, note: e.note || "", recurring: e.recurring || false }); setShowForm(true); }
+  function toggleProp(id: number) { setExpandedProps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   async function handleDelete(id: number) {
     await supabase.from("expenses").delete().eq("id", id);
@@ -611,7 +619,10 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
           <div key={p.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
               <div><h4 style={{ fontSize: "14px", fontWeight: "800" }}>{p.name}</h4><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{p.type}</p></div>
-              <span style={{ fontSize: "16px", fontWeight: "800", color: p.annualNet >= 0 ? "#34d399" : "#f87171" }}>{p.annualNet >= 0 ? "+" : ""}{fmtFull(p.annualNet)}/yr</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "16px", fontWeight: "800", color: p.annualNet >= 0 ? "#34d399" : "#f87171" }}>{p.annualNet >= 0 ? "+" : ""}{fmtFull(p.annualNet)}/yr</span>
+                <button onClick={() => toggleProp(p.id)} style={{ fontSize: "10px", padding: "3px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontWeight: "600" }}>{expandedProps.has(p.id) ? "▲ Hide" : "▼ Expenses"}</button>
+              </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px", marginBottom: "12px" }}>
               {[{ label: "Annual Income", value: fmtFull(p.annualRent), color: "#34d399" }, { label: "Annual Expenses", value: fmtFull(p.annualExp), color: "#f87171" }, { label: "Logged Costs", value: fmtFull(p.totalLogged), color: "#f59e0b" }].map(m => (
@@ -626,6 +637,24 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
               <div style={{ height: "100%", width: `${Math.min(100, p.annualRent > 0 ? (p.annualExp / p.annualRent) * 100 : 100)}%`, background: "#f87171", borderRadius: "999px" }} />
             </div>
             <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>Expense ratio: {p.annualRent > 0 ? ((p.annualExp / p.annualRent) * 100).toFixed(1) : "—"}%</p>
+            {expandedProps.has(p.id) && (
+              <div style={{ marginTop: "14px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "14px" }}>
+                {p.propExpenses.length === 0 ? <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "12px" }}>No expenses logged for this property.</p> : p.propExpenses.map((e: any) => (
+                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.02)", marginBottom: "6px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: `${CAT_COLORS[e.category] || "rgba(255,255,255,0.1)"}22`, color: CAT_COLORS[e.category] || "rgba(255,255,255,0.5)", fontWeight: "700" }}>{e.category}</span>
+                      <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{e.date}</span>
+                      {e.note && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>{e.note}</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "13px", fontWeight: "700", color: "#f87171" }}>{fmtFull(e.amount)}</span>
+                      <button onClick={() => openEditExpense(e)} style={{ fontSize: "10px", padding: "3px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>Edit</button>
+                      <button onClick={() => handleDelete(e.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -663,7 +692,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
                     <td style={{ padding: "12px 16px" }}><span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: `${CAT_COLORS[e.category] || "rgba(255,255,255,0.1)"}22`, color: CAT_COLORS[e.category] || "rgba(255,255,255,0.5)", fontWeight: "700" }}>{e.category}</span></td>
                     <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: "700", color: "#f87171" }}>{fmtFull(e.amount)}</td>
                     <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>{e.note || "—"}</td>
-                    <td style={{ padding: "12px 10px" }}><button onClick={() => handleDelete(e.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button></td>
+                    <td style={{ padding: "12px 10px" }}><div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}><button onClick={() => openEditExpense(e)} style={{ fontSize: "10px", padding: "3px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>Edit</button><button onClick={() => handleDelete(e.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button></div></td>
                   </tr>
                 );
               })}
@@ -677,8 +706,8 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, padding: "120px 20px 20px" }}>
           <div style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "460px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-              <h2 style={{ fontSize: "17px", fontWeight: "800" }}>Log Expense</h2>
-              <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
+              <h2 style={{ fontSize: "17px", fontWeight: "800" }}>{editingExpenseId !== null ? "Edit Expense" : "Log Expense"}</h2>
+              <button onClick={() => { setShowForm(false); setEditingExpenseId(null); setForm({ property_id: "", category: "Mortgage", amount: "", date: new Date().toISOString().split("T")[0], note: "", recurring: false }); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               <Field label="Property"><select value={form.property_id} onChange={e => { setForm({ ...form, property_id: e.target.value }); setExpenseErrors(f => ({ ...f, property_id: false })); }} style={{ ...IS, border: expenseErrors.property_id ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: expenseErrors.property_id ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }}><option value="">Select property...</option>{properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
