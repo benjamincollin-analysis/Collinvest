@@ -737,7 +737,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
             const borderColor = m.isCurrent ? "#f59e0b" : "transparent";
             return (
               <div key={m.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", height: "100%" }}>
-                <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
+                  <div title={`${m.label}: ${fmtMoney(val)}`} style={{ width: "100%", height: `${barH}%`, background: color, borderRadius: "4px 4px 0 0", border: `1px solid ${borderColor}`, boxShadow: m.isCurrent ? `0 0 8px rgba(245,158,11,0.4)` : "none", transition: "all 0.3s", cursor: "default", position: "relative", display: "flex", alignItems: "flex-start", justifyContent: "center" }}><span style={{ fontSize: "8px", fontWeight: "800", color: "#fff", opacity: 0.85, marginTop: "3px", whiteSpace: "nowrap", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{fmtMoney(val)}</span></div>
                   <div title={`${m.label}: ${fmtMoney(val)}`} style={{ width: "100%", height: `${barH}%`, background: color, borderRadius: "4px 4px 0 0", border: `1px solid ${borderColor}`, boxShadow: m.isCurrent ? `0 0 8px rgba(245,158,11,0.4)` : "none", transition: "all 0.3s", cursor: "default", position: "relative" }} />
                 </div>
                 <span style={{ fontSize: "9px", color: m.isCurrent ? "#f59e0b" : "rgba(255,255,255,0.25)", fontWeight: m.isCurrent ? "800" : "400", whiteSpace: "nowrap" }}>{m.label}</span>
