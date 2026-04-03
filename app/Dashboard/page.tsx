@@ -953,6 +953,371 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
 }
 
 
+function ProjectsTab({ user }: { user: any }) {
+  const PROJECT_TYPES = ["Renovation", "Rehabilitation", "Flip", "New Build", "Commercial", "Mixed-Use"];
+  const PHASE_TEMPLATES: Record<string, string[]> = {
+    "Renovation":     ["Planning", "Permits", "Demo", "Construction", "Finishing", "Inspection", "Delivery"],
+    "Rehabilitation": ["Assessment", "Planning", "Permits", "Structural", "Systems", "Finishing", "Certificate"],
+    "Flip":           ["Acquisition", "Planning", "Demo", "Construction", "Staging", "Listing", "Closing"],
+    "New Build":      ["Design", "Permits", "Foundation", "Framing", "MEP", "Finishing", "Inspection", "Handover"],
+    "Commercial":     ["Feasibility", "Design", "Permits", "Demo", "Construction", "Fit-Out", "Inspection", "Opening"],
+    "Mixed-Use":      ["Planning", "Permits", "Foundation", "Structure", "Residential", "Commercial", "Inspection", "Delivery"],
+  };
+  const STATUS_COLORS: Record<string, { color: string; bg: string; border: string }> = {
+    "not_started": { color: "rgba(255,255,255,0.4)", bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.1)" },
+    "in_progress": { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
+    "done":        { color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)" },
+    "delayed":     { color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" },
+  };
+  const STATUS_LABELS: Record<string, string> = { not_started: "⬜ Not Started", in_progress: "🟡 In Progress", done: "✅ Done", delayed: "🔴 Delayed" };
+  const TEAM_ROLES = ["Architect", "Contractor", "Project Manager", "Accountant", "Engineer", "Designer", "Inspector"];
+  const TRADE_CATEGORIES = ["Architecture", "Engineering", "Permits", "Demo", "Foundation", "Framing", "Plumbing", "Electrical", "HVAC", "Insulation", "Drywall", "Flooring", "Painting", "Roofing", "Windows", "Finishing", "Landscaping", "Other"];
+
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [activeSection, setActiveSection] = useState<Record<number, string>>({});
+  const [form, setForm] = useState({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
+  const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+
+  useEffect(() => { if (!user) return; loadProjects(); }, [user]);
+
+  async function loadProjects() {
+    const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setProjects((data || []).map(p => ({ ...p, phases: p.phases || [], team: p.team || [] })));
+    setLoading(false);
+  }
+
+  async function handleSave() {
+    if (!form.name) return;
+    const phases = PHASE_TEMPLATES[form.type || "Renovation"].map(name => ({ name, status: "not_started", date: "", note: "" }));
+    const payload = { user_id: user.id, name: form.name, type: form.type, address: form.address, budget: parseFloat(form.budget) || 0, spent: 0, start_date: form.start_date || null, end_date: form.end_date || null, notes: form.notes, phases, team: [] };
+    if (editingId !== null) {
+      const { error } = await supabase.from("projects").update({ name: form.name, type: form.type, address: form.address, budget: parseFloat(form.budget) || 0, start_date: form.start_date || null, end_date: form.end_date || null, notes: form.notes }).eq("id", editingId);
+      if (!error) await loadProjects();
+    } else {
+      const { error } = await supabase.from("projects").insert(payload);
+      if (!error) await loadProjects();
+    }
+    setShowForm(false); setEditingId(null); setForm({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
+  }
+
+  async function deleteProject(id: number) { await supabase.from("projects").delete().eq("id", id); setProjects(projects.filter(p => p.id !== id)); }
+
+  async function updatePhase(project: any, phaseIdx: number, updates: any) {
+    const phases = [...project.phases]; phases[phaseIdx] = { ...phases[phaseIdx], ...updates };
+    await supabase.from("projects").update({ phases }).eq("id", project.id);
+    setProjects(projects.map(p => p.id === project.id ? { ...p, phases } : p));
+  }
+
+  async function updateTeam(project: any, team: any[]) {
+    await supabase.from("projects").update({ team }).eq("id", project.id);
+    setProjects(projects.map(p => p.id === project.id ? { ...p, team } : p));
+  }
+
+  async function updateSpent(project: any, spent: number) {
+    await supabase.from("projects").update({ spent }).eq("id", project.id);
+    setProjects(projects.map(p => p.id === project.id ? { ...p, spent } : p));
+  }
+
+  function toggleExpand(id: number) { setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+
+  function healthScore(p: any) {
+    const done = p.phases.filter((ph: any) => ph.status === "done").length;
+    const total = p.phases.length || 1;
+    const phasePct = (done / total) * 100;
+    const budgetOk = p.budget > 0 ? Math.max(0, 100 - ((p.spent / p.budget) * 100)) : 50;
+    const delayed = p.phases.filter((ph: any) => ph.status === "delayed").length;
+    const delayPenalty = delayed * 15;
+    return Math.max(0, Math.min(100, Math.round((phasePct * 0.5) + (budgetOk * 0.3) + (50 * 0.2) - delayPenalty)));
+  }
+
+  function healthColor(score: number) { if (score >= 70) return "#34d399"; if (score >= 40) return "#f59e0b"; return "#f87171"; }
+  function fmtMoney(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + Math.round(n).toLocaleString("en-US"); return "$" + n.toFixed(0); }
+  function daysLeft(end: string) { if (!end) return null; const d = Math.ceil((new Date(end).getTime() - Date.now()) / 86400000); return d; }
+
+  const totalBudget = projects.reduce((s, p) => s + (p.budget || 0), 0);
+  const totalSpent = projects.reduce((s, p) => s + (p.spent || 0), 0);
+  const activeProjects = projects.filter(p => p.phases.some((ph: any) => ph.status === "in_progress"));
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 6px #a78bfa", animation: "blink 1.5s infinite" }} />
+            <span style={{ fontSize: "10px", color: "rgba(167,139,250,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Project Command Center · Construction & Development</span>
+          </div>
+          <h2 style={{ fontSize: "22px", fontWeight: "900", letterSpacing: "-0.5px" }}>Projects</h2>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "3px" }}>Timeline · Budget · Team · Health Score</p>
+        </div>
+        <button onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ New Project</button>
+      </div>
+
+      {/* Summary KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }}>
+        {[
+          { label: "Total Projects", value: String(projects.length), color: "#fff", sub: `${activeProjects.length} active` },
+          { label: "Total Budget", value: fmtMoney(totalBudget), color: "#a78bfa", sub: "across all projects" },
+          { label: "Total Spent", value: fmtMoney(totalSpent), color: "#f87171", sub: totalBudget > 0 ? `${((totalSpent / totalBudget) * 100).toFixed(1)}% of budget` : "no budget set" },
+          { label: "Remaining", value: fmtMoney(totalBudget - totalSpent), color: totalBudget > totalSpent ? "#34d399" : "#f87171", sub: "budget left" },
+        ].map(m => (
+          <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px 20px" }}>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px", fontWeight: "600" }}>{m.label}</p>
+            <p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{m.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Project Cards */}
+      {loading ? <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Loading...</p> : projects.length === 0 ? (
+        <div style={{ padding: "60px", textAlign: "center", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "20px" }}>
+          <p style={{ fontSize: "32px", marginBottom: "12px" }}>🏗️</p>
+          <p style={{ fontSize: "14px", fontWeight: "700", color: "rgba(255,255,255,0.5)", marginBottom: "6px" }}>No projects yet</p>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>Click "+ New Project" to start tracking your first construction or renovation.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {projects.map(p => {
+            const score = healthScore(p);
+            const hc = healthColor(score);
+            const doneCount = p.phases.filter((ph: any) => ph.status === "done").length;
+            const phasePct = p.phases.length > 0 ? (doneCount / p.phases.length) * 100 : 0;
+            const budgetPct = p.budget > 0 ? Math.min(100, (p.spent / p.budget) * 100) : 0;
+            const days = daysLeft(p.end_date);
+            const isExpanded = expanded.has(p.id);
+            const section = activeSection[p.id] || "timeline";
+            const delayedCount = p.phases.filter((ph: any) => ph.status === "delayed").length;
+
+            return (
+              <div key={p.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${hc}22`, borderRadius: "20px", overflow: "hidden" }}>
+                {/* Project Header */}
+                <div style={{ padding: "20px 24px", borderBottom: isExpanded ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
+                        {/* Health Score */}
+                        <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${hc}15`, border: `1px solid ${hc}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: "11px", fontWeight: "900", color: hc }}>{score}</span>
+                        </div>
+                        <div>
+                          <h3 style={{ fontSize: "16px", fontWeight: "800" }}>{p.name}</h3>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>
+                            {p.type}{p.address ? ` · ${p.address}` : ""}
+                            {days !== null && <span style={{ color: days < 0 ? "#f87171" : days < 14 ? "#f59e0b" : "rgba(255,255,255,0.3)", marginLeft: "8px", fontWeight: "700" }}>{days < 0 ? `⚠ ${Math.abs(days)}d overdue` : `${days}d left`}</span>}
+                          </p>
+                        </div>
+                        {delayedCount > 0 && <span style={{ fontSize: "10px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", padding: "2px 8px", borderRadius: "999px", fontWeight: "700" }}>🔴 {delayedCount} delayed</span>}
+                      </div>
+
+                      {/* Progress bars */}
+                      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: "120px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                            <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Progress</span>
+                            <span style={{ fontSize: "9px", color: hc, fontWeight: "700" }}>{doneCount}/{p.phases.length} phases · {phasePct.toFixed(0)}%</span>
+                          </div>
+                          <div style={{ height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}>
+                            <div style={{ height: "100%", width: `${phasePct}%`, background: hc, borderRadius: "999px", transition: "width 0.6s", boxShadow: `0 0 8px ${hc}44` }} />
+                          </div>
+                        </div>
+                        {p.budget > 0 && (
+                          <div style={{ flex: 1, minWidth: "120px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                              <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Budget</span>
+                              <span style={{ fontSize: "9px", color: budgetPct > 90 ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{fmtMoney(p.spent)} / {fmtMoney(p.budget)}</span>
+                            </div>
+                            <div style={{ height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}>
+                              <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : "#f59e0b", borderRadius: "999px", transition: "width 0.6s" }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
+                      <button onClick={() => { setEditingId(p.id); setForm({ name: p.name, type: p.type, address: p.address || "", budget: String(p.budget), start_date: p.start_date || "", end_date: p.end_date || "", notes: p.notes || "" }); setShowForm(true); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Edit</button>
+                      <button onClick={() => deleteProject(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer" }}>×</button>
+                      <button onClick={() => toggleExpand(p.id)} style={{ fontSize: "11px", padding: "5px 14px", background: isExpanded ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.06)", border: `1px solid ${isExpanded ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: isExpanded ? "#a78bfa" : "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "700" }}>{isExpanded ? "▲ Close" : "▼ Open"}</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div>
+                    {/* Section tabs */}
+                    <div style={{ display: "flex", gap: "2px", padding: "12px 24px", background: "rgba(0,0,0,0.2)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                      {[{ key: "timeline", label: "🗂 Timeline" }, { key: "budget", label: "💰 Budget" }, { key: "team", label: "👷 Team" }].map(s => (
+                        <button key={s.key} onClick={() => setActiveSection({ ...activeSection, [p.id]: s.key })} style={{ padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", border: "none", cursor: "pointer", background: section === s.key ? "rgba(167,139,250,0.15)" : "transparent", color: section === s.key ? "#a78bfa" : "rgba(255,255,255,0.35)" }}>{s.label}</button>
+                      ))}
+                    </div>
+
+                    {/* TIMELINE */}
+                    {section === "timeline" && (
+                      <div style={{ padding: "24px" }}>
+                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "16px" }}>Phase Timeline <span style={{ color: "rgba(255,255,255,0.15)", fontWeight: "400", letterSpacing: "0", textTransform: "none" }}>· click status to update · add dates manually</span></p>
+
+                        {/* Visual timeline line */}
+                        <div style={{ position: "relative", marginBottom: "24px", overflowX: "auto", paddingBottom: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", minWidth: `${p.phases.length * 110}px` }}>
+                            {p.phases.map((ph: any, i: number) => {
+                              const sc = STATUS_COLORS[ph.status] || STATUS_COLORS.not_started;
+                              const isLast = i === p.phases.length - 1;
+                              return (
+                                <div key={i} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "90px" }}>
+                                    <div onClick={() => { const statuses = ["not_started","in_progress","done","delayed"]; const next = statuses[(statuses.indexOf(ph.status) + 1) % statuses.length]; updatePhase(p, i, { status: next }); }} style={{ width: "32px", height: "32px", borderRadius: "50%", background: sc.bg, border: `2px solid ${sc.color}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: ph.status === "in_progress" ? `0 0 10px ${sc.color}66` : "none", transition: "all 0.2s" }}>
+                                      <span style={{ fontSize: "10px" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : "○"}</span>
+                                    </div>
+                                    <span style={{ fontSize: "9px", color: sc.color, fontWeight: "700", textAlign: "center", whiteSpace: "nowrap" }}>{ph.name}</span>
+                                    <input type="date" value={ph.date || ""} onChange={e => updatePhase(p, i, { date: e.target.value })} style={{ fontSize: "8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px", color: "rgba(255,255,255,0.3)", padding: "2px 4px", width: "80px", outline: "none", fontFamily: "inherit" }} />
+                                  </div>
+                                  {!isLast && <div style={{ flex: 1, height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px", marginBottom: "28px" }} />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Phase detail list */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {p.phases.map((ph: any, i: number) => {
+                            const sc = STATUS_COLORS[ph.status] || STATUS_COLORS.not_started;
+                            return (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: `1px solid ${sc.color}22` }}>
+                                <span style={{ fontSize: "11px", fontWeight: "700", color: sc.color, minWidth: "100px" }}>{ph.name}</span>
+                                <select value={ph.status} onChange={e => updatePhase(p, i, { status: e.target.value })} style={{ fontSize: "10px", background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: "6px", color: sc.color, padding: "3px 8px", cursor: "pointer", fontWeight: "700", outline: "none", fontFamily: "inherit" }}>
+                                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                </select>
+                                <input type="date" value={ph.date || ""} onChange={e => updatePhase(p, i, { date: e.target.value })} style={{ fontSize: "11px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", padding: "4px 8px", outline: "none", fontFamily: "inherit" }} />
+                                <input type="text" placeholder="Note..." value={ph.note || ""} onChange={e => updatePhase(p, i, { note: e.target.value })} style={{ flex: 1, fontSize: "11px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", padding: "4px 10px", outline: "none", fontFamily: "inherit" }} />
+              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BUDGET */}
+                    {section === "budget" && (
+                      <div style={{ padding: "24px" }}>
+                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "16px" }}>Budget & Comptes des Travaux <span style={{ color: "rgba(255,255,255,0.15)", fontWeight: "400", letterSpacing: "0", textTransform: "none" }}>· quote vs actual per trade</span></p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
+                          {[{ label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa" }, { label: "Spent", value: fmtMoney(p.spent), color: "#f87171" }, { label: "Remaining", value: fmtMoney(p.budget - p.spent), color: p.budget > p.spent ? "#34d399" : "#f87171" }].map(m => (
+                            <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "16px" }}>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>{m.label}</p>
+                              <p style={{ fontSize: "20px", fontWeight: "800", color: m.color }}>{m.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Budget bar */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <div style={{ height: "8px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : "#f59e0b", borderRadius: "999px", transition: "width 0.6s" }} />
+                          </div>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{budgetPct.toFixed(1)}% of budget used</p>
+                        </div>
+                        {/* Update spent */}
+                        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", padding: "14px" }}>
+                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>Update total spent:</span>
+                          <input type="number" placeholder={String(p.spent)} onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateSpent(p, v); e.target.value = ""; }} style={{ flex: 1, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>press Tab/click out to save</span>
+                        </div>
+                        {/* Trade breakdown placeholder */}
+                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "10px" }}>Trade Breakdown</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
+                          {TRADE_CATEGORIES.slice(0, 9).map(cat => (
+                            <div key={cat} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "10px 12px" }}>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{cat}</p>
+                              <p style={{ fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.3)" }}>— / —</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TEAM */}
+                    {section === "team" && (
+                      <div style={{ padding: "24px" }}>
+                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "16px" }}>Team & Intervenants</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                          {p.team.length === 0 && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px" }}>No team members added yet.</p>}
+                          {p.team.map((member: any, i: number) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#a78bfa", flexShrink: 0 }}>{(member.name?.[0] || "?").toUpperCase()}</div>
+                              <div style={{ flex: 1 }}>
+                                <p style={{ fontSize: "13px", fontWeight: "700" }}>{member.name}</p>
+                                <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{member.role} {member.contact ? `· ${member.contact}` : ""}</p>
+                              </div>
+                              <button onClick={() => { const t = p.team.filter((_: any, j: number) => j !== i); updateTeam(p, t); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Add team member */}
+                        <AddTeamMember roles={TEAM_ROLES} onAdd={(member: any) => updateTeam(p, [...p.team, member])} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add/Edit Project Modal */}
+      {showForm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, padding: "80px 20px 20px" }}>
+          <div style={{ background: "#0f0f0f", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "17px", fontWeight: "800" }}>{editingId !== null ? "Edit Project" : "New Project"}</h2>
+              <button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <Field label="Project Name"><input type="text" placeholder="e.g. 14 Maple Street Renovation" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={IS} /></Field>
+              <Field label="Project Type">
+                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>
+                  {PROJECT_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Address"><input type="text" placeholder="e.g. 14 Maple Street, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={IS} /></Field>
+              <Field label="Total Budget ($)"><input type="number" placeholder="150000" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} style={IS} /></Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <Field label="Start Date"><input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} style={IS} /></Field>
+                <Field label="End Date"><input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} style={IS} /></Field>
+              </div>
+              <Field label="Notes (optional)"><textarea placeholder="Project details, objectives, special requirements..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...IS, height: "80px", resize: "vertical" }} /></Field>
+            </div>
+            <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
+              <button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
+              <button onClick={handleSave} style={{ flex: 1, padding: "12px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>{editingId !== null ? "Save Changes" : "Create Project"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddTeamMember({ roles, onAdd }: { roles: string[]; onAdd: (m: any) => void }) {
+  const [name, setName] = useState(""); const [role, setRole] = useState(roles[0]); const [contact, setContact] = useState("");
+  const IS: React.CSSProperties = { background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", color: "#fff", outline: "none", fontFamily: "inherit" };
+  return (
+    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.1)", borderRadius: "12px", padding: "12px" }}>
+      <input type="text" placeholder="Name" value={name} onChange={e => setName(e.target.value)} style={{ ...IS, flex: 2, minWidth: "100px" }} />
+      <select value={role} onChange={e => setRole(e.target.value)} style={{ ...IS, flex: 2, minWidth: "100px" }}>{roles.map(r => <option key={r}>{r}</option>)}</select>
+      <input type="text" placeholder="Contact / Email" value={contact} onChange={e => setContact(e.target.value)} style={{ ...IS, flex: 2, minWidth: "100px" }} />
+      <button onClick={() => { if (!name) return; onAdd({ name, role, contact }); setName(""); setContact(""); }} style={{ padding: "8px 16px", background: "#a78bfa", color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>+ Add</button>
+    </div>
+  );
+}
+
+
 function NotificationBell({ user, properties }: { user: any; properties: Property[] }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -1087,5 +1452,6 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
+
 
 
