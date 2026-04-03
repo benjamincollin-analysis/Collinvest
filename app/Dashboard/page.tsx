@@ -130,7 +130,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"portfolio" | "map" | "projections" | "finances" | "market">("portfolio");
+  const [activeTab, setActiveTab] = useState<"portfolio" | "map" | "projections" | "finances" | "market" | "projects">("portfolio");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -212,7 +212,7 @@ export default function Dashboard() {
           <span style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>GOLDSTREAM</span>
           <span style={{ fontSize: "9px", fontWeight: "600", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>BETA</span>
         </div>
-        <div className="gs-tabs">{(["portfolio", "map", "projections", "finances", "market"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
+        <div className="gs-tabs">{(["portfolio", "projections", "finances", "market", "projects"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
           <NotificationBell user={user} properties={properties} />
@@ -233,20 +233,20 @@ export default function Dashboard() {
       </div>
 
       <div className="gs-main">
-        {activeTab === "portfolio" && <>
-          <div className="gs-grid-2">
-            <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} />
-            <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
-          </div>
-          <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f59e0b" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171" }, { label: "Properties", value: String(properties.length), color: "#fff" }].map((m) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "20px" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>{m.label}</p><p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p></div>))}</div>
-          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
-          {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
-        </>}
+        {activeTab === "portfolio" && <><div className="gs-grid-2"><GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} /><GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} /></div><div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f59e0b" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171" }, { label: "Properties", value: String(properties.length), color: "#fff" }].map((m) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "20px" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>{m.label}</p><p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p></div>))}</div><div style={{ marginBottom: "20px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>All portfolio properties</p></div><button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "11px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "700" }}>⤢ Pop Out Map</button></div><TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} /></div><PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />{active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}</>
 
-        {activeTab === "map" && <>
-          <div className="gs-map-header"><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>All portfolio properties — live from database.</p></div><button onClick={openAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer", flexShrink: 0 }}>+ Add Property</button></div>
-          <TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />
-          {active && <div style={{ marginTop: "16px" }}><PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} /></div>}
+
+
+
+
+
+
+
+
+
+
+
+
         </>}
 
         {activeTab === "projections" && <>
@@ -266,8 +266,8 @@ export default function Dashboard() {
         </>}
 
         {activeTab === "market" && <MarketInline />}
-{activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
-      </div>
+        {activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
+        {activeTab === "projects" && <ProjectsTab user={user} />}
 
       {confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
       {showAddScenarioProp && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div className="gs-modal" style={{ border: "1px solid rgba(96,165,250,0.25)" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Hypothetical Property</h2><button onClick={() => setShowAddScenarioProp(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Name"><input type="text" value={scenPropForm.name} onChange={e => setScenPropForm(f => ({ ...f, name: e.target.value }))} style={IS} /></Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="300000" value={scenPropForm.value || ""} onChange={e => setScenPropForm(f => ({ ...f, value: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Mortgage ($)"><input type="number" placeholder="240000" value={scenPropForm.mortgage || ""} onChange={e => setScenPropForm(f => ({ ...f, mortgage: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="2000" value={scenPropForm.rent || ""} onChange={e => setScenPropForm(f => ({ ...f, rent: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="400" value={scenPropForm.expenses || ""} onChange={e => setScenPropForm(f => ({ ...f, expenses: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={scenPropForm.appreciation} onChange={e => setScenPropForm(f => ({ ...f, appreciation: parseFloat(e.target.value) || 3.5 }))} style={IS} /></Field></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => setShowAddScenarioProp(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={addScenarioProp} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Add to Scenario</button></div></div></div>)}
