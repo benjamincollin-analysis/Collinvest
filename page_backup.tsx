@@ -130,7 +130,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"portfolio" | "projections" | "finances" | "market" | "projects">("portfolio");
+  const [activeTab, setActiveTab] = useState<"portfolio" | "map" | "projections" | "finances" | "market">("portfolio");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -212,7 +212,7 @@ export default function Dashboard() {
           <span style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>GOLDSTREAM</span>
           <span style={{ fontSize: "9px", fontWeight: "600", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>BETA</span>
         </div>
-        <div className="gs-tabs">{(["portfolio", "projections", "finances", "market", "projects"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
+        <div className="gs-tabs">{(["portfolio", "map", "projections", "finances", "market"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
           <NotificationBell user={user} properties={properties} />
@@ -239,7 +239,7 @@ export default function Dashboard() {
             <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
           </div>
           <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f59e0b" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171" }, { label: "Properties", value: String(properties.length), color: "#fff" }].map((m) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "20px" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>{m.label}</p><p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p></div>))}</div>
-          <div style={{ marginBottom: "20px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>All portfolio properties</p></div><button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "11px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "700" }}>⤢ Pop Out Map</button></div><TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} /></div>          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
+          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
 
@@ -265,7 +265,7 @@ export default function Dashboard() {
           </div>
         </>}
 
-        {activeTab === "market" && <MarketInline />}{activeTab === "projects" && <ProjectsTab user={user} />}
+        {activeTab === "market" && <MarketInline />}
 {activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
       </div>
 
@@ -951,8 +951,6 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
     </div>
   );
 }
-
-
 function NotificationBell({ user, properties }: { user: any; properties: Property[] }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -1087,5 +1085,3 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
-
-
