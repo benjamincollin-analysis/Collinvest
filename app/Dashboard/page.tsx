@@ -243,11 +243,7 @@ export default function Dashboard() {
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
 
-        {activeTab === "map" && <>
-          <div className="gs-map-header"><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>All portfolio properties — live from database.</p></div><button onClick={openAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer", flexShrink: 0 }}>+ Add Property</button></div>
-          <TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />
-          {active && <div style={{ marginTop: "16px" }}><PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} /></div>}
-        </>}
+
 
         {activeTab === "projections" && <>
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px", padding: "24px", marginBottom: "20px" }}>
@@ -1452,6 +1448,7 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
+
 
 
 
