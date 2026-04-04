@@ -975,6 +975,7 @@ function ProjectsTab({ user }: { user: any }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [activeSection, setActiveSection] = useState<Record<number, string>>({});
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
@@ -982,7 +983,9 @@ function ProjectsTab({ user }: { user: any }) {
 
   async function loadProjects() {
     const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    setProjects((data || []).map(p => ({ ...p, phases: p.phases || [], team: p.team || [] })));
+    const loaded = (data || []).map(p => ({ ...p, phases: p.phases || [], team: p.team || [], trades: p.trades || [] }));
+    setProjects(loaded);
+    setExpanded(new Set(loaded.map((p: any) => p.id)));
     setLoading(false);
   }
 
@@ -1016,6 +1019,23 @@ function ProjectsTab({ user }: { user: any }) {
   async function updateSpent(project: any, spent: number) {
     await supabase.from("projects").update({ spent }).eq("id", project.id);
     setProjects(projects.map(p => p.id === project.id ? { ...p, spent } : p));
+  }
+
+  async function updateTrades(project: any, trades: any[]) {
+    await supabase.from("projects").update({ trades }).eq("id", project.id);
+    setProjects(projects.map(p => p.id === project.id ? { ...p, trades } : p));
+  }
+
+  function generateMemberToken(projectId: number, memberIndex: number) {
+    return btoa(`gs_member_${projectId}_${memberIndex}_${Date.now()}`).replace(/=/g, "");
+  }
+
+  function copyMemberLink(project: any, memberIndex: number) {
+    const token = generateMemberToken(project.id, memberIndex);
+    const url = `${window.location.origin}/team/${token}?pid=${project.id}&mi=${memberIndex}&pname=${encodeURIComponent(project.name)}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(`${project.id}_${memberIndex}`);
+    setTimeout(() => setCopiedLink(null), 2000);
   }
 
   function toggleExpand(id: number) { setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
@@ -1110,25 +1130,25 @@ function ProjectsTab({ user }: { user: any }) {
                         {delayedCount > 0 && <span style={{ fontSize: "10px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", padding: "2px 8px", borderRadius: "999px", fontWeight: "700" }}>🔴 {delayedCount} delayed</span>}
                       </div>
 
-                      {/* Progress bars */}
-                      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                        <div style={{ flex: 1, minWidth: "120px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                            <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Progress</span>
-                            <span style={{ fontSize: "9px", color: hc, fontWeight: "700" }}>{doneCount}/{p.phases.length} phases · {phasePct.toFixed(0)}%</span>
+                      {/* Progress bars — bigger */}
+                      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "8px" }}>
+                        <div style={{ flex: 1, minWidth: "140px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Progress</span>
+                            <span style={{ fontSize: "13px", color: hc, fontWeight: "800" }}>{doneCount}/{p.phases.length} · {phasePct.toFixed(0)}%</span>
                           </div>
-                          <div style={{ height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}>
-                            <div style={{ height: "100%", width: `${phasePct}%`, background: hc, borderRadius: "999px", transition: "width 0.6s", boxShadow: `0 0 8px ${hc}44` }} />
+                          <div style={{ height: "10px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }}>
+                            <div style={{ height: "100%", width: `${phasePct}%`, background: hc, borderRadius: "999px", transition: "width 0.6s", boxShadow: `0 0 12px ${hc}66` }} />
                           </div>
                         </div>
                         {p.budget > 0 && (
-                          <div style={{ flex: 1, minWidth: "120px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                              <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Budget</span>
-                              <span style={{ fontSize: "9px", color: budgetPct > 90 ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{fmtMoney(p.spent)} / {fmtMoney(p.budget)}</span>
+                          <div style={{ flex: 1, minWidth: "140px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Budget</span>
+                              <span style={{ fontSize: "13px", color: budgetPct > 90 ? "#f87171" : "#f59e0b", fontWeight: "800" }}>{fmtMoney(p.spent)} / {fmtMoney(p.budget)}</span>
                             </div>
-                            <div style={{ height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px" }}>
-                              <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : "#f59e0b", borderRadius: "999px", transition: "width 0.6s" }} />
+                            <div style={{ height: "10px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }}>
+                              <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : "#f59e0b", borderRadius: "999px", transition: "width 0.6s", boxShadow: budgetPct > 90 ? "0 0 12px rgba(248,113,113,0.5)" : "0 0 12px rgba(245,158,11,0.4)" }} />
                             </div>
                           </div>
                         )}
@@ -1202,59 +1222,117 @@ function ProjectsTab({ user }: { user: any }) {
                     {/* BUDGET */}
                     {section === "budget" && (
                       <div style={{ padding: "24px" }}>
-                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "16px" }}>Budget & Comptes des Travaux <span style={{ color: "rgba(255,255,255,0.15)", fontWeight: "400", letterSpacing: "0", textTransform: "none" }}>· quote vs actual per trade</span></p>
+                        {/* KPI strip */}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
-                          {[{ label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa" }, { label: "Spent", value: fmtMoney(p.spent), color: "#f87171" }, { label: "Remaining", value: fmtMoney(p.budget - p.spent), color: p.budget > p.spent ? "#34d399" : "#f87171" }].map(m => (
-                            <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "16px" }}>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>{m.label}</p>
-                              <p style={{ fontSize: "20px", fontWeight: "800", color: m.color }}>{m.value}</p>
+                          {[
+                            { label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa", sub: "project ceiling" },
+                            { label: "Spent", value: fmtMoney(p.spent), color: "#f87171", sub: `${budgetPct.toFixed(1)}% used` },
+                            { label: "Remaining", value: fmtMoney(Math.max(0, p.budget - p.spent)), color: p.budget > p.spent ? "#34d399" : "#f87171", sub: p.budget > p.spent ? "on budget" : "over budget ⚠" },
+                          ].map(m => (
+                            <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.color}22`, borderRadius: "14px", padding: "18px 20px" }}>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: "600" }}>{m.label}</p>
+                              <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px" }}>{m.value}</p>
+                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{m.sub}</p>
                             </div>
                           ))}
                         </div>
+
                         {/* Budget bar */}
                         <div style={{ marginBottom: "20px" }}>
-                          <div style={{ height: "8px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : "#f59e0b", borderRadius: "999px", transition: "width 0.6s" }} />
+                          <div style={{ height: "10px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : budgetPct > 70 ? "#f59e0b" : "#34d399", borderRadius: "999px", transition: "width 0.6s", boxShadow: budgetPct > 90 ? "0 0 12px rgba(248,113,113,0.5)" : "0 0 12px rgba(245,158,11,0.4)" }} />
                           </div>
-                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{budgetPct.toFixed(1)}% of budget used</p>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>$0</span>
+                            <span style={{ fontSize: "10px", color: budgetPct > 90 ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{budgetPct.toFixed(1)}% spent</span>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>{fmtMoney(p.budget)}</span>
+                          </div>
                         </div>
+
                         {/* Update spent */}
-                        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", padding: "14px" }}>
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>Update total spent:</span>
-                          <input type="number" placeholder={String(p.spent)} onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateSpent(p, v); e.target.value = ""; }} style={{ flex: 1, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>press Tab/click out to save</span>
+                        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "24px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px", padding: "14px" }}>
+                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>💸 Update total spent:</span>
+                          <input type="number" placeholder={String(p.spent)} onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateSpent(p, v); e.target.value = ""; }} style={{ flex: 1, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 14px", fontSize: "15px", fontWeight: "700", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Tab/click out to save</span>
                         </div>
-                        {/* Trade breakdown placeholder */}
-                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "10px" }}>Trade Breakdown</p>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
-                          {TRADE_CATEGORIES.slice(0, 9).map(cat => (
-                            <div key={cat} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "10px 12px" }}>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{cat}</p>
-                              <p style={{ fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.3)" }}>— / —</p>
-                            </div>
-                          ))}
+
+                        {/* Trade Breakdown — editable */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Trade Breakdown <span style={{ color: "rgba(255,255,255,0.2)", textTransform: "none", letterSpacing: "0", fontWeight: "400" }}>· quote vs actual</span></p>
+                          <button onClick={() => { const newTrades = [...(p.trades || []), { name: "New Trade", quoted: 0, actual: 0, assignedTo: "" }]; updateTrades(p, newTrades); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "6px", color: "#a78bfa", cursor: "pointer", fontWeight: "700" }}>+ Add Trade</button>
                         </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }}>
+                          {(p.trades && p.trades.length > 0 ? p.trades : TRADE_CATEGORIES.slice(0, 6).map((name: string) => ({ name, quoted: 0, actual: 0, assignedTo: "" }))).map((trade: any, ti: number) => {
+                            const over = trade.actual > trade.quoted && trade.quoted > 0;
+                            const tradeColor = over ? "#f87171" : trade.actual > 0 ? "#34d399" : "rgba(255,255,255,0.3)";
+                            return (
+                              <div key={ti} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "12px", padding: "14px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                                  <input value={trade.name} onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], name: e.target.value }; updateTrades(p, t); }} style={{ fontSize: "11px", fontWeight: "800", color: "#fff", background: "none", border: "none", outline: "none", fontFamily: "inherit", width: "100%", textTransform: "uppercase", letterSpacing: "0.8px" }} />
+                                  <button onClick={() => { const t = (p.trades || []).filter((_: any, i: number) => i !== ti); updateTrades(p, t); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "14px", flexShrink: 0 }}>×</button>
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                                  <div>
+                                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>QUOTED</p>
+                                    <input type="number" value={trade.quoted || ""} placeholder="0" onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], quoted: parseFloat(e.target.value) || 0 }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 8px", fontSize: "13px", fontWeight: "700", color: "#f59e0b", outline: "none", fontFamily: "inherit" }} />
+                                  </div>
+                                  <div>
+                                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>ACTUAL</p>
+                                    <input type="number" value={trade.actual || ""} placeholder="0" onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], actual: parseFloat(e.target.value) || 0 }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 8px", fontSize: "13px", fontWeight: "700", color: tradeColor, outline: "none", fontFamily: "inherit" }} />
+                                  </div>
+                                </div>
+                                {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700" }}>⚠ Over by {fmtMoney(trade.actual - trade.quoted)}</p>}
+                                {trade.quoted > 0 && !over && trade.actual > 0 && <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "700" }}>✓ Under by {fmtMoney(trade.quoted - trade.actual)}</p>}
+                                <div style={{ marginTop: "8px" }}>
+                                  <select value={trade.assignedTo || ""} onChange={e => { const t = [...(p.trades || [])]; t[ti] = { ...t[ti], assignedTo: e.target.value }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "4px 8px", fontSize: "10px", color: "rgba(255,255,255,0.5)", outline: "none", fontFamily: "inherit" }}>
+                                    <option value="">— Assign to team member —</option>
+                                    {p.team.map((m: any, mi: number) => <option key={mi} value={m.name}>{m.name} · {m.role}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Trade totals */}
+                        {p.trades && p.trades.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px", padding: "12px 16px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.1)", borderRadius: "10px" }}>
+                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>TOTAL QUOTED</p><p style={{ fontSize: "16px", fontWeight: "800", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p></div>
+                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>TOTAL ACTUAL</p><p style={{ fontSize: "16px", fontWeight: "800", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p></div>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* TEAM */}
                     {section === "team" && (
                       <div style={{ padding: "24px" }}>
-                        <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "16px" }}>Team & Intervenants</p>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
-                          {p.team.length === 0 && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px" }}>No team members added yet.</p>}
-                          {p.team.map((member: any, i: number) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
-                              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#a78bfa", flexShrink: 0 }}>{(member.name?.[0] || "?").toUpperCase()}</div>
-                              <div style={{ flex: 1 }}>
-                                <p style={{ fontSize: "13px", fontWeight: "700" }}>{member.name}</p>
-                                <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{member.role} {member.contact ? `· ${member.contact}` : ""}</p>
-                              </div>
-                              <button onClick={() => { const t = p.team.filter((_: any, j: number) => j !== i); updateTeam(p, t); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px" }}>×</button>
-                            </div>
-                          ))}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600" }}>Team & Intervenants</p>
+                          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>Share link → member sees only their info</span>
                         </div>
-                        {/* Add team member */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
+                          {p.team.length === 0 && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px" }}>No team members added yet.</p>}
+                          {p.team.map((member: any, i: number) => {
+                            const assignedTrades = (p.trades || []).filter((t: any) => t.assignedTo === member.name);
+                            const linkKey = `${p.id}_${i}`;
+                            return (
+                              <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "14px", overflow: "hidden" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px" }}>
+                                  <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "#a78bfa", flexShrink: 0 }}>{(member.name?.[0] || "?").toUpperCase()}</div>
+                                  <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: "14px", fontWeight: "800" }}>{member.name}</p>
+                                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{member.role}{member.contact ? ` · ${member.contact}` : ""}</p>
+                                    {assignedTrades.length > 0 && <p style={{ fontSize: "10px", color: "#a78bfa", marginTop: "3px" }}>📋 {assignedTrades.map((t: any) => t.name).join(", ")}</p>}
+                                  </div>
+                                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                    <button onClick={() => copyMemberLink(p, i)} style={{ fontSize: "11px", padding: "6px 12px", background: copiedLink === linkKey ? "rgba(52,211,153,0.15)" : "rgba(167,139,250,0.1)", border: `1px solid ${copiedLink === linkKey ? "rgba(52,211,153,0.3)" : "rgba(167,139,250,0.25)"}`, borderRadius: "8px", color: copiedLink === linkKey ? "#34d399" : "#a78bfa", cursor: "pointer", fontWeight: "700", whiteSpace: "nowrap" }}>{copiedLink === linkKey ? "✓ Copied!" : "🔗 Share Link"}</button>
+                                    <button onClick={() => { const t = p.team.filter((_: any, j: number) => j !== i); updateTeam(p, t); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "18px" }}>×</button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                         <AddTeamMember roles={TEAM_ROLES} onAdd={(member: any) => updateTeam(p, [...p.team, member])} />
                       </div>
                     )}
