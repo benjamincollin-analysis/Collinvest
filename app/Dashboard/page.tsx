@@ -983,7 +983,7 @@ function ProjectsTab({ user }: { user: any }) {
 
   async function loadProjects() {
     const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    const loaded = (data || []).map(p => ({ ...p, phases: p.phases || [], team: p.team || [], trades: p.trades || [] }));
+    const loaded = (data || []).map(p => ({ ...p, phases: p.phases || [], team: p.team || [], trades: p.trades || [], budgetHistory: p.budget_history || [] }));
     setProjects(loaded);
     setExpanded(new Set(loaded.map((p: any) => p.id)));
     setLoading(false);
@@ -1219,8 +1219,9 @@ function ProjectsTab({ user }: { user: any }) {
                       </div>
                     )}
 
-                    {/* BUDGET */}
-                    {section === "budget" && (
+                    )}
+
+                    {/* TEAM */}
                       <div style={{ padding: "24px" }}>
                         {/* KPI strip */}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
@@ -1249,55 +1250,63 @@ function ProjectsTab({ user }: { user: any }) {
                           </div>
                         </div>
 
-                        {/* Update spent */}
-                        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "24px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px", padding: "14px" }}>
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>💸 Update total spent:</span>
-                          <input type="number" placeholder={String(p.spent)} onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) updateSpent(p, v); e.target.value = ""; }} style={{ flex: 1, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 14px", fontSize: "15px", fontWeight: "700", color: "#fff", outline: "none", fontFamily: "inherit" }} />
-                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Tab/click out to save</span>
-                        </div>
+                        {/* Log Spend Entry */}
+                        <LogSpendEntry project={p} onLog={(entry: any) => {
+                          const history = [...(p.budgetHistory || []), entry];
+                          const newSpent = p.spent + entry.amount;
+                          supabase.from("projects").update({ budget_history: history, spent: newSpent }).eq("id", p.id);
+                          setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: history, spent: newSpent } : pr));
+                        }} team={p.team} trades={p.trades || []} />
 
-                        {/* Trade Breakdown — editable */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Trade Breakdown <span style={{ color: "rgba(255,255,255,0.2)", textTransform: "none", letterSpacing: "0", fontWeight: "400" }}>· quote vs actual</span></p>
+                        {/* Trade Breakdown */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", marginTop: "24px" }}>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Trade Breakdown <span style={{ color: "rgba(255,255,255,0.2)", textTransform: "none", letterSpacing: "0", fontWeight: "400" }}>· quoted vs actual · press Enter to save</span></p>
                           <button onClick={() => { const newTrades = [...(p.trades || []), { name: "New Trade", quoted: 0, actual: 0, assignedTo: "" }]; updateTrades(p, newTrades); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "6px", color: "#a78bfa", cursor: "pointer", fontWeight: "700" }}>+ Add Trade</button>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }}>
                           {(p.trades && p.trades.length > 0 ? p.trades : TRADE_CATEGORIES.slice(0, 6).map((name: string) => ({ name, quoted: 0, actual: 0, assignedTo: "" }))).map((trade: any, ti: number) => {
+                            const trades = p.trades && p.trades.length > 0 ? p.trades : TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" }));
                             const over = trade.actual > trade.quoted && trade.quoted > 0;
                             const tradeColor = over ? "#f87171" : trade.actual > 0 ? "#34d399" : "rgba(255,255,255,0.3)";
                             return (
-                              <div key={ti} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "12px", padding: "14px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                                  <input value={trade.name} onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], name: e.target.value }; updateTrades(p, t); }} style={{ fontSize: "11px", fontWeight: "800", color: "#fff", background: "none", border: "none", outline: "none", fontFamily: "inherit", width: "100%", textTransform: "uppercase", letterSpacing: "0.8px" }} />
-                                  <button onClick={() => { const t = (p.trades || []).filter((_: any, i: number) => i !== ti); updateTrades(p, t); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "14px", flexShrink: 0 }}>×</button>
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                                  <div>
-                                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>QUOTED</p>
-                                    <input type="number" value={trade.quoted || ""} placeholder="0" onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], quoted: parseFloat(e.target.value) || 0 }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 8px", fontSize: "13px", fontWeight: "700", color: "#f59e0b", outline: "none", fontFamily: "inherit" }} />
-                                  </div>
-                                  <div>
-                                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>ACTUAL</p>
-                                    <input type="number" value={trade.actual || ""} placeholder="0" onChange={e => { const t = [...(p.trades || TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" })))]; t[ti] = { ...t[ti], actual: parseFloat(e.target.value) || 0 }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 8px", fontSize: "13px", fontWeight: "700", color: tradeColor, outline: "none", fontFamily: "inherit" }} />
-                                  </div>
-                                </div>
-                                {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700" }}>⚠ Over by {fmtMoney(trade.actual - trade.quoted)}</p>}
-                                {trade.quoted > 0 && !over && trade.actual > 0 && <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "700" }}>✓ Under by {fmtMoney(trade.quoted - trade.actual)}</p>}
-                                <div style={{ marginTop: "8px" }}>
-                                  <select value={trade.assignedTo || ""} onChange={e => { const t = [...(p.trades || [])]; t[ti] = { ...t[ti], assignedTo: e.target.value }; updateTrades(p, t); }} style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "4px 8px", fontSize: "10px", color: "rgba(255,255,255,0.5)", outline: "none", fontFamily: "inherit" }}>
-                                    <option value="">— Assign to team member —</option>
-                                    {p.team.map((m: any, mi: number) => <option key={mi} value={m.name}>{m.name} · {m.role}</option>)}
-                                  </select>
-                                </div>
-                              </div>
+                              <TradeCard
+                                key={ti}
+                                trade={trade}
+                                index={ti}
+                                tradeColor={tradeColor}
+                                over={over}
+                                team={p.team}
+                                onUpdate={(updated: any) => { const t = [...trades]; t[ti] = updated; updateTrades(p, t); }}
+                                onDelete={() => { const t = trades.filter((_: any, i: number) => i !== ti); updateTrades(p, t); }}
+                                fmtMoney={fmtMoney}
+                              />
                             );
                           })}
                         </div>
-                        {/* Trade totals */}
+
                         {p.trades && p.trades.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px", padding: "12px 16px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.1)", borderRadius: "10px" }}>
-                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>TOTAL QUOTED</p><p style={{ fontSize: "16px", fontWeight: "800", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p></div>
-                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px" }}>TOTAL ACTUAL</p><p style={{ fontSize: "16px", fontWeight: "800", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p></div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px", padding: "14px 18px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px" }}>
+                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Quoted</p><p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p></div>
+                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Actual</p><p style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p></div>
+                          </div>
+                        )}
+
+                        {p.budgetHistory && p.budgetHistory.length > 0 && (
+                          <div style={{ marginTop: "24px" }}>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "10px" }}>📋 Spend History</p>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              {[...(p.budgetHistory || [])].reverse().map((entry: any, ei: number) => (
+                                <div key={ei} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", flexWrap: "wrap", gap: "8px" }}>
+                                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{entry.date}</span>
+                                    {entry.trade && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontWeight: "700" }}>{entry.trade}</span>}
+                                    {entry.enteredBy && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>by {entry.enteredBy}</span>}
+                                    {entry.note && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>{entry.note}</span>}
+                                  </div>
+                                  <span style={{ fontSize: "14px", fontWeight: "800", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1374,6 +1383,164 @@ function ProjectsTab({ user }: { user: any }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [trade, setTrade] = useState("");
+  const [enteredBy, setEnteredBy] = useState("");
+  function handleSave() {
+    if (!amount) return;
+    onLog({ amount: parseFloat(amount), note, trade, enteredBy, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
+    setAmount(""); setNote(""); setTrade(""); setEnteredBy("");
+  }
+  const IS2: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", width: "100%" };
+  return (
+    <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
+      <p style={{ fontSize: "10px", color: "rgba(248,113,113,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>💸 Log Spend</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Amount ($) *</p>
+          <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f87171" }} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Trade</p>
+          <select value={trade} onChange={e => setTrade(e.target.value)} style={{ ...IS2 }}>
+            <option value="">— Select trade —</option>
+            {trades.map((t: any, i: number) => <option key={i} value={t.name}>{t.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Note</p>
+          <input type="text" placeholder="e.g. First payment — roof work" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={IS2} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Entered By</p>
+          <select value={enteredBy} onChange={e => setEnteredBy(e.target.value)} style={{ ...IS2 }}>
+            <option value="">— Select person —</option>
+            <option value="Owner">Owner</option>
+            {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>Save Spend Entry</button>
+    </div>
+  );
+}
+
+function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, fmtMoney }: any) {
+  const [localTrade, setLocalTrade] = useState(trade);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { setLocalTrade(trade); }, [trade]);
+  function handleSave() { onUpdate(localTrade); setDirty(false); }
+  const fieldStyle: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 10px", fontSize: "15px", fontWeight: "800", color: "#fff", outline: "none", fontFamily: "inherit" };
+  return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "14px", padding: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <input value={localTrade.name || ""} onChange={e => { setLocalTrade({ ...localTrade, name: e.target.value }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ fontSize: "12px", fontWeight: "800", color: "#fff", background: "none", border: "none", outline: "none", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.8px", width: "100%" }} />
+        <button onClick={onDelete} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", flexShrink: 0 }}>×</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>QUOTED</p>
+          <input type="number" value={localTrade.quoted ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, quoted: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: "#f59e0b" }} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>ACTUAL</p>
+          <input type="number" value={localTrade.actual ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, actual: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: tradeColor }} />
+        </div>
+      </div>
+      {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700", marginBottom: "6px" }}>⚠ Over by {fmtMoney((localTrade.actual || 0) - (localTrade.quoted || 0))}</p>}
+      {!over && localTrade.actual > 0 && localTrade.quoted > 0 && <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "700", marginBottom: "6px" }}>✓ Under by {fmtMoney((localTrade.quoted || 0) - (localTrade.actual || 0))}</p>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+        <select value={localTrade.assignedTo || ""} onChange={e => { setLocalTrade({ ...localTrade, assignedTo: e.target.value }); setDirty(true); }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "5px 8px", fontSize: "10px", color: localTrade.assignedTo ? "#a78bfa" : "rgba(255,255,255,0.3)", outline: "none", fontFamily: "inherit" }}>
+          <option value="">— Assign later —</option>
+          {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} · {m.role}</option>)}
+        </select>
+        {dirty && <button onClick={handleSave} style={{ padding: "5px 14px", background: "#a78bfa", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Save ↵</button>}
+      </div>
+    </div>
+  );
+}
+
+function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [trade, setTrade] = useState("");
+  const [enteredBy, setEnteredBy] = useState("");
+  function handleSave() {
+    if (!amount) return;
+    onLog({ amount: parseFloat(amount), note, trade, enteredBy, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
+    setAmount(""); setNote(""); setTrade(""); setEnteredBy("");
+  }
+  const IS2: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", width: "100%" };
+  return (
+    <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
+      <p style={{ fontSize: "10px", color: "rgba(248,113,113,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>💸 Log Spend</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Amount ($) *</p>
+          <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f87171" }} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Trade</p>
+          <select value={trade} onChange={e => setTrade(e.target.value)} style={{ ...IS2 }}>
+            <option value="">— Select trade —</option>
+            {trades.map((t: any, i: number) => <option key={i} value={t.name}>{t.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Note</p>
+          <input type="text" placeholder="e.g. First payment — roof work" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={IS2} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Entered By</p>
+          <select value={enteredBy} onChange={e => setEnteredBy(e.target.value)} style={{ ...IS2 }}>
+            <option value="">— Select person —</option>
+            <option value="Owner">Owner</option>
+            {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>Save Spend Entry</button>
+    </div>
+  );
+}
+
+function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, fmtMoney }: any) {
+  const [localTrade, setLocalTrade] = useState(trade);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { setLocalTrade(trade); }, [trade]);
+  function handleSave() { onUpdate(localTrade); setDirty(false); }
+  const fieldStyle: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 10px", fontSize: "15px", fontWeight: "800", color: "#fff", outline: "none", fontFamily: "inherit" };
+  return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "14px", padding: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <input value={localTrade.name || ""} onChange={e => { setLocalTrade({ ...localTrade, name: e.target.value }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ fontSize: "12px", fontWeight: "800", color: "#fff", background: "none", border: "none", outline: "none", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.8px", width: "100%" }} />
+        <button onClick={onDelete} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", flexShrink: 0 }}>×</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>QUOTED</p>
+          <input type="number" value={localTrade.quoted ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, quoted: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: "#f59e0b" }} />
+        </div>
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>ACTUAL</p>
+          <input type="number" value={localTrade.actual ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, actual: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: tradeColor }} />
+        </div>
+      </div>
+      {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700", marginBottom: "6px" }}>⚠ Over by {fmtMoney((localTrade.actual || 0) - (localTrade.quoted || 0))}</p>}
+      {!over && localTrade.actual > 0 && localTrade.quoted > 0 && <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "700", marginBottom: "6px" }}>✓ Under by {fmtMoney((localTrade.quoted || 0) - (localTrade.actual || 0))}</p>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+        <select value={localTrade.assignedTo || ""} onChange={e => { setLocalTrade({ ...localTrade, assignedTo: e.target.value }); setDirty(true); }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "5px 8px", fontSize: "10px", color: localTrade.assignedTo ? "#a78bfa" : "rgba(255,255,255,0.3)", outline: "none", fontFamily: "inherit" }}>
+          <option value="">— Assign later —</option>
+          {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} · {m.role}</option>)}
+        </select>
+        {dirty && <button onClick={handleSave} style={{ padding: "5px 14px", background: "#a78bfa", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Save ↵</button>}
+      </div>
     </div>
   );
 }
