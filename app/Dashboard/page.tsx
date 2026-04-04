@@ -1149,7 +1149,7 @@ function ProjectsTab({ user }: { user: any }) {
                     {/* Section tabs */}
                     <div style={{ display: "flex", gap: "2px", padding: "12px 24px", background: "rgba(0,0,0,0.2)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                       {[{ key: "timeline", label: "🗂 Timeline" }, { key: "budget", label: "💰 Budget" }, { key: "team", label: "👷 Team" }].map(s => (
-                        <button key={s.key} onClick={() => setActiveSection({ ...activeSection, [p.id]: s.key })} style={{ padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", border: "none", cursor: "pointer", background: section === s.key ? "rgba(167,139,250,0.15)" : "transparent", color: section === s.key ? "#a78bfa" : "rgba(255,255,255,0.35)" }}>{s.label}</button>
+                        <button key={s.key} onClick={() => setActiveSection({ ...activeSection, [p.id]: s.key })} style={{ padding: "10px 22px", borderRadius: "10px", fontSize: "14px", fontWeight: "800", border: `1px solid ${section === s.key ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.06)"}`, cursor: "pointer", background: section === s.key ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.03)", color: section === s.key ? "#a78bfa" : "rgba(255,255,255,0.4)", transition: "all 0.2s", boxShadow: section === s.key ? "0 0 16px rgba(167,139,250,0.2)" : "none" }}>{s.label}</button>
                       ))}
                     </div>
 
