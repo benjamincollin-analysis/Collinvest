@@ -130,7 +130,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"portfolio" | "projections" | "finances" | "market" | "projects">("portfolio");
+  const [activeTab, setActiveTab] = useState<"portfolio" | "finances" | "projects" | "market" | "projections">("portfolio");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -212,7 +212,7 @@ export default function Dashboard() {
           <span style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>GOLDSTREAM</span>
           <span style={{ fontSize: "9px", fontWeight: "600", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>BETA</span>
         </div>
-        <div className="gs-tabs">{(["portfolio", "projections", "finances", "market", "projects"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
+        <div className="gs-tabs">{(["portfolio", "finances", "projects", "market", "projections"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
           <NotificationBell user={user} properties={properties} />
