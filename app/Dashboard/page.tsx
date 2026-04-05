@@ -1023,7 +1023,8 @@ function ProjectsTab({ user }: { user: any }) {
 
   async function updateTrades(project: any, trades: any[]) {
     await supabase.from("projects").update({ trades }).eq("id", project.id);
-    setProjects(projects.map(p => p.id === project.id ? { ...p, trades } : p));
+    setProjects(prev => prev.map(p => p.id === project.id ? { ...p, trades } : p));
+    return true;
   }
 
   function generateMemberToken(projectId: number, memberIndex: number) {
@@ -1072,6 +1073,9 @@ function ProjectsTab({ user }: { user: any }) {
         </div>
         <button onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ New Project</button>
       </div>
+
+      {/* #46 — Cash Available Tracker */}
+      <CashTracker totalEquity={projects.reduce((s, p) => s + (p.budget || 0) - (p.spent || 0), 0)} totalRemaining={projects.reduce((s, p) => s + Math.max(0, (p.budget || 0) - (p.spent || 0)), 0)} userId={user?.id} />
 
       {/* Summary KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }}>
@@ -1168,7 +1172,7 @@ function ProjectsTab({ user }: { user: any }) {
                   <div>
                     {/* Section tabs */}
                     <div style={{ display: "flex", gap: "2px", padding: "12px 24px", background: "rgba(0,0,0,0.2)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      {[{ key: "timeline", label: "🗂 Timeline" }, { key: "budget", label: "💰 Budget" }, { key: "team", label: "👷 Team" }].map(s => (
+                      {[{ key: "timeline", label: "🗂 Timeline" }, { key: "budget", label: "💰 Budget" }, { key: "team", label: "👷 Team" }, { key: "activity", label: "📋 Activity" }].map(s => (
                         <button key={s.key} onClick={() => setActiveSection({ ...activeSection, [p.id]: s.key })} style={{ padding: "10px 22px", borderRadius: "10px", fontSize: "14px", fontWeight: "800", border: `1px solid ${section === s.key ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.06)"}`, cursor: "pointer", background: section === s.key ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.03)", color: section === s.key ? "#a78bfa" : "rgba(255,255,255,0.4)", transition: "all 0.2s", boxShadow: section === s.key ? "0 0 16px rgba(167,139,250,0.2)" : "none" }}>{s.label}</button>
                       ))}
                     </div>
@@ -1212,6 +1216,7 @@ function ProjectsTab({ user }: { user: any }) {
                                 </select>
                                 <input type="date" value={ph.date || ""} onChange={e => updatePhase(p, i, { date: e.target.value })} style={{ fontSize: "11px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", padding: "4px 8px", outline: "none", fontFamily: "inherit" }} />
                                 <input type="text" placeholder="Note..." value={ph.note || ""} onChange={e => updatePhase(p, i, { note: e.target.value })} style={{ flex: 1, fontSize: "11px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", padding: "4px 10px", outline: "none", fontFamily: "inherit" }} />
+                                <PhaseChecklist phase={ph} onUpdate={(checklist: any[]) => updatePhase(p, i, { checklist })} />
               </div>
                             );
                           })}
@@ -1219,9 +1224,7 @@ function ProjectsTab({ user }: { user: any }) {
                       </div>
                     )}
 
-                    )}
-
-                    {/* TEAM */}
+                    {section === "budget" && (
                       <div style={{ padding: "24px" }}>
                         {/* KPI strip */}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
@@ -1276,18 +1279,36 @@ function ProjectsTab({ user }: { user: any }) {
                                 tradeColor={tradeColor}
                                 over={over}
                                 team={p.team}
-                                onUpdate={(updated: any) => { const t = [...trades]; t[ti] = updated; updateTrades(p, t); }}
-                                onDelete={() => { const t = trades.filter((_: any, i: number) => i !== ti); updateTrades(p, t); }}
+onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; await updateTrades(p, t); }}                                onDelete={() => { const t = trades.filter((_: any, i: number) => i !== ti); updateTrades(p, t); }}
                                 fmtMoney={fmtMoney}
+                                onLog={async (entry: any) => {
+                                  const history = [...(p.budgetHistory || []), entry];
+                                  const newSpent = p.spent + entry.amount;
+                                  await supabase.from("projects").update({ budget_history: history, spent: newSpent }).eq("id", p.id);
+                                  setProjects(prev => prev.map(pr => pr.id === p.id ? { ...pr, budgetHistory: history, spent: newSpent } : pr));
+                                }}
                               />
                             );
                           })}
                         </div>
 
                         {p.trades && p.trades.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "12px", padding: "14px 18px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px" }}>
-                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Quoted</p><p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p></div>
-                            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Actual</p><p style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p></div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginTop: "12px", padding: "14px 18px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px" }}>
+                            <div>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Contractors Quoted</p>
+                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>what trades estimated</p>
+                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Contractors Actual</p>
+                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>final trade invoices</p>
+                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Spent</p>
+                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>all payments logged</p>
+                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#34d399" }}>{fmtMoney(p.spent)}</p>
+                            </div>
                           </div>
                         )}
 
@@ -1303,13 +1324,28 @@ function ProjectsTab({ user }: { user: any }) {
                                     {entry.enteredBy && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>by {entry.enteredBy}</span>}
                                     {entry.note && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>{entry.note}</span>}
                                   </div>
-                                  <span style={{ fontSize: "14px", fontWeight: "800", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <span style={{ fontSize: "14px", fontWeight: "800", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                    <button onClick={() => {
+                                      const original = [...(p.budgetHistory || [])];
+                                      original.reverse();
+                                      original.splice(ei, 1);
+                                      original.reverse();
+                                      supabase.from("projects").update({ budget_history: original }).eq("id", p.id);
+                                      setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: original } : pr));
+                                    }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", padding: "0 4px" }} title="Delete entry">×</button>
+                                  </div>
                                 </div>
                               ))}
+
                             </div>
                           </div>
                         )}
                       </div>
+                    )}
+                    {/* ACTIVITY LOG */}
+                    {section === "activity" && (
+                      <ActivityLog project={p} />
                     )}
 
                     {/* TEAM */}
@@ -1386,6 +1422,285 @@ function ProjectsTab({ user }: { user: any }) {
     </div>
   );
 }
+const PHASE_CHECKLIST_DEFAULTS: Record<string, string[]> = {
+  "Planning":     ["Define scope & objectives", "Set budget envelope", "Identify key stakeholders", "Create project schedule"],
+  "Permits":      ["Submit permit application", "Pay permit fees", "Schedule inspections", "Receive permit approval"],
+  "Demo":         ["Disconnect utilities", "Protect adjacent structures", "Complete demolition", "Remove debris & dispose"],
+  "Foundation":   ["Excavation complete", "Footings poured", "Foundation walls complete", "Waterproofing applied"],
+  "Framing":      ["Floor system complete", "Wall framing complete", "Roof framing complete", "Framing inspection passed"],
+  "MEP":          ["Rough plumbing complete", "Rough electrical complete", "HVAC rough-in complete", "MEP inspection passed"],
+  "Plumbing":     ["Rough-in complete", "Pressure test passed", "Fixtures installed", "Final inspection"],
+  "Electrical":   ["Panel installed", "Rough wiring complete", "Outlets & switches installed", "Final inspection passed"],
+  "HVAC":         ["Ductwork installed", "Unit installed", "System tested & balanced", "Inspection passed"],
+  "Insulation":   ["Wall insulation complete", "Ceiling insulation complete", "Inspection passed"],
+  "Drywall":      ["Drywall hung", "Taped & mudded", "Sanded & primed", "Ready for paint"],
+  "Finishing":    ["Paint complete", "Trim & molding installed", "Hardware installed", "Final walkthrough"],
+  "Flooring":     ["Subfloor prepared", "Flooring installed", "Transitions complete", "Final clean"],
+  "Inspection":   ["Schedule final inspection", "Punch list complete", "Inspector sign-off", "Certificate of occupancy"],
+  "Delivery":     ["Final walkthrough with client", "Deficiency list resolved", "Keys handed over", "Project closed"],
+  "Staging":      ["Furniture sourced", "Staging complete", "Photos taken", "Ready for listing"],
+  "Listing":      ["MLS listing live", "Showings scheduled", "Offers reviewed"],
+  "Closing":      ["Title search complete", "Final walkthrough", "Documents signed", "Funds transferred"],
+  "Assessment":   ["Structural assessment", "Systems assessment", "Cost estimate", "Report delivered"],
+  "Structural":   ["Engineer sign-off", "Structural work complete", "Inspection passed"],
+  "Systems":      ["Plumbing upgraded", "Electrical upgraded", "HVAC upgraded", "Systems test passed"],
+  "Certificate":  ["Final inspection", "Certificate issued", "Occupancy confirmed"],
+  "Design":       ["Schematic design approved", "Design development complete", "Construction docs issued"],
+  "Feasibility":  ["Market analysis complete", "Financial model approved", "Go/no-go decision made"],
+  "Fit-Out":      ["Partitions installed", "Finishes complete", "FF&E installed", "Commissioning done"],
+  "Opening":      ["Staff trained", "Soft opening complete", "Grand opening done"],
+  "Acquisition":  ["Due diligence complete", "Financing secured", "Closing complete"],
+  "Structure":    ["Structure complete", "Engineer certified", "Inspection passed"],
+  "Residential":  ["Units complete", "Fixtures installed", "Ready for occupancy"],
+  "Commercial":   ["Shell complete", "Fit-out ready", "Tenant handover"],
+  "Handover":     ["Deficiency list cleared", "O&M manuals delivered", "Keys handed over"],
+};
+function ActivityLog({ project }: { project: any }) {
+  const events: any[] = [];
+
+  // From spend history
+  (project.budgetHistory || []).forEach((entry: any) => {
+    events.push({
+      type: "spend",
+      color: "#f87171",
+      icon: "💸",
+      label: `Spend logged — ${entry.trade || "General"}`,
+      detail: `${entry.note ? entry.note + " · " : ""}$${Math.abs(entry.amount).toLocaleString("en-US")}${entry.enteredBy ? ` · by ${entry.enteredBy}` : ""}`,
+      date: entry.date || "—",
+      ts: entry.date || "",
+    });
+  });
+
+  // From phases
+  (project.phases || []).forEach((ph: any) => {
+    if (ph.status !== "not_started") {
+      events.push({
+        type: "phase",
+        color: ph.status === "done" ? "#34d399" : ph.status === "delayed" ? "#f87171" : "#f59e0b",
+        icon: ph.status === "done" ? "✅" : ph.status === "delayed" ? "🔴" : "🟡",
+        label: `${ph.name} → ${ph.status.replace("_", " ").toUpperCase()}`,
+        detail: ph.note || "",
+        date: ph.date || "—",
+        ts: ph.date || "",
+      });
+    }
+    // Checklist completions
+    const checklist = ph.checklist || [];
+    const doneItems = checklist.filter((c: any) => c.done);
+    if (doneItems.length > 0 && doneItems.length === checklist.length) {
+      events.push({
+        type: "checklist",
+        color: "#34d399",
+        icon: "🟢",
+        label: `${ph.name} checklist complete`,
+        detail: `All ${checklist.length} items checked off`,
+        date: ph.date || "—",
+        ts: ph.date || "",
+      });
+    }
+  });
+
+  // From team
+  (project.team || []).forEach((member: any) => {
+    events.push({
+      type: "team",
+      color: "#a78bfa",
+      icon: "🟣",
+      label: `${member.name} added to team`,
+      detail: `${member.role}${member.contact ? " · " + member.contact : ""}`,
+      date: "—",
+      ts: "",
+    });
+  });
+
+  // Sort: entries with real dates first, then undated
+  events.sort((a, b) => {
+    if (!a.ts && !b.ts) return 0;
+    if (!a.ts) return 1;
+    if (!b.ts) return -1;
+    return new Date(b.ts).getTime() - new Date(a.ts).getTime();
+  });
+
+  return (
+    <div style={{ padding: "24px" }}>
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", fontWeight: "600", marginBottom: "20px" }}>
+        Activity Log <span style={{ color: "rgba(255,255,255,0.15)", textTransform: "none", letterSpacing: "0", fontWeight: "400" }}>· auto-generated from all project actions</span>
+      </p>
+
+      {events.length === 0 ? (
+        <div style={{ padding: "40px", textAlign: "center", border: "1px dashed rgba(255,255,255,0.06)", borderRadius: "12px" }}>
+          <p style={{ fontSize: "24px", marginBottom: "10px" }}>📋</p>
+          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.2)" }}>No activity yet. Start logging spend or updating phases.</p>
+        </div>
+      ) : (
+        <div style={{ position: "relative" }}>
+          {/* Vertical line */}
+          <div style={{ position: "absolute", left: "19px", top: "8px", bottom: "8px", width: "2px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+            {events.map((ev, i) => (
+              <div key={i} style={{ display: "flex", gap: "16px", alignItems: "flex-start", paddingBottom: "16px" }}>
+                {/* Dot */}
+                <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: "2px", position: "relative", zIndex: 1 }}>
+                  <div style={{ width: "14px", height: "14px", borderRadius: "50%", background: ev.color, boxShadow: `0 0 8px ${ev.color}66`, border: "2px solid #0f0f0f", display: "flex", alignItems: "center", justifyContent: "center" }} />
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: `1px solid ${ev.color}22`, borderRadius: "12px", padding: "12px 14px", marginTop: "-2px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", flexWrap: "wrap" }}>
+                    <div>
+                      <p style={{ fontSize: "12px", fontWeight: "700", color: "#fff", marginBottom: "3px" }}>
+                        <span style={{ marginRight: "6px" }}>{ev.icon}</span>{ev.label}
+                      </p>
+                      {ev.detail && <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", lineHeight: "1.4" }}>{ev.detail}</p>}
+                    </div>
+                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", whiteSpace: "nowrap", flexShrink: 0, fontWeight: "600" }}>{ev.date}</span>
+                  </div>
+                  <div style={{ display: "flex", marginTop: "8px" }}>
+                    <span style={{ fontSize: "9px", fontWeight: "700", padding: "2px 8px", borderRadius: "999px", background: `${ev.color}15`, color: ev.color, textTransform: "uppercase", letterSpacing: "0.8px" }}>{ev.type}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function PhaseChecklist({ phase, onUpdate }: { phase: any; onUpdate: (checklist: any[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const checklist: any[] = phase.checklist || PHASE_CHECKLIST_DEFAULTS[phase.name]?.map(label => ({ label, done: false })) || [];
+  const doneCount = checklist.filter(c => c.done).length;
+  const allDone = checklist.length > 0 && doneCount === checklist.length;
+
+  function toggle(idx: number) {
+    const updated = checklist.map((c, i) => i === idx ? { ...c, done: !c.done } : c);
+    onUpdate(updated);
+  }
+  function addItem() {
+    if (!newItem.trim()) return;
+    onUpdate([...checklist, { label: newItem.trim(), done: false }]);
+    setNewItem("");
+  }
+  function removeItem(idx: number) {
+    onUpdate(checklist.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen(!open)} title="Phase Checklist" style={{ padding: "4px 10px", background: allDone ? "rgba(52,211,153,0.15)" : doneCount > 0 ? "rgba(245,158,11,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${allDone ? "rgba(52,211,153,0.3)" : doneCount > 0 ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.1)"}`, borderRadius: "6px", color: allDone ? "#34d399" : doneCount > 0 ? "#f59e0b" : "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "10px", fontWeight: "700", whiteSpace: "nowrap" }}>
+        {allDone ? "✓" : `${doneCount}/${checklist.length}`} ☑
+      </button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "32px", zIndex: 50, width: "280px", background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "14px", padding: "14px", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "800", color: "#fff" }}>{phase.name} Checklist</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "10px", color: allDone ? "#34d399" : "rgba(255,255,255,0.3)", fontWeight: "700" }}>{doneCount}/{checklist.length}</span>
+              <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}>×</button>
+            </div>
+          </div>
+          <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginBottom: "10px" }}>
+            <div style={{ height: "100%", width: `${checklist.length > 0 ? (doneCount / checklist.length) * 100 : 0}%`, background: allDone ? "#34d399" : "#f59e0b", borderRadius: "999px", transition: "width 0.4s" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "220px", overflowY: "auto", marginBottom: "10px" }}>
+            {checklist.map((item, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 8px", borderRadius: "8px", background: item.done ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)"}` }}>
+                <input type="checkbox" checked={item.done} onChange={() => toggle(idx)} style={{ accentColor: "#34d399", cursor: "pointer", flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: "11px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)", textDecoration: item.done ? "line-through" : "none" }}>{item.label}</span>
+                <button onClick={() => removeItem(idx)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.15)", cursor: "pointer", fontSize: "14px", flexShrink: 0, lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input type="text" placeholder="Add custom item..." value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => e.key === "Enter" && addItem()} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "7px", padding: "7px 10px", fontSize: "11px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+            <button onClick={addItem} style={{ padding: "7px 12px", background: "#a78bfa", color: "#000", borderRadius: "7px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer" }}>+</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: number; totalRemaining: number; userId: string }) {
+  const storageKey = `gs_warChest_${userId}`;
+  const [warChest, setWarChest] = useState(0);
+  const [equityPct, setEquityPct] = useState(20);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) { const d = JSON.parse(raw); setWarChest(d.warChest || 0); setEquityPct(d.equityPct || 20); }
+    } catch {}
+  }, [storageKey]);
+
+  function save(wc: number, ep: number) {
+    try { localStorage.setItem(storageKey, JSON.stringify({ warChest: wc, equityPct: ep })); } catch {}
+  }
+
+  const autoCash = Math.round((totalEquity / 100) * equityPct);
+  const totalAvailable = warChest + autoCash;
+  const coverageRatio = totalRemaining > 0 ? (totalAvailable / totalRemaining) * 100 : 100;
+  const coverageColor = coverageRatio >= 100 ? "#34d399" : coverageRatio >= 50 ? "#f59e0b" : "#f87171";
+
+  function fmtM(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + Math.round(n).toLocaleString("en-US"); return "$" + n.toFixed(0); }
+
+  return (
+    <div style={{ background: "linear-gradient(135deg, rgba(52,211,153,0.06), rgba(96,165,250,0.04))", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "16px", padding: "20px 24px", marginBottom: "24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
+            <span style={{ fontSize: "10px", color: "rgba(52,211,153,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Cash Available · War Chest</span>
+          </div>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Manual savings + auto-calculated from portfolio equity</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "11px", color: coverageColor, fontWeight: "700", background: `${coverageColor}15`, padding: "4px 10px", borderRadius: "999px", border: `1px solid ${coverageColor}33` }}>
+            {coverageRatio >= 100 ? "✓ Fully funded" : `${coverageRatio.toFixed(0)}% of remaining budget covered`}
+          </span>
+          <button onClick={() => setEditing(!editing)} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontWeight: "600" }}>{editing ? "Close" : "✎ Edit"}</button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: editing ? "16px" : "0" }}>
+        {[
+          { label: "War Chest", sublabel: "manual cash input", value: fmtM(warChest), color: "#34d399" },
+          { label: "Equity Deployable", sublabel: `${equityPct}% of project equity`, value: fmtM(autoCash), color: "#60a5fa" },
+          { label: "Total Available", sublabel: "combined liquidity", value: fmtM(totalAvailable), color: "#f59e0b", big: true },
+        ].map(m => (
+          <div key={m.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: "12px", padding: "14px 16px", border: `1px solid ${m.color}22` }}>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "2px" }}>{m.label}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>{m.sublabel}</p>
+            <p style={{ fontSize: m.big ? "22px" : "18px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px" }}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", padding: "16px", background: "rgba(0,0,0,0.2)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "6px" }}>War Chest ($) — cash in bank</p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input type="number" placeholder={String(warChest)} value={inputVal} onChange={e => setInputVal(e.target.value)} style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "8px", padding: "9px 12px", fontSize: "14px", fontWeight: "800", color: "#34d399", outline: "none", fontFamily: "inherit" }} />
+              <button onClick={() => { const v = parseFloat(inputVal) || 0; setWarChest(v); save(v, equityPct); setInputVal(""); }} style={{ padding: "9px 14px", background: "#34d399", color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer" }}>Set</button>
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "6px" }}>Equity Deployable — {equityPct}%</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <input type="range" min="0" max="100" step="5" value={equityPct} onChange={e => { const v = parseInt(e.target.value); setEquityPct(v); save(warChest, v); }} style={{ flex: 1, accentColor: "#60a5fa" }} />
+              <span style={{ fontSize: "14px", fontWeight: "800", color: "#60a5fa", minWidth: "36px" }}>{equityPct}%</span>
+            </div>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>= {fmtM(autoCash)} deployable from equity</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
   const [amount, setAmount] = useState("");
@@ -1431,90 +1746,23 @@ function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: 
   );
 }
 
-function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, fmtMoney }: any) {
+function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, fmtMoney, onLog }: any) {
   const [localTrade, setLocalTrade] = useState(trade);
   const [dirty, setDirty] = useState(false);
   useEffect(() => { setLocalTrade(trade); }, [trade]);
-  function handleSave() { onUpdate(localTrade); setDirty(false); }
-  const fieldStyle: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 10px", fontSize: "15px", fontWeight: "800", color: "#fff", outline: "none", fontFamily: "inherit" };
-  return (
-    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "14px", padding: "16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-        <input value={localTrade.name || ""} onChange={e => { setLocalTrade({ ...localTrade, name: e.target.value }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ fontSize: "12px", fontWeight: "800", color: "#fff", background: "none", border: "none", outline: "none", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.8px", width: "100%" }} />
-        <button onClick={onDelete} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", flexShrink: 0 }}>×</button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>QUOTED</p>
-          <input type="number" value={localTrade.quoted ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, quoted: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: "#f59e0b" }} />
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>ACTUAL</p>
-          <input type="number" value={localTrade.actual ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, actual: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: tradeColor }} />
-        </div>
-      </div>
-      {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700", marginBottom: "6px" }}>⚠ Over by {fmtMoney((localTrade.actual || 0) - (localTrade.quoted || 0))}</p>}
-      {!over && localTrade.actual > 0 && localTrade.quoted > 0 && <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "700", marginBottom: "6px" }}>✓ Under by {fmtMoney((localTrade.quoted || 0) - (localTrade.actual || 0))}</p>}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-        <select value={localTrade.assignedTo || ""} onChange={e => { setLocalTrade({ ...localTrade, assignedTo: e.target.value }); setDirty(true); }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "5px 8px", fontSize: "10px", color: localTrade.assignedTo ? "#a78bfa" : "rgba(255,255,255,0.3)", outline: "none", fontFamily: "inherit" }}>
-          <option value="">— Assign later —</option>
-          {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} · {m.role}</option>)}
-        </select>
-        {dirty && <button onClick={handleSave} style={{ padding: "5px 14px", background: "#a78bfa", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Save ↵</button>}
-      </div>
-    </div>
-  );
-}
-
-function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [trade, setTrade] = useState("");
-  const [enteredBy, setEnteredBy] = useState("");
   function handleSave() {
-    if (!amount) return;
-    onLog({ amount: parseFloat(amount), note, trade, enteredBy, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
-    setAmount(""); setNote(""); setTrade(""); setEnteredBy("");
+    onUpdate(localTrade);
+    if (onLog && localTrade.actual > 0) {
+      onLog({
+        amount: localTrade.actual,
+        note: `${localTrade.name} — Quoted: ${fmtMoney(localTrade.quoted || 0)} / Actual: ${fmtMoney(localTrade.actual)}`,
+        trade: localTrade.name,
+        enteredBy: localTrade.assignedTo || "Owner",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      });
+    }
+    setDirty(false);
   }
-  const IS2: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", width: "100%" };
-  return (
-    <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
-      <p style={{ fontSize: "10px", color: "rgba(248,113,113,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>💸 Log Spend</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Amount ($) *</p>
-          <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f87171" }} />
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Trade</p>
-          <select value={trade} onChange={e => setTrade(e.target.value)} style={{ ...IS2 }}>
-            <option value="">— Select trade —</option>
-            {trades.map((t: any, i: number) => <option key={i} value={t.name}>{t.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Note</p>
-          <input type="text" placeholder="e.g. First payment — roof work" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={IS2} />
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Entered By</p>
-          <select value={enteredBy} onChange={e => setEnteredBy(e.target.value)} style={{ ...IS2 }}>
-            <option value="">— Select person —</option>
-            <option value="Owner">Owner</option>
-            {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name}</option>)}
-          </select>
-        </div>
-      </div>
-      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>Save Spend Entry</button>
-    </div>
-  );
-}
-
-function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, fmtMoney }: any) {
-  const [localTrade, setLocalTrade] = useState(trade);
-  const [dirty, setDirty] = useState(false);
-  useEffect(() => { setLocalTrade(trade); }, [trade]);
-  function handleSave() { onUpdate(localTrade); setDirty(false); }
   const fieldStyle: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px 10px", fontSize: "15px", fontWeight: "800", color: "#fff", outline: "none", fontFamily: "inherit" };
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${tradeColor}33`, borderRadius: "14px", padding: "16px" }}>
@@ -1525,11 +1773,11 @@ function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, f
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
         <div>
           <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>QUOTED</p>
-          <input type="number" value={localTrade.quoted ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, quoted: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: "#f59e0b" }} />
+          <input type="number" value={localTrade.quoted || ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, quoted: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: "#f59e0b" }} />
         </div>
         <div>
           <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>ACTUAL</p>
-          <input type="number" value={localTrade.actual ?? ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, actual: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: tradeColor }} />
+          <input type="number" value={localTrade.actual || ""} placeholder="0" onChange={e => { setLocalTrade({ ...localTrade, actual: parseFloat(e.target.value) || 0 }); setDirty(true); }} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...fieldStyle, color: tradeColor }} />
         </div>
       </div>
       {over && <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "700", marginBottom: "6px" }}>⚠ Over by {fmtMoney((localTrade.actual || 0) - (localTrade.quoted || 0))}</p>}
@@ -1537,7 +1785,8 @@ function TradeCard({ trade, index, tradeColor, over, team, onUpdate, onDelete, f
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
         <select value={localTrade.assignedTo || ""} onChange={e => { setLocalTrade({ ...localTrade, assignedTo: e.target.value }); setDirty(true); }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "5px 8px", fontSize: "10px", color: localTrade.assignedTo ? "#a78bfa" : "rgba(255,255,255,0.3)", outline: "none", fontFamily: "inherit" }}>
           <option value="">— Assign later —</option>
-          {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} · {m.role}</option>)}
+        <option value="Owner">Owner</option>
+        {team.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} · {m.role}</option>)}
         </select>
         {dirty && <button onClick={handleSave} style={{ padding: "5px 14px", background: "#a78bfa", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Save ↵</button>}
       </div>
