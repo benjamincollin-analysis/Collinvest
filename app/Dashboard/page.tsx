@@ -190,7 +190,7 @@ export default function Dashboard() {
   const chartPts = (pts: typeof projReal) => pts.map((p, i) => `${(i / 10) * (CW - 40) + 20},${CH - 20 - ((p.value / maxVal) * (CH - 40))}`).join(" ");
   const goalY = CH - 20 - ((GOAL_PORTFOLIO / maxVal) * (CH - 40)); const mile1Y = CH - 20 - ((MILESTONE / maxVal) * (CH - 40));
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
-  const tabStyle = (t: string) => ({ padding: "6px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 as const, border: "none", cursor: "pointer" as const, transition: "all 0.2s", background: activeTab === t ? "rgba(255,255,255,0.08)" : "transparent", color: activeTab === t ? "#fff" : "rgba(255,255,255,0.35)" });
+  const tabStyle = (t: string) => ({ padding: "7px 20px", borderRadius: "8px", fontSize: "11px", fontWeight: 700 as const, border: "none", cursor: "pointer" as const, transition: "all 0.2s", letterSpacing: "0.5px", textTransform: "uppercase" as const, background: activeTab === t ? "rgba(245,166,35,0.12)" : "transparent", color: activeTab === t ? "#f5a623" : "rgba(255,255,255,0.3)", boxShadow: activeTab === t ? "inset 0 0 0 1px rgba(245,166,35,0.25)" : "none" });
 
   if (loading) return (<div style={{ minHeight: "100vh", background: "#080808", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}><div style={{ width: "28px", height: "28px", background: "#f59e0b", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#000" }}>GS</div><p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px", letterSpacing: "1px" }}>LOADING PORTFOLIO...</p></div>);
 
@@ -198,7 +198,100 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#fff", fontFamily: "'DM Sans','Helvetica Neue',sans-serif" }}>
-      <style>{`* { box-sizing: border-box; } select option { background:#1a1a1a; color:#fff; } @keyframes tPulse { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.4} 100%{transform:translate(-50%,-50%) scale(2.8);opacity:0} } @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} } @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} } input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.5); } .gs-nav { display:flex; justify-content:space-between; align-items:center; padding:14px 40px; border-bottom:1px solid rgba(255,255,255,0.06); position:relative; z-index:10; gap:10px; } .gs-nav-user { display:flex; align-items:center; gap:10px; font-size:13px; color:rgba(255,255,255,0.4); } .gs-tabs { display:flex; gap:2px; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px; } @media (max-width: 768px) { .gs-nav { padding:12px 16px; flex-wrap:wrap; } .gs-nav-user { display:none !important; } .gs-tabs { order:3; width:100%; justify-content:stretch; } .gs-tabs button { flex:1; font-size:10px !important; padding:5px 2px !important; } } .gs-strip-desktop { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 180px; border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.35); backdrop-filter:blur(10px); position:sticky; top:0; z-index:9; padding:0 40px; } .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; padding:10px 16px; border-right:1px solid rgba(255,255,255,0.05); gap:3px; } .gs-strip-desktop .strip-cell:last-child { border-right:none; } .gs-strip-label { font-size:9px; color:rgba(255,255,255,0.3); letter-spacing:1.2px; text-transform:uppercase; font-weight:600; } .gs-strip-value { font-size:15px; font-weight:800; letter-spacing:-0.3px; } .gs-strip-sub { font-size:10px; color:rgba(255,255,255,0.2); } .gs-strip-mobile { display:none; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.05); position:sticky; top:0; z-index:9; padding:10px 12px; } .gs-strip-mobile-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; } .gs-strip-mobile-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; } .gs-strip-mobile-goal { padding:0 2px; } .gs-strip-mobile-goal-bar { height:4px; background:rgba(255,255,255,0.06); border-radius:999px; margin-top:4px; } @media (max-width: 768px) { .gs-strip-desktop { display:none !important; } .gs-strip-mobile { display:block !important; } } .gs-main { max-width:1100px; margin:0 auto; padding:40px; position:relative; z-index:1; } @media (max-width:768px) { .gs-main { padding:16px 12px; } } .gs-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; } .gs-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; } .gs-milestone-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; } .gs-scenario-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media (max-width:768px) { .gs-grid-2 { grid-template-columns:1fr !important; } .gs-grid-4 { grid-template-columns:1fr 1fr !important; } .gs-milestone-grid { grid-template-columns:1fr 1fr !important; } .gs-scenario-grid { grid-template-columns:1fr !important; } .gs-detail-grid { grid-template-columns:1fr 1fr !important; } } .gs-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; } .gs-table { min-width:580px; } @media (max-width:768px) { .gs-map { height:280px !important; } } .gs-section-header { display:flex; justify-content:space-between; align-items:center; } @media (max-width:600px) { .gs-section-header { flex-direction:column; gap:10px; align-items:flex-start !important; } } .gs-modal { background:#0f0f0f; border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:36px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; } .gs-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:600px) { .gs-modal { padding:20px 16px !important; margin:0 8px; } .gs-modal-grid { grid-template-columns:1fr !important; } } .gs-goal-value { font-size:36px; } @media (max-width:768px) { .gs-goal-value { font-size:26px !important; } } @media (max-width:480px) { .gs-goal-value { font-size:22px !important; } } .gs-map-header { margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; } @media (max-width:600px) { .gs-map-header { flex-direction:column; gap:10px; align-items:flex-start; } }`}</style>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        select option { background: #0d0d0d; color: #fff; }
+        @keyframes tPulse { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.4} 100%{transform:translate(-50%,-50%) scale(2.8);opacity:0} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
+        input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.5); }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.3); }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(245,166,35,0.2); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(245,166,35,0.4); }
+
+        .gs-nav { display:flex; justify-content:space-between; align-items:center; padding:12px 40px; border-bottom:1px solid rgba(255,255,255,0.05); position:relative; z-index:10; gap:10px; background: rgba(8,8,8,0.95); backdrop-filter: blur(20px); }
+        .gs-nav-user { display:flex; align-items:center; gap:10px; font-size:13px; color:rgba(255,255,255,0.4); }
+        .gs-tabs { display:flex; gap:2px; background:rgba(255,255,255,0.03); border-radius:10px; padding:3px; border: 1px solid rgba(255,255,255,0.05); }
+
+        @media (max-width: 768px) {
+          .gs-nav { padding:12px 16px; flex-wrap:wrap; }
+          .gs-nav-user { display:none !important; }
+          .gs-tabs { order:3; width:100%; justify-content:stretch; }
+          .gs-tabs button { flex:1; font-size:9px !important; padding:5px 2px !important; }
+        }
+
+        .gs-strip-desktop {
+          display:grid; grid-template-columns:1fr 1fr 1fr 1fr 200px;
+          border-bottom:1px solid rgba(255,255,255,0.04);
+          background: rgba(5,5,5,0.9);
+          backdrop-filter:blur(20px);
+          position:sticky; top:0; z-index:9; padding:0 40px;
+          box-shadow: 0 1px 0 rgba(245,166,35,0.06), 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; padding:10px 18px; border-right:1px solid rgba(255,255,255,0.04); gap:3px; }
+        .gs-strip-desktop .strip-cell:last-child { border-right:none; }
+        .gs-strip-label { font-size:8px; color:rgba(255,255,255,0.25); letter-spacing:1.8px; text-transform:uppercase; font-weight:700; }
+        .gs-strip-value { font-size:16px; font-weight:900; letter-spacing:-0.5px; }
+        .gs-strip-sub { font-size:10px; color:rgba(255,255,255,0.18); }
+
+        .gs-strip-mobile { display:none; background:rgba(5,5,5,0.95); backdrop-filter:blur(20px); border-bottom:1px solid rgba(255,255,255,0.04); position:sticky; top:0; z-index:9; padding:10px 12px; }
+        .gs-strip-mobile-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+        .gs-strip-mobile-card { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:10px 12px; }
+        .gs-strip-mobile-goal { padding:0 2px; }
+        .gs-strip-mobile-goal-bar { height:3px; background:rgba(255,255,255,0.05); border-radius:999px; margin-top:4px; }
+
+        @media (max-width: 768px) {
+          .gs-strip-desktop { display:none !important; }
+          .gs-strip-mobile { display:block !important; }
+        }
+
+        .gs-main { max-width:1140px; margin:0 auto; padding:36px 40px; position:relative; z-index:1; }
+        @media (max-width:768px) { .gs-main { padding:16px 12px; } }
+
+        .gs-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+        .gs-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+        .gs-milestone-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+        .gs-scenario-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+        @media (max-width:768px) {
+          .gs-grid-2 { grid-template-columns:1fr !important; }
+          .gs-grid-4 { grid-template-columns:1fr 1fr !important; }
+          .gs-milestone-grid { grid-template-columns:1fr 1fr !important; }
+          .gs-scenario-grid { grid-template-columns:1fr !important; }
+          .gs-detail-grid { grid-template-columns:1fr 1fr !important; }
+        }
+
+        .gs-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .gs-table { min-width:580px; }
+        @media (max-width:768px) { .gs-map { height:280px !important; } }
+
+        .gs-section-header { display:flex; justify-content:space-between; align-items:center; }
+        @media (max-width:600px) { .gs-section-header { flex-direction:column; gap:10px; align-items:flex-start !important; } }
+
+        .gs-modal { background:#0a0a0a; border:1px solid rgba(255,255,255,0.08); border-radius:24px; padding:36px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow: 0 40px 80px rgba(0,0,0,0.7); }
+        .gs-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        @media (max-width:600px) { .gs-modal { padding:20px 16px !important; margin:0 8px; } .gs-modal-grid { grid-template-columns:1fr !important; } }
+
+        .gs-goal-value { font-size:38px; }
+        @media (max-width:768px) { .gs-goal-value { font-size:26px !important; } }
+        @media (max-width:480px) { .gs-goal-value { font-size:22px !important; } }
+
+        .gs-map-header { margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
+        @media (max-width:600px) { .gs-map-header { flex-direction:column; gap:10px; align-items:flex-start; } }
+
+        .gs-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; transition: border-color 0.2s; }
+        .gs-card:hover { border-color: rgba(255,255,255,0.1); }
+        .gs-kpi-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px; transition: all 0.2s; }
+        .gs-kpi-card:hover { border-color: rgba(245,166,35,0.15); background: rgba(255,255,255,0.035); }
+        .gs-section-label { font-size: 9px; color: rgba(255,255,255,0.25); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+        .gs-btn-primary { padding: 9px 20px; background: #f5a623; color: #000; border-radius: 9px; font-weight: 800; font-size: 12px; border: none; cursor: pointer; letter-spacing: 0.3px; transition: opacity 0.15s; }
+        .gs-btn-primary:hover { opacity: 0.88; }
+        .gs-btn-ghost { padding: 7px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .gs-btn-ghost:hover { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
+        tr.gs-table-row:hover td { background: rgba(245,166,35,0.025) !important; }
+      `}</style> 0%{transform:translate(-50%,-50%) scale(1);opacity:0.4} 100%{transform:translate(-50%,-50%) scale(2.8);opacity:0} } @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} } @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} } input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.5); } .gs-nav { display:flex; justify-content:space-between; align-items:center; padding:14px 40px; border-bottom:1px solid rgba(255,255,255,0.06); position:relative; z-index:10; gap:10px; } .gs-nav-user { display:flex; align-items:center; gap:10px; font-size:13px; color:rgba(255,255,255,0.4); } .gs-tabs { display:flex; gap:2px; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px; } @media (max-width: 768px) { .gs-nav { padding:12px 16px; flex-wrap:wrap; } .gs-nav-user { display:none !important; } .gs-tabs { order:3; width:100%; justify-content:stretch; } .gs-tabs button { flex:1; font-size:10px !important; padding:5px 2px !important; } } .gs-strip-desktop { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 180px; border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.35); backdrop-filter:blur(10px); position:sticky; top:0; z-index:9; padding:0 40px; } .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; padding:10px 16px; border-right:1px solid rgba(255,255,255,0.05); gap:3px; } .gs-strip-desktop .strip-cell:last-child { border-right:none; } .gs-strip-label { font-size:9px; color:rgba(255,255,255,0.3); letter-spacing:1.2px; text-transform:uppercase; font-weight:600; } .gs-strip-value { font-size:15px; font-weight:800; letter-spacing:-0.3px; } .gs-strip-sub { font-size:10px; color:rgba(255,255,255,0.2); } .gs-strip-mobile { display:none; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.05); position:sticky; top:0; z-index:9; padding:10px 12px; } .gs-strip-mobile-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; } .gs-strip-mobile-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px; } .gs-strip-mobile-goal { padding:0 2px; } .gs-strip-mobile-goal-bar { height:4px; background:rgba(255,255,255,0.06); border-radius:999px; margin-top:4px; } @media (max-width: 768px) { .gs-strip-desktop { display:none !important; } .gs-strip-mobile { display:block !important; } } .gs-main { max-width:1100px; margin:0 auto; padding:40px; position:relative; z-index:1; } @media (max-width:768px) { .gs-main { padding:16px 12px; } } .gs-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; } .gs-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; } .gs-milestone-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; } .gs-scenario-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media (max-width:768px) { .gs-grid-2 { grid-template-columns:1fr !important; } .gs-grid-4 { grid-template-columns:1fr 1fr !important; } .gs-milestone-grid { grid-template-columns:1fr 1fr !important; } .gs-scenario-grid { grid-template-columns:1fr !important; } .gs-detail-grid { grid-template-columns:1fr 1fr !important; } } .gs-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; } .gs-table { min-width:580px; } @media (max-width:768px) { .gs-map { height:280px !important; } } .gs-section-header { display:flex; justify-content:space-between; align-items:center; } @media (max-width:600px) { .gs-section-header { flex-direction:column; gap:10px; align-items:flex-start !important; } } .gs-modal { background:#0f0f0f; border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:36px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; } .gs-modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:600px) { .gs-modal { padding:20px 16px !important; margin:0 8px; } .gs-modal-grid { grid-template-columns:1fr !important; } } .gs-goal-value { font-size:36px; } @media (max-width:768px) { .gs-goal-value { font-size:26px !important; } } @media (max-width:480px) { .gs-goal-value { font-size:22px !important; } } .gs-map-header { margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; } @media (max-width:600px) { .gs-map-header { flex-direction:column; gap:10px; align-items:flex-start; } }`}</style>
 
       {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} />}
       {showSettings && <SettingsModal settings={settings} onSave={handleSettingsSave} onClose={() => setShowSettings(false)} />}
@@ -238,7 +331,7 @@ export default function Dashboard() {
             <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} />
             <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
           </div>
-          <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f59e0b" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171" }, { label: "Properties", value: String(properties.length), color: "#fff" }].map((m) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "20px" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>{m.label}</p><p style={{ fontSize: "22px", fontWeight: "800", color: m.color }}>{m.value}</p></div>))}</div>
+          <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f5a623", sub: "net owned value" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff", sub: "monthly income" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171", sub: "monthly outflow" }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m: any) => (<div key={m.label} className="gs-kpi-card"><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.8px", textTransform: "uppercase", marginBottom: "10px", fontWeight: "700" }}>{m.label}</p><p style={{ fontSize: "24px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", lineHeight: 1 }}>{m.value}</p><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "6px" }}>{m.sub}</p></div>))}</div>
           <div style={{ marginBottom: "20px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>All portfolio properties</p></div><button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "11px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "700" }}>⤢ Pop Out Map</button></div><TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} /></div>          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
@@ -273,7 +366,29 @@ export default function Dashboard() {
 }
 
 function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, barColor, glow, min, mid, max, onEdit }: any) {
-  return (<div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px", padding: "24px" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", flexWrap: "wrap", gap: "4px" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "600" }}>{label}</p><div style={{ display: "flex", alignItems: "center", gap: "8px" }}><span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>{pctLabel}</span><button onClick={onEdit} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "12px", padding: "0" }}>✎</button></div></div><p className="gs-goal-value" style={{ fontWeight: "800", letterSpacing: "-1px", marginBottom: "4px", color: valueColor || "#fff" }}>{value}</p><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.25)", marginBottom: "16px" }}>{sub}</p><div style={{ position: "relative", height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginBottom: "10px" }}><div style={{ height: "100%", width: `${p}%`, background: barColor, borderRadius: "999px", transition: "width 0.8s", boxShadow: `0 0 12px ${glow}` }} />{milestonePct && <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: `${milestonePct}%`, width: "1px", height: "14px", background: "rgba(255,255,255,0.2)" }} />}</div><div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "rgba(255,255,255,0.2)" }}><span>{min}</span>{mid && <span style={{ color: "rgba(255,255,255,0.3)" }}>{mid}</span>}<span>{max}</span></div></div>);
+  return (
+    <div style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "22px", padding: "28px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, right: 0, width: "200px", height: "200px", background: `radial-gradient(circle at top right, ${glow ? glow.replace("0.4", "0.06").replace("0.3", "0.06") : "transparent"} 0%, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "4px" }}>
+        <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "700" }}>{label}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", fontWeight: "600" }}>{pctLabel}</span>
+          <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "5px", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "11px", padding: "2px 7px", lineHeight: 1.4 }}>✎</button>
+        </div>
+      </div>
+      <p className="gs-goal-value" style={{ fontWeight: "900", letterSpacing: "-1.5px", marginBottom: "4px", color: valueColor || "#fff", lineHeight: 1 }}>{value}</p>
+      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginBottom: "20px", fontWeight: "500" }}>{sub}</p>
+      <div style={{ position: "relative", height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "12px" }}>
+        <div style={{ height: "100%", width: `${p}%`, background: `linear-gradient(90deg, ${barColor}cc, ${barColor})`, borderRadius: "999px", transition: "width 1s cubic-bezier(0.4,0,0.2,1)", boxShadow: `0 0 16px ${glow}` }} />
+        {milestonePct && <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: `${milestonePct}%`, width: "1px", height: "12px", background: "rgba(255,255,255,0.15)" }} />}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: "rgba(255,255,255,0.18)", fontWeight: "600", letterSpacing: "0.5px" }}>
+        <span>{min}</span>
+        {mid && <span style={{ color: "rgba(255,255,255,0.25)" }}>{mid}</span>}
+        <span>{max}</span>
+      </div>
+    </div>
+  );
 }
 
 function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd }: any) {
