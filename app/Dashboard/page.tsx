@@ -1240,7 +1240,10 @@ function ProjectsTab({ user }: { user: any }) {
                           <span style={{ fontSize: "11px", fontWeight: "900", color: hc }}>{score}</span>
                         </div>
                         <div>
-                          <h3 style={{ fontSize: "16px", fontWeight: "800" }}>{p.name}</h3>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <h3 style={{ fontSize: "16px", fontWeight: "800" }}>{p.name}</h3>
+                            {p.verified && <span style={{ fontSize: "9px", fontWeight: "800", color: "#34d399", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", borderRadius: "5px", padding: "2px 7px", letterSpacing: "1px", textTransform: "uppercase" }}>✓ Verified</span>}
+                          </div>
                           <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>
                             {p.type}{p.address ? ` · ${p.address}` : ""}
                             {days !== null && <span style={{ color: days < 0 ? "#f87171" : days < 14 ? "#f59e0b" : "rgba(255,255,255,0.3)", marginLeft: "8px", fontWeight: "700" }}>{days < 0 ? `⚠ ${Math.abs(days)}d overdue` : `${days}d left`}</span>}
@@ -1276,6 +1279,7 @@ function ProjectsTab({ user }: { user: any }) {
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
                       <button onClick={() => { setEditingId(p.id); setForm({ name: p.name, type: p.type, address: p.address || "", budget: String(p.budget), start_date: p.start_date || "", end_date: p.end_date || "", notes: p.notes || "" }); setShowForm(true); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Edit</button>
+                      <button onClick={async () => { const newVal = !p.verified; await supabase.from("projects").update({ verified: newVal }).eq("id", p.id); setProjects(prev => prev.map(pr => pr.id === p.id ? { ...pr, verified: newVal } : pr)); }} title={p.verified ? "Click to unverify" : "Click to verify"} style={{ fontSize: "11px", padding: "5px 12px", background: p.verified ? "rgba(52,211,153,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${p.verified ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: "8px", color: p.verified ? "#34d399" : "rgba(255,255,255,0.25)", cursor: "pointer", fontWeight: "700", fontSize: "11px", letterSpacing: "0.3px" }}>{p.verified ? "✓ VERIFIED" : "◯ Verify"}</button>
                       <button onClick={() => deleteProject(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer" }}>×</button>
                       <button onClick={() => toggleExpand(p.id)} style={{ fontSize: "11px", padding: "5px 14px", background: isExpanded ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.06)", border: `1px solid ${isExpanded ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: isExpanded ? "#a78bfa" : "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "700" }}>{isExpanded ? "▲ Close" : "▼ Open"}</button>
                     </div>
