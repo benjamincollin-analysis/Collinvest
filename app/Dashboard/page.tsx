@@ -1098,6 +1098,7 @@ function ProjectsTab({ user }: { user: any }) {
   const [confirmPhaseDelete, setConfirmPhaseDelete] = useState<{ projectId: number; phaseIdx: number; phaseName: string } | null>(null);
   const [projectComplete, setProjectComplete] = useState<number | null>(null);
   const [showDeletedPhases, setShowDeletedPhases] = useState<Record<number, boolean>>({});
+  const [confirmProjectDelete, setConfirmProjectDelete] = useState<number | null>(null);
   const [addPropertyForm, setAddPropertyForm] = useState<{ name: string; address: string; equity: string } | null>(null);
   const [form, setForm] = useState({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
@@ -1128,23 +1129,42 @@ function ProjectsTab({ user }: { user: any }) {
 
   async function deleteProject(id: number) { await supabase.from("projects").delete().eq("id", id); setProjects(projects.filter(p => p.id !== id)); }
 
+  const [noteValues, setNoteValues] = useState<Record<string, string>>({});
+
   async function updatePhase(project: any, phaseIdx: number, updates: any) {
+    // Note field: only update local state, save on blur
+    if (Object.keys(updates).length === 1 && "note" in updates) {
+      setNoteValues(prev => ({ ...prev, [`${project.id}_${phaseIdx}`]: updates.note }));
+      return;
+    }
     const phases = [...project.phases];
     const updatedPhase = { ...phases[phaseIdx], ...updates };
-    // Auto-complete: if all checklist done → set phase to done
     if (updates.checklist) {
       const allDone = updates.checklist.length > 0 && updates.checklist.every((c: any) => c.done);
       if (allDone && updatedPhase.status !== "done") updatedPhase.status = "done";
     }
     phases[phaseIdx] = updatedPhase;
-    // Auto-progress: if phase just set to done, set next not_started → in_progress
     if ((updates.status === "done" || (updates.checklist && phases[phaseIdx].status === "done")) && phaseIdx < phases.length - 1) {
       const nextIdx = phases.findIndex((ph: any, i: number) => i > phaseIdx && ph.status === "not_started");
       if (nextIdx !== -1) phases[nextIdx] = { ...phases[nextIdx], status: "in_progress" };
     }
-    // Check if all phases done → trigger completion
     const allPhasesDone = phases.every((ph: any) => ph.status === "done");
-    if (allPhasesDone) setProjectComplete(project.id);
+    if (allPhasesDone && !project.completed) {
+      await supabase.from("projects").update({ phases, completed: true }).eq("id", project.id);
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, phases, completed: true } : p));
+      setProjectComplete(project.id);
+      return;
+    }
+    await supabase.from("projects").update({ phases }).eq("id", project.id);
+    setProjects(prev => prev.map(p => p.id === project.id ? { ...p, phases } : p));
+  }
+
+  async function saveNote(project: any, phaseIdx: number) {
+    const key = `${project.id}_${phaseIdx}`;
+    const note = noteValues[key];
+    if (note === undefined) return;
+    const phases = [...project.phases];
+    phases[phaseIdx] = { ...phases[phaseIdx], note };
     await supabase.from("projects").update({ phases }).eq("id", project.id);
     setProjects(prev => prev.map(p => p.id === project.id ? { ...p, phases } : p));
   }
@@ -1332,7 +1352,7 @@ function ProjectsTab({ user }: { user: any }) {
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
                       <button onClick={() => { setEditingId(p.id); setForm({ name: p.name, type: p.type, address: p.address || "", budget: String(p.budget), start_date: p.start_date || "", end_date: p.end_date || "", notes: p.notes || "" }); setShowForm(true); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Edit</button>
                       <button onClick={async () => { const newVal = !p.verified; await supabase.from("projects").update({ verified: newVal }).eq("id", p.id); setProjects(prev => prev.map(pr => pr.id === p.id ? { ...pr, verified: newVal } : pr)); }} title={p.verified ? "Click to unverify" : "Click to verify"} style={{ fontSize: "11px", padding: "5px 12px", background: p.verified ? "rgba(52,211,153,0.12)" : "rgba(255,255,255,0.04)", border: `1px solid ${p.verified ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: "8px", color: p.verified ? "#34d399" : "rgba(255,255,255,0.25)", cursor: "pointer", fontWeight: "700", fontSize: "11px", letterSpacing: "0.3px" }}>{p.verified ? "✓ VERIFIED" : "◯ Verify"}</button>
-                      <button onClick={() => deleteProject(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer" }}>×</button>
+                      <button onClick={() => setConfirmProjectDelete(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer" }}>×</button>
                       <button onClick={() => toggleExpand(p.id)} style={{ fontSize: "11px", padding: "5px 14px", background: isExpanded ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.06)", border: `1px solid ${isExpanded ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.1)"}`, borderRadius: "8px", color: isExpanded ? "#a78bfa" : "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "700" }}>{isExpanded ? "▲ Close" : "▼ Open"}</button>
                     </div>
                   </div>
@@ -1399,10 +1419,10 @@ function ProjectsTab({ user }: { user: any }) {
                                   <select value={ph.status} onChange={e => updatePhase(p, i, { status: e.target.value })} style={{ fontSize: "10px", background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: "6px", color: sc.color, padding: "3px 8px", cursor: "pointer", fontWeight: "700", outline: "none", fontFamily: "inherit" }}>
                                     {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                   </select>
-                                  <input type="date" value={ph.date || ""} onChange={e => updatePhase(p, i, { date: e.target.value })} style={{ fontSize: "11px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", padding: "4px 8px", outline: "none", fontFamily: "inherit" }} />
-                                  <input type="text" placeholder="Note..." value={ph.note || ""} onChange={e => updatePhase(p, i, { note: e.target.value })} style={{ flex: 1, fontSize: "11px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", padding: "4px 10px", outline: "none", fontFamily: "inherit" }} />
-                                  <span style={{ fontSize: "10px", color: allDone ? "#34d399" : doneCount > 0 ? "#f59e0b" : "rgba(255,255,255,0.25)", fontWeight: "700", minWidth: "36px", textAlign: "right" }}>{doneCount}/{checklist.length}</span>
-                                  <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", flexShrink: 0 }}>×</button>
+                                  <input type="date" value={ph.date || ""} onChange={e => updatePhase(p, i, { date: e.target.value })} style={{ fontSize: "13px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.6)", padding: "6px 8px", outline: "none", fontFamily: "inherit" }} />
+                                  <input type="text" placeholder="Note..." value={noteValues[`${p.id}_${i}`] ?? ph.note ?? ""} onChange={e => setNoteValues(prev => ({ ...prev, [`${p.id}_${i}`]: e.target.value }))} onBlur={() => saveNote(p, i)} style={{ flex: 1, fontSize: "13px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", color: "rgba(255,255,255,0.6)", padding: "6px 10px", outline: "none", fontFamily: "inherit" }} />
+                                  <span style={{ fontSize: "13px", color: allDone ? "#34d399" : doneCount > 0 ? "#f59e0b" : "rgba(255,255,255,0.25)", fontWeight: "700", minWidth: "40px", textAlign: "right" }}>{doneCount}/{checklist.length}</span>
+                                  <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "5px", color: "#f87171", cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "2px 7px", fontWeight: "700", lineHeight: 1.4 }}>×</button>
                                 </div>
 
                                 {/* Inline checklist — auto-open when in_progress */}
@@ -1609,6 +1629,21 @@ onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; awai
           })}
         </div>
       )}
+      {/* Project delete confirmation */}
+      {confirmProjectDelete !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}>
+          <div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}>
+            <div style={{ fontSize: "32px", marginBottom: "16px" }}>🗑️</div>
+            <h3 style={{ fontSize: "16px", fontWeight: "800", marginBottom: "8px" }}>Delete Project?</h3>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "8px", lineHeight: "1.5" }}>This will permanently delete <span style={{ color: "#fff", fontWeight: "700" }}>{projects.find(pr => pr.id === confirmProjectDelete)?.name}</span> and all its data.</p>
+            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.25)", marginBottom: "28px" }}>This cannot be undone.</p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setConfirmProjectDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
+              <button onClick={async () => { await deleteProject(confirmProjectDelete!); setConfirmProjectDelete(null); }} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Phase delete confirmation */}
       {confirmPhaseDelete && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}>
@@ -1646,7 +1681,23 @@ onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; awai
                 <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", textAlign: "center" }}>You'll fill in value, mortgage, rent & expenses in the Portfolio tab after adding.</p>
                 <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
                   <button onClick={() => setAddPropertyForm(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>← Back</button>
-                  <button onClick={() => { setProjectComplete(null); setAddPropertyForm(null); }} style={{ flex: 1, padding: "12px", background: "#34d399", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Save & Go to Portfolio →</button>
+                  <button onClick={async () => {
+                    if (!addPropertyForm) return;
+                    const proj = projects.find(pr => pr.id === projectComplete);
+                    const equity = parseFloat(addPropertyForm.equity) || 0;
+                    let lat = 29.7604; let lng = -95.3698;
+                    try {
+                      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addPropertyForm.address)}&limit=1`, { headers: { "Accept-Language": "en" } });
+                      const geo = await res.json();
+                      if (geo?.[0]) { lat = parseFloat(geo[0].lat); lng = parseFloat(geo[0].lon); }
+                    } catch {}
+                    const newId = Date.now();
+                    const newProp = { id: newId, name: addPropertyForm.name, type: proj?.type || "Single Family", value: equity, mortgage: 0, rent: 0, expenses: 0, occupancy_status: "vacant", planned_date: "", appreciation: 3.5, address: addPropertyForm.address, lat, lng, user_id: user.id };
+                    await supabase.from("properties").insert(newProp);
+                    await supabase.from("notifications").insert({ user_id: user.id, type: "project_complete", title: "🎉 Project Complete", message: `${addPropertyForm.name} has been added to your portfolio. Fill in value, mortgage & rent to activate tracking.`, read: false });
+                    setProjectComplete(null);
+                    setAddPropertyForm(null);
+                  }} style={{ flex: 1, padding: "12px", background: "#34d399", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Save & Add to Portfolio →</button>
                 </div>
               </div>
             )}
