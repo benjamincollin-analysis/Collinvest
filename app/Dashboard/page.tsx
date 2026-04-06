@@ -1099,6 +1099,7 @@ function ProjectsTab({ user }: { user: any }) {
   const [projectComplete, setProjectComplete] = useState<number | null>(null);
   const [showDeletedPhases, setShowDeletedPhases] = useState<Record<number, boolean>>({});
   const [confirmProjectDelete, setConfirmProjectDelete] = useState<number | null>(null);
+  const [checklistOpenState, setChecklistOpenState] = useState<Record<string, boolean>>({});
   const [addPropertyForm, setAddPropertyForm] = useState<{ name: string; address: string; equity: string } | null>(null);
   const [form, setForm] = useState({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
@@ -1392,8 +1393,8 @@ function ProjectsTab({ user }: { user: any }) {
                                     <div onClick={() => { const statuses = ["not_started","in_progress","done","delayed"]; const next = statuses[(statuses.indexOf(ph.status) + 1) % statuses.length]; updatePhase(p, i, { status: next }); }} style={{ width: "32px", height: "32px", borderRadius: "50%", background: sc.bg, border: `2px solid ${sc.color}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: ph.status === "in_progress" ? `0 0 10px ${sc.color}66` : "none", transition: "all 0.2s" }}>
                                       <span style={{ fontSize: "10px" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : "○"}</span>
                                     </div>
-                                    <span style={{ fontSize: "9px", color: sc.color, fontWeight: "700", textAlign: "center", whiteSpace: "nowrap" }}>{ph.name}</span>
-                                    <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ position: "absolute", top: "-6px", right: "8px", background: "none", border: "none", color: "rgba(255,255,255,0.15)", cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: "0" }}>×</button>
+                                    <span style={{ fontSize: "10px", color: sc.color, fontWeight: "700", textAlign: "center", whiteSpace: "nowrap", marginTop: "4px" }}>{ph.name}</span>
+                                    <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ position: "absolute", top: "-6px", right: "8px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "4px", color: "#f87171", cursor: "pointer", fontSize: "11px", lineHeight: 1, padding: "1px 5px", fontWeight: "700" }}>×</button>
                                   </div>
                                   {!isLast && <div style={{ flex: 1, height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px", marginBottom: "20px" }} />}
                                 </div>
@@ -1413,9 +1414,9 @@ function ProjectsTab({ user }: { user: any }) {
                             return (
                               <div key={i} style={{ background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: `1px solid ${sc.color}22`, overflow: "hidden" }}>
                                 {/* Phase row */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px" }}>
-                                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: sc.color, boxShadow: isInProgress ? `0 0 6px ${sc.color}` : "none", flexShrink: 0 }} />
-                                  <span style={{ fontSize: "12px", fontWeight: "700", color: sc.color, minWidth: "110px" }}>{ph.name}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 16px" }}>
+                                  <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: sc.color, boxShadow: isInProgress ? `0 0 8px ${sc.color}` : "none", flexShrink: 0 }} />
+                                  <span style={{ fontSize: "13px", fontWeight: "700", color: sc.color, minWidth: "110px" }}>{ph.name}</span>
                                   <select value={ph.status} onChange={e => updatePhase(p, i, { status: e.target.value })} style={{ fontSize: "10px", background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: "6px", color: sc.color, padding: "3px 8px", cursor: "pointer", fontWeight: "700", outline: "none", fontFamily: "inherit" }}>
                                     {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                   </select>
@@ -1425,27 +1426,49 @@ function ProjectsTab({ user }: { user: any }) {
                                   <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "5px", color: "#f87171", cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "2px 7px", fontWeight: "700", lineHeight: 1.4 }}>×</button>
                                 </div>
 
-                                {/* Inline checklist — auto-open when in_progress */}
-                                {(isInProgress || allDone) && (
-                                  <div style={{ borderTop: `1px solid ${sc.color}22`, padding: "12px 14px", background: "rgba(0,0,0,0.15)" }}>
-                                    <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "10px" }}>
-                                      <div style={{ height: "100%", width: `${checklist.length > 0 ? (doneCount / checklist.length) * 100 : 0}%`, background: allDone ? "#34d399" : "#f59e0b", borderRadius: "999px", transition: "width 0.4s" }} />
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}>
-                                      {checklist.map((item: any, idx: number) => (
-                                        <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 8px", borderRadius: "7px", background: item.done ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.done ? "rgba(52,211,153,0.12)" : "rgba(255,255,255,0.04)"}` }}>
-                                          <input type="checkbox" checked={item.done} onChange={() => { const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, done: !c.done } : c); updatePhase(p, i, { checklist: updated }); }} style={{ accentColor: "#34d399", cursor: "pointer", flexShrink: 0 }} />
-                                          <span style={{ flex: 1, fontSize: "11px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)", textDecoration: item.done ? "line-through" : "none" }}>{item.label}</span>
-                                          <button onClick={() => { const updated = checklist.filter((_: any, ci: number) => ci !== idx); updatePhase(p, i, { checklist: updated }); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.1)", cursor: "pointer", fontSize: "13px" }}>×</button>
+                                {/* Inline checklist — retractable, auto-open when in_progress */}
+                                {(isInProgress || allDone || (ph.checklist && ph.checklist.some((c: any) => c.done))) && (() => {
+                                  const checklistKey = `cl_${p.id}_${i}`;
+                                  const isOpen = isInProgress ? (checklistOpenState[checklistKey] !== false) : (checklistOpenState[checklistKey] === true);
+                                  return (
+                                    <div style={{ borderTop: `1px solid ${sc.color}22` }}>
+                                      {/* Retract toggle bar */}
+                                      <button onClick={() => setChecklistOpenState(prev => ({ ...prev, [checklistKey]: !isOpen }))} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", background: "rgba(0,0,0,0.1)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", fontSize: "10px", fontWeight: "700", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                          <span style={{ color: allDone ? "#34d399" : isInProgress ? "#f59e0b" : "rgba(255,255,255,0.3)" }}>☑ Checklist</span>
+                                          <span style={{ color: allDone ? "#34d399" : doneCount > 0 ? "#f59e0b" : "rgba(255,255,255,0.2)", fontWeight: "800" }}>{doneCount}/{checklist.length}</span>
+                                          {/* Mini progress */}
+                                          <div style={{ width: "60px", height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
+                                            <div style={{ height: "100%", width: `${checklist.length > 0 ? (doneCount / checklist.length) * 100 : 0}%`, background: allDone ? "#34d399" : "#f59e0b", borderRadius: "999px", transition: "width 0.4s" }} />
+                                          </div>
                                         </div>
-                                      ))}
+                                        <span style={{ fontSize: "12px" }}>{isOpen ? "▲" : "▼"}</span>
+                                      </button>
+                                      {isOpen && (
+                                        <div style={{ padding: "10px 16px 14px", background: "rgba(0,0,0,0.12)" }}>
+                                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "10px" }}>
+                                            {checklist.map((item: any, idx: number) => (
+                                              <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "8px", background: item.done ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.done ? "rgba(52,211,153,0.12)" : "rgba(255,255,255,0.05)"}` }}>
+                                                <input type="checkbox" checked={item.done} onChange={() => { const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, done: !c.done } : c); updatePhase(p, i, { checklist: updated }); }} style={{ accentColor: "#34d399", cursor: "pointer", flexShrink: 0 }} />
+                                                <input
+                                                  type="text"
+                                                  value={item.label}
+                                                  onChange={e => { const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, label: e.target.value } : c); updatePhase(p, i, { checklist: updated }); }}
+                                                  style={{ flex: 1, fontSize: "12px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.75)", textDecoration: item.done ? "line-through" : "none", background: "none", border: "none", outline: "none", fontFamily: "inherit", cursor: "text" }}
+                                                />
+                                                <button onClick={() => { const updated = checklist.filter((_: any, ci: number) => ci !== idx); updatePhase(p, i, { checklist: updated }); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.15)", cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "0 2px" }}>×</button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <div style={{ display: "flex", gap: "6px" }}>
+                                            <input type="text" placeholder="Add task..." onKeyDown={e => { if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) { const updated = [...checklist, { label: (e.target as HTMLInputElement).value.trim(), done: false }]; updatePhase(p, i, { checklist: updated }); (e.target as HTMLInputElement).value = ""; } }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "6px 10px", fontSize: "12px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+                                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", alignSelf: "center" }}>↵ to add</span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div style={{ display: "flex", gap: "6px" }}>
-                                      <input type="text" placeholder="Add item..." onKeyDown={e => { if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) { const updated = [...checklist, { label: (e.target as HTMLInputElement).value.trim(), done: false }]; updatePhase(p, i, { checklist: updated }); (e.target as HTMLInputElement).value = ""; } }} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", padding: "5px 10px", fontSize: "11px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
-                                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", alignSelf: "center" }}>↵ to add</span>
-                                    </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                               </div>
                             );
                           })}
