@@ -1100,6 +1100,7 @@ function ProjectsTab({ user }: { user: any }) {
   const [showDeletedPhases, setShowDeletedPhases] = useState<Record<number, boolean>>({});
   const [confirmProjectDelete, setConfirmProjectDelete] = useState<number | null>(null);
   const [checklistOpenState, setChecklistOpenState] = useState<Record<string, boolean>>({});
+  const [checklistLabelValues, setChecklistLabelValues] = useState<Record<string, string>>({});
   const [addPropertyForm, setAddPropertyForm] = useState<{ name: string; address: string; equity: string } | null>(null);
   const [form, setForm] = useState({ name: "", type: "Renovation", address: "", budget: "", start_date: "", end_date: "", notes: "" });
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
@@ -1389,7 +1390,7 @@ function ProjectsTab({ user }: { user: any }) {
                               const isLast = i === p.phases.length - 1;
                               return (
                                 <div key={i} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "90px", position: "relative" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "90px", position: "relative", paddingTop: "18px" }}>
                                     <div onClick={() => { const statuses = ["not_started","in_progress","done","delayed"]; const next = statuses[(statuses.indexOf(ph.status) + 1) % statuses.length]; updatePhase(p, i, { status: next }); }} style={{ width: "32px", height: "32px", borderRadius: "50%", background: sc.bg, border: `2px solid ${sc.color}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: ph.status === "in_progress" ? `0 0 10px ${sc.color}66` : "none", transition: "all 0.2s" }}>
                                       <span style={{ fontSize: "10px" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : "○"}</span>
                                     </div>
@@ -1426,8 +1427,8 @@ function ProjectsTab({ user }: { user: any }) {
                                   <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "5px", color: "#f87171", cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "2px 7px", fontWeight: "700", lineHeight: 1.4 }}>×</button>
                                 </div>
 
-                                {/* Inline checklist — retractable, auto-open when in_progress */}
-                                {(isInProgress || allDone || (ph.checklist && ph.checklist.some((c: any) => c.done))) && (() => {
+                                {/* Inline checklist — always visible toggle bar, retractable items */}
+                                {(() => {
                                   const checklistKey = `cl_${p.id}_${i}`;
                                   const isOpen = isInProgress ? (checklistOpenState[checklistKey] !== false) : (checklistOpenState[checklistKey] === true);
                                   return (
@@ -1452,8 +1453,15 @@ function ProjectsTab({ user }: { user: any }) {
                                                 <input type="checkbox" checked={item.done} onChange={() => { const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, done: !c.done } : c); updatePhase(p, i, { checklist: updated }); }} style={{ accentColor: "#34d399", cursor: "pointer", flexShrink: 0 }} />
                                                 <input
                                                   type="text"
-                                                  value={item.label}
-                                                  onChange={e => { const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, label: e.target.value } : c); updatePhase(p, i, { checklist: updated }); }}
+                                                  value={checklistLabelValues[`${p.id}_${i}_${idx}`] ?? item.label}
+                                                  onChange={e => setChecklistLabelValues(prev => ({ ...prev, [`${p.id}_${i}_${idx}`]: e.target.value }))}
+                                                  onBlur={() => {
+                                                    const key = `${p.id}_${i}_${idx}`;
+                                                    const val = checklistLabelValues[key];
+                                                    if (val === undefined) return;
+                                                    const updated = checklist.map((c: any, ci: number) => ci === idx ? { ...c, label: val } : c);
+                                                    updatePhase(p, i, { checklist: updated });
+                                                  }}
                                                   style={{ flex: 1, fontSize: "12px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.75)", textDecoration: item.done ? "line-through" : "none", background: "none", border: "none", outline: "none", fontFamily: "inherit", cursor: "text" }}
                                                 />
                                                 <button onClick={() => { const updated = checklist.filter((_: any, ci: number) => ci !== idx); updatePhase(p, i, { checklist: updated }); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.15)", cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "0 2px" }}>×</button>
