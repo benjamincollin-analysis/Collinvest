@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
 // ── Types ────────────────────────────────────────────────────────────
-type OccupancyStatus = "occupied" | "vacant" | "planned";
+type OccupancyStatus = "occupied" | "vacant" | "planned" | "sold" | "str";
 
 type Property = {
   id: number;
@@ -20,6 +20,11 @@ type Property = {
   lat: number;
   lng: number;
   address: string;
+  occupancyPct: number;
+  soldPrice: number;
+  soldDate: string;
+  parentId: number | null;
+  groupTag: string;
 };
 
 type ScenarioProperty = {
@@ -67,6 +72,7 @@ const EMPTY_FORM = {
   name: "", type: "Single Family", value: "", mortgage: "",
   rent: "", expenses: "", occupancyStatus: "occupied" as OccupancyStatus,
   plannedDate: "", appreciation: "3.5", address: "", lat: "", lng: "",
+  occupancyPct: "100", soldPrice: "", soldDate: "", parentId: "", groupTag: "",
 };
 
 const EMPTY_SCENARIO_PROP: Omit<ScenarioProperty, "id"> = {
@@ -74,18 +80,37 @@ const EMPTY_SCENARIO_PROP: Omit<ScenarioProperty, "id"> = {
 };
 
 function toDb(p: Omit<Property, "id">) {
-  return { name: p.name, type: p.type, value: p.value, mortgage: p.mortgage, rent: p.rent, expenses: p.expenses, occupancy_status: p.occupancyStatus, planned_date: p.plannedDate, appreciation: p.appreciation, lat: p.lat, lng: p.lng, address: p.address };
+  return { name: p.name, type: p.type, value: p.value, mortgage: p.mortgage, rent: p.rent, expenses: p.expenses, occupancy_status: p.occupancyStatus, planned_date: p.plannedDate, appreciation: p.appreciation, lat: p.lat, lng: p.lng, address: p.address, occupancy_pct: p.occupancyPct ?? 100, sold_price: p.soldPrice ?? null, sold_date: p.soldDate ?? null, parent_id: p.parentId ?? null, group_tag: p.groupTag ?? "" };
 }
 function fromDb(row: any): Property {
-  return { id: row.id, name: row.name, type: row.type, value: row.value, mortgage: row.mortgage, rent: row.rent, expenses: row.expenses, occupancyStatus: row.occupancy_status, plannedDate: row.planned_date || "", appreciation: row.appreciation, lat: row.lat, lng: row.lng, address: row.address || "" };
+  return { id: row.id, name: row.name, type: row.type, value: row.value, mortgage: row.mortgage, rent: row.rent, expenses: row.expenses, occupancyStatus: row.occupancy_status, plannedDate: row.planned_date || "", appreciation: row.appreciation, lat: row.lat, lng: row.lng, address: row.address || "", occupancyPct: row.occupancy_pct ?? 100, soldPrice: row.sold_price ?? 0, soldDate: row.sold_date ?? "", parentId: row.parent_id ?? null, groupTag: row.group_tag ?? "" };
 }
 function fmt(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K"; return "$" + n.toLocaleString("en-US"); }
 function fmtFull(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US"); }
 function pct(value: number, total: number) { return Math.min(100, Math.max(0, (value / total) * 100)); }
-function isEffectivelyOccupied(p: Property) { return p.occupancyStatus === "occupied"; }
-function propCashFlow(p: Property) { return isEffectivelyOccupied(p) ? p.rent - p.expenses : -p.expenses; }
-function occupancyLabel(p: Property) { if (p.occupancyStatus === "occupied") return "Occupied"; if (p.occupancyStatus === "vacant") return "Vacant"; return p.plannedDate ? `Planned ${p.plannedDate}` : "Planned"; }
-function occupancyColor(p: Property) { if (p.occupancyStatus === "occupied") return { bg: "rgba(52,211,153,0.08)", color: "#34d399", border: "rgba(52,211,153,0.2)" }; if (p.occupancyStatus === "vacant") return { bg: "rgba(248,113,113,0.08)", color: "#f87171", border: "rgba(248,113,113,0.2)" }; return { bg: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "rgba(96,165,250,0.2)" }; }
+function isEffectivelyOccupied(p: Property) { return p.occupancyStatus === "occupied" || p.occupancyStatus === "str"; }
+function propCashFlow(p: Property) {
+  if (p.occupancyStatus === "sold") return 0;
+  if (p.occupancyStatus === "str") {
+    const occupiedRent = p.rent * ((p.occupancyPct ?? 100) / 100);
+    return occupiedRent - p.expenses;
+  }
+  return isEffectivelyOccupied(p) ? p.rent - p.expenses : -p.expenses;
+}
+function occupancyLabel(p: Property) {
+  if (p.occupancyStatus === "occupied") return "Occupied";
+  if (p.occupancyStatus === "vacant") return "Vacant";
+  if (p.occupancyStatus === "sold") return "Sold";
+  if (p.occupancyStatus === "str") return `STR ${p.occupancyPct ?? 100}%`;
+  return p.plannedDate ? `Planned ${p.plannedDate}` : "Planned";
+}
+function occupancyColor(p: Property) {
+  if (p.occupancyStatus === "occupied") return { bg: "rgba(52,211,153,0.08)", color: "#34d399", border: "rgba(52,211,153,0.2)" };
+  if (p.occupancyStatus === "vacant") return { bg: "rgba(248,113,113,0.08)", color: "#f87171", border: "rgba(248,113,113,0.2)" };
+  if (p.occupancyStatus === "sold") return { bg: "rgba(255,215,0,0.08)", color: "#ffd700", border: "rgba(255,215,0,0.2)" };
+  if (p.occupancyStatus === "str") return { bg: "rgba(232,121,249,0.08)", color: "#e879f9", border: "rgba(232,121,249,0.2)" };
+  return { bg: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "rgba(96,165,250,0.2)" };
+}
 function computeProjections(properties: Property[], scenario: Scenario, years = 10) { const realValue = properties.reduce((s, p) => s + p.value, 0); const realAvgApp = properties.length > 0 ? properties.reduce((s, p) => s + p.appreciation, 0) / properties.length / 100 : 0.035; const realMonthlyCF = properties.reduce((s, p) => s + propCashFlow(p), 0); const scenApp = realAvgApp + scenario.appreciationDelta / 100; const extraValue = scenario.extraProperties.reduce((s, p) => s + p.value, 0); const extraCF = scenario.extraProperties.reduce((s, p) => s + (p.rent - p.expenses), 0); const scenBaseValue = realValue + extraValue; const real = [], scen = []; for (let y = 0; y <= years; y++) { real.push({ year: y, value: realValue * Math.pow(1 + realAvgApp, y), cashFlow: realMonthlyCF }); scen.push({ year: y, value: scenBaseValue * Math.pow(1 + scenApp, y), cashFlow: realMonthlyCF + extraCF }); } return { real, scen }; }
 function monthsToGoal(currentValue: number, annualRate: number, goal: number) { if (currentValue >= goal) return 0; if (annualRate <= 0) return Infinity; return Math.ceil(Math.log(goal / currentValue) / Math.log(1 + annualRate)); }
 function fmtTime(months: number) { if (months === 0) return "✓ Done"; if (months === Infinity) return "∞"; if (months < 12) return `${months}mo`; return `${Math.ceil(months / 12)}yr`; }
@@ -177,10 +202,10 @@ export default function Dashboard() {
   const active = properties.find((p) => p.id === selected);
 
   function openAdd() { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }
-  function openEdit(p: Property, e: React.MouseEvent) { e.stopPropagation(); setEditingId(p.id); setForm({ name: p.name, type: p.type, value: String(p.value), mortgage: String(p.mortgage), rent: String(p.rent), expenses: String(p.expenses), occupancyStatus: p.occupancyStatus, plannedDate: p.plannedDate, appreciation: String(p.appreciation), address: p.address, lat: String(p.lat), lng: String(p.lng) }); setShowForm(true); }
+  function openEdit(p: Property, e: React.MouseEvent) { e.stopPropagation(); setEditingId(p.id); setForm({ name: p.name, type: p.type, value: String(p.value), mortgage: String(p.mortgage), rent: String(p.rent), expenses: String(p.expenses), occupancyStatus: p.occupancyStatus, plannedDate: p.plannedDate, appreciation: String(p.appreciation), address: p.address, lat: String(p.lat), lng: String(p.lng), occupancyPct: String(p.occupancyPct ?? 100), soldPrice: String(p.soldPrice ?? ""), soldDate: p.soldDate ?? "", parentId: p.parentId ? String(p.parentId) : "", groupTag: p.groupTag ?? "" }); setShowForm(true); }
   async function geocodeAddress(address: string) { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } }); const data = await res.json(); if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }; } catch {} return null; }
   async function handleGeocodeClick() { if (!form.address) return; setGeocoding(true); const coords = await geocodeAddress(form.address); if (coords) setForm({ ...form, lat: String(coords.lat), lng: String(coords.lng) }); setGeocoding(false); }
-  async function handleSave() { const errors: Record<string, boolean> = {}; if (!form.name) errors.name = true; if (!form.value) errors.value = true; if (Object.keys(errors).length > 0) { setFormErrors(errors); return; } setFormErrors({}); setSaving(true); let lat = parseFloat(form.lat) || 29.7604; let lng = parseFloat(form.lng) || -95.3698; if (form.address && (!form.lat || !form.lng)) { const coords = await geocodeAddress(form.address); if (coords) { lat = coords.lat; lng = coords.lng; } } const data: Omit<Property, "id"> = { name: form.name, type: form.type, value: parseFloat(form.value) || 0, mortgage: parseFloat(form.mortgage) || 0, rent: parseFloat(form.rent) || 0, expenses: parseFloat(form.expenses) || 0, occupancyStatus: form.occupancyStatus, plannedDate: form.plannedDate, appreciation: parseFloat(form.appreciation) || 0, address: form.address, lat, lng }; if (editingId !== null) { const { error } = await supabase.from("properties").update(toDb(data)).eq("id", editingId); if (!error) setProperties(properties.map((p) => p.id === editingId ? { ...p, ...data } : p)); } else { const newId = Date.now(); const { error } = await supabase.from("properties").insert({ id: newId, ...toDb(data), user_id: user?.id }); if (!error) setProperties([...properties, { id: newId, ...data }]); } setSaving(false); setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }
+  async function handleSave() { const errors: Record<string, boolean> = {}; if (!form.name) errors.name = true; if (!form.value) errors.value = true; if (Object.keys(errors).length > 0) { setFormErrors(errors); return; } setFormErrors({}); setSaving(true); let lat = parseFloat(form.lat) || 29.7604; let lng = parseFloat(form.lng) || -95.3698; if (form.address && (!form.lat || !form.lng)) { const coords = await geocodeAddress(form.address); if (coords) { lat = coords.lat; lng = coords.lng; } } const data: Omit<Property, "id"> = { name: form.name, type: form.type, value: parseFloat(form.value) || 0, mortgage: parseFloat(form.mortgage) || 0, rent: parseFloat(form.rent) || 0, expenses: parseFloat(form.expenses) || 0, occupancyStatus: form.occupancyStatus, plannedDate: form.plannedDate, appreciation: parseFloat(form.appreciation) || 0, address: form.address, lat, lng, occupancyPct: parseFloat(form.occupancyPct) || 100, soldPrice: parseFloat(form.soldPrice) || 0, soldDate: form.soldDate || "", parentId: form.parentId ? parseInt(form.parentId) : null, groupTag: form.groupTag || "" }; if (editingId !== null) { const { error } = await supabase.from("properties").update(toDb(data)).eq("id", editingId); if (!error) setProperties(properties.map((p) => p.id === editingId ? { ...p, ...data } : p)); } else { const newId = Date.now(); const { error } = await supabase.from("properties").insert({ id: newId, ...toDb(data), user_id: user?.id }); if (!error) setProperties([...properties, { id: newId, ...data }]); } setSaving(false); setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }
   function handleDelete(id: number) { setConfirmDelete(id); }
   async function confirmDeleteNow() { if (confirmDelete === null) return; const { error } = await supabase.from("properties").delete().eq("id", confirmDelete); if (!error) { setProperties(properties.filter((p) => p.id !== confirmDelete)); if (selected === confirmDelete) setSelected(null); } setConfirmDelete(null); }
   function addScenarioProp() { setScenario(s => ({ ...s, extraProperties: [...s.extraProperties, { id: Date.now(), ...scenPropForm }] })); setShowAddScenarioProp(false); setScenPropForm({ ...EMPTY_SCENARIO_PROP, name: "Hypothetical Property" }); }
@@ -360,7 +385,25 @@ export default function Dashboard() {
 
       {confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
       {showAddScenarioProp && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div className="gs-modal" style={{ border: "1px solid rgba(96,165,250,0.25)" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Hypothetical Property</h2><button onClick={() => setShowAddScenarioProp(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Name"><input type="text" value={scenPropForm.name} onChange={e => setScenPropForm(f => ({ ...f, name: e.target.value }))} style={IS} /></Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="300000" value={scenPropForm.value || ""} onChange={e => setScenPropForm(f => ({ ...f, value: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Mortgage ($)"><input type="number" placeholder="240000" value={scenPropForm.mortgage || ""} onChange={e => setScenPropForm(f => ({ ...f, mortgage: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="2000" value={scenPropForm.rent || ""} onChange={e => setScenPropForm(f => ({ ...f, rent: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="400" value={scenPropForm.expenses || ""} onChange={e => setScenPropForm(f => ({ ...f, expenses: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={scenPropForm.appreciation} onChange={e => setScenPropForm(f => ({ ...f, appreciation: parseFloat(e.target.value) || 3.5 }))} style={IS} /></Field></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => setShowAddScenarioProp(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={addScenarioProp} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Add to Scenario</button></div></div></div>)}
-      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)"><div style={{ display: "flex", gap: "8px" }}><input type="text" placeholder="e.g. 1234 Main St, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ ...IS, flex: 1 }} /><button onClick={handleGeocodeClick} disabled={geocoding} style={{ padding: "10px 12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", color: "#f59e0b", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}>{geocoding ? "..." : "Locate"}</button></div>{form.lat && form.lng && <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px" }}>✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</p>}</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="200000" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} style={IS} /></Field><Field label="Mortgage Balance ($)"><input type="number" placeholder="160000" value={form.mortgage} onChange={e => setForm({ ...form, mortgage: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="1200" value={form.rent} onChange={e => setForm({ ...form, rent: e.target.value })} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="300" value={form.expenses} onChange={e => setForm({ ...form, expenses: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Occupancy Status"><select value={form.occupancyStatus} onChange={e => setForm({ ...form, occupancyStatus: e.target.value as OccupancyStatus })} style={IS}><option value="occupied">✓ Occupied</option><option value="vacant">✗ Vacant</option><option value="planned">◷ Planned</option></select></Field>{form.occupancyStatus === "planned" ? (<Field label="Target Month"><input type="month" value={form.plannedDate} onChange={e => setForm({ ...form, plannedDate: e.target.value })} style={IS} /></Field>) : (<Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={form.appreciation} onChange={e => setForm({ ...form, appreciation: e.target.value })} style={IS} /></Field>)}</div>{form.occupancyStatus === "planned" && (<Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={form.appreciation} onChange={e => setForm({ ...form, appreciation: e.target.value })} style={IS} /></Field>)}</div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "rgba(245,158,11,0.5)" : "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "Saving..." : editingId !== null ? "Save Changes" : "Add Property"}</button></div></div></div>)}
+      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)"><div style={{ display: "flex", gap: "8px" }}><input type="text" placeholder="e.g. 1234 Main St, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ ...IS, flex: 1 }} /><button onClick={handleGeocodeClick} disabled={geocoding} style={{ padding: "10px 12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", color: "#f59e0b", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}>{geocoding ? "..." : "Locate"}</button></div>{form.lat && form.lng && <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px" }}>✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</p>}</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="200000" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} style={IS} /></Field><Field label="Mortgage Balance ($)"><input type="number" placeholder="160000" value={form.mortgage} onChange={e => setForm({ ...form, mortgage: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="1200" value={form.rent} onChange={e => setForm({ ...form, rent: e.target.value })} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="300" value={form.expenses} onChange={e => setForm({ ...form, expenses: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid">
+  <Field label="Occupancy Status">
+    <select value={form.occupancyStatus} onChange={e => setForm({ ...form, occupancyStatus: e.target.value as OccupancyStatus })} style={IS}>
+      <option value="occupied">✓ Occupied</option>
+      <option value="vacant">✗ Vacant</option>
+      <option value="planned">◷ Planned</option>
+      <option value="str">🏖 STR / Short-Term</option>
+      <option value="sold">🏆 Sold / Exited</option>
+    </select>
+  </Field>
+  {form.occupancyStatus === "planned" && <Field label="Target Month"><input type="month" value={form.plannedDate} onChange={e => setForm({ ...form, plannedDate: e.target.value })} style={IS} /></Field>}
+  {form.occupancyStatus === "str" && <Field label="Avg Occupancy %"><input type="number" placeholder="72" min="0" max="100" value={form.occupancyPct} onChange={e => setForm({ ...form, occupancyPct: e.target.value })} style={IS} /></Field>}
+  {form.occupancyStatus === "sold" && <Field label="Sale Price ($)"><input type="number" placeholder="350000" value={form.soldPrice} onChange={e => setForm({ ...form, soldPrice: e.target.value })} style={IS} /></Field>}
+  {form.occupancyStatus === "sold" && <Field label="Sale Date"><input type="date" value={form.soldDate} onChange={e => setForm({ ...form, soldDate: e.target.value })} style={IS} /></Field>}
+</div>
+<Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={form.appreciation} onChange={e => setForm({ ...form, appreciation: e.target.value })} style={IS} /></Field>
+<div className="gs-modal-grid">
+  <Field label="Group / Building Tag (optional)"><input type="text" placeholder="e.g. Maple Portfolio, Montreal" value={form.groupTag} onChange={e => setForm({ ...form, groupTag: e.target.value })} style={IS} /></Field>
+</div></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "rgba(245,158,11,0.5)" : "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "Saving..." : editingId !== null ? "Save Changes" : "Add Property"}</button></div></div></div>)}
     </div>
   );
 }
@@ -392,7 +435,184 @@ function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, ba
 }
 
 function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd }: any) {
-  return (<div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px", overflow: "hidden", marginBottom: "20px" }}><div className="gs-section-header" style={{ padding: "18px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Properties</h2><button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button></div><div className="gs-table-wrap"><table className="gs-table" style={{ width: "100%", fontSize: "13px", borderCollapse: "collapse" }}><thead><tr style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", letterSpacing: "1px", textTransform: "uppercase" }}>{["Property", "Value", "Equity", "Rent/mo", "Cash Flow", "ROI", "Status", ""].map(h => (<th key={h} style={{ textAlign: h === "Property" || h === "" ? "left" : "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>{h}</th>))}</tr></thead><tbody>{properties.map((p: Property) => { const equity = p.value - p.mortgage; const cf = propCashFlow(p); const roi = equity > 0 ? ((cf * 12) / equity) * 100 : 0; const oc = occupancyColor(p); return (<tr key={p.id} onClick={() => onSelect(selected === p.id ? null : p.id)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selected === p.id ? "rgba(245,158,11,0.04)" : "transparent", transition: "background 0.15s" }}><td style={{ padding: "14px 16px" }}><p style={{ fontWeight: "600" }}>{p.name}</p><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{p.type}</p></td><td style={{ textAlign: "right", padding: "14px 16px" }}>{fmtFull(p.value)}</td><td style={{ textAlign: "right", padding: "14px 16px", color: "#f59e0b", fontWeight: "600" }}>{fmtFull(equity)}</td><td style={{ textAlign: "right", padding: "14px 16px" }}>{isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—"}</td><td style={{ textAlign: "right", padding: "14px 16px", fontWeight: "700", color: cf >= 0 ? "#34d399" : "#f87171" }}>{cf >= 0 ? "+" : ""}{fmtFull(cf)}</td><td style={{ textAlign: "right", padding: "14px 16px", color: "rgba(255,255,255,0.5)" }}>{roi.toFixed(1)}%</td><td style={{ textAlign: "right", padding: "14px 16px" }}><span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", fontWeight: "600", background: oc.bg, color: oc.color, border: `1px solid ${oc.border}`, whiteSpace: "nowrap" }}>{occupancyLabel(p)}</span></td><td style={{ padding: "14px 10px" }} onClick={e => e.stopPropagation()}><div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}><button onClick={e => onEdit(p, e)} style={{ fontSize: "11px", padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Edit</button><button onClick={() => onDelete(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>×</button></div></td></tr>); })}</tbody></table></div></div>);
+  const [sortBy, setSortBy] = useState<"name"|"value"|"cashflow"|"roi"|"equity">("value");
+  const [sortDir, setSortDir] = useState<"desc"|"asc">("desc");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [showArchive, setShowArchive] = useState(false);
+
+  const activeProps = properties.filter((p: Property) => p.occupancyStatus !== "sold");
+  const soldProps = properties.filter((p: Property) => p.occupancyStatus === "sold");
+  const groups = Array.from(new Set(properties.map((p: Property) => p.groupTag).filter(Boolean))) as string[];
+  const types = Array.from(new Set(properties.map((p: Property) => p.type))) as string[];
+
+  function sorted(list: Property[]) {
+    return [...list]
+      .filter(p => filterStatus === "all" || p.occupancyStatus === filterStatus)
+      .filter(p => filterType === "all" || p.type === filterType)
+      .filter(p => filterGroup === "all" || p.groupTag === filterGroup)
+      .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.address.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        const eq = (p: Property) => p.value - p.mortgage;
+        const cf = (p: Property) => propCashFlow(p);
+        const roi = (p: Property) => eq(p) > 0 ? (cf(p) * 12 / eq(p)) * 100 : 0;
+        let va = 0, vb = 0;
+        if (sortBy === "value") { va = a.value; vb = b.value; }
+        else if (sortBy === "cashflow") { va = cf(a); vb = cf(b); }
+        else if (sortBy === "roi") { va = roi(a); vb = roi(b); }
+        else if (sortBy === "equity") { va = eq(a); vb = eq(b); }
+        else { return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name); }
+        return sortDir === "desc" ? vb - va : va - vb;
+      });
+  }
+
+  function SortBtn({ col, label }: { col: typeof sortBy; label: string }) {
+    const active = sortBy === col;
+    return (
+      <span onClick={() => { if (active) setSortDir(d => d === "desc" ? "asc" : "desc"); else { setSortBy(col); setSortDir("desc"); } }}
+        style={{ cursor: "pointer", color: active ? "#f59e0b" : "rgba(255,255,255,0.25)", userSelect: "none" }}>
+        {label}{active ? (sortDir === "desc" ? " ↓" : " ↑") : ""}
+      </span>
+    );
+  }
+
+  function PropRow({ p }: { p: Property }) {
+    const equity = p.value - p.mortgage;
+    const cf = propCashFlow(p);
+    const roi = equity > 0 ? ((cf * 12) / equity) * 100 : 0;
+    const oc = occupancyColor(p);
+    return (
+      <tr onClick={() => onSelect(selected === p.id ? null : p.id)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selected === p.id ? "rgba(245,158,11,0.04)" : "transparent", transition: "background 0.15s" }}>
+        <td style={{ padding: "14px 16px" }}>
+          <p style={{ fontWeight: "600" }}>{p.name}</p>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>
+            {p.type}{p.groupTag ? <span style={{ marginLeft: "6px", fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>{p.groupTag}</span> : null}
+          </p>
+        </td>
+        <td style={{ textAlign: "right", padding: "14px 16px" }}>{fmtFull(p.value)}</td>
+        <td style={{ textAlign: "right", padding: "14px 16px", color: "#f59e0b", fontWeight: "600" }}>{fmtFull(equity)}</td>
+        <td style={{ textAlign: "right", padding: "14px 16px" }}>{isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—"}</td>
+        <td style={{ textAlign: "right", padding: "14px 16px", fontWeight: "700", color: cf >= 0 ? "#34d399" : "#f87171" }}>{cf >= 0 ? "+" : ""}{fmtFull(cf)}</td>
+        <td style={{ textAlign: "right", padding: "14px 16px", color: "rgba(255,255,255,0.5)" }}>{roi.toFixed(1)}%</td>
+        <td style={{ textAlign: "right", padding: "14px 16px" }}>
+          <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", fontWeight: "600", background: oc.bg, color: oc.color, border: `1px solid ${oc.border}`, whiteSpace: "nowrap" }}>{occupancyLabel(p)}</span>
+        </td>
+        <td style={{ padding: "14px 10px" }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+            <button onClick={e => onEdit(p, e)} style={{ fontSize: "11px", padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Edit</button>
+            <button onClick={() => onDelete(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>×</button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  const displayProps = sorted(activeProps);
+
+  return (
+    <div style={{ marginBottom: "20px" }}>
+      {/* Header + controls */}
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px 20px 0 0", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+          <h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Properties</h2>
+          <button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button>
+        </div>
+        {/* Search + filters */}
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <input placeholder="🔍 Search properties..." value={search} onChange={e => setSearch(e.target.value)}
+            style={{ flex: 2, minWidth: "160px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "7px 12px", fontSize: "12px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+          {[
+            { val: filterStatus, set: setFilterStatus, opts: [["all","All Status"],["occupied","Occupied"],["vacant","Vacant"],["str","STR"],["planned","Planned"]] },
+            { val: filterType, set: setFilterType, opts: [["all","All Types"], ...types.map(t => [t,t])] },
+            ...(groups.length > 0 ? [{ val: filterGroup, set: setFilterGroup, opts: [["all","All Groups"], ...groups.map(g => [g,g])] }] : []),
+          ].map((f, i) => (
+            <select key={i} value={f.val} onChange={e => f.set(e.target.value)}
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "7px 10px", fontSize: "11px", color: f.val !== "all" ? "#f59e0b" : "rgba(255,255,255,0.4)", outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+              {f.opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: displayProps.length === 0 ? "0 0 20px 20px" : "0", overflow: "hidden" }}>
+        <div className="gs-table-wrap">
+          <table className="gs-table" style={{ width: "100%", fontSize: "13px", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ fontSize: "10px", letterSpacing: "1px", textTransform: "uppercase" }}>
+                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><SortBtn col="name" label="Property" /></th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><SortBtn col="value" label="Value" /></th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><SortBtn col="equity" label="Equity" /></th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.25)" }}>Rent/mo</th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><SortBtn col="cashflow" label="Cash Flow" /></th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><SortBtn col="roi" label="ROI" /></th>
+                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: "600", borderBottom: "1px solid rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.25)" }}>Status</th>
+                <th style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayProps.length === 0
+                ? <tr><td colSpan={8} style={{ padding: "32px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px" }}>No properties match your filters.</td></tr>
+                : displayProps.map((p: Property) => <PropRow key={p.id} p={p} />)
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Sold Archive */}
+      {soldProps.length > 0 && (
+        <div style={{ background: "rgba(255,215,0,0.02)", border: "1px solid rgba(255,215,0,0.15)", borderTop: "none", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
+          <button onClick={() => setShowArchive(!showArchive)} style={{ width: "100%", padding: "14px 20px", background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "10px", fontWeight: "700", color: "#ffd700", letterSpacing: "1.5px", textTransform: "uppercase" }}>🏆 Sold / Exited — {soldProps.length} propert{soldProps.length > 1 ? "ies" : "y"}</span>
+            <span style={{ fontSize: "11px", color: "rgba(255,215,0,0.5)" }}>{showArchive ? "▲ Hide" : "▼ Show Archive"}</span>
+          </button>
+          {showArchive && (
+            <div style={{ padding: "0 20px 20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {soldProps.map((p: Property) => {
+                  const profit = (p.soldPrice || 0) - p.value;
+                  const exitRoi = p.mortgage > 0 ? (profit / (p.value - p.mortgage)) * 100 : 0;
+                  return (
+                    <div key={p.id} style={{ background: "rgba(255,215,0,0.04)", border: "1px solid rgba(255,215,0,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "800" }}>{p.name}</span>
+                            <span style={{ fontSize: "9px", fontWeight: "700", padding: "2px 8px", borderRadius: "999px", background: "rgba(255,215,0,0.1)", color: "#ffd700", border: "1px solid rgba(255,215,0,0.2)" }}>SOLD</span>
+                          </div>
+                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{p.type}{p.address ? ` · ${p.address}` : ""}{p.soldDate ? ` · Sold ${p.soldDate}` : ""}</p>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={e => onEdit(p, e)} style={{ fontSize: "11px", padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontWeight: "600" }}>Edit</button>
+                          <button onClick={() => onDelete(p.id)} style={{ fontSize: "16px", background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer" }}>×</button>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "8px", marginTop: "12px" }}>
+                        {[
+                          { label: "Purchase Price", value: fmtFull(p.value), color: "#fff" },
+                          { label: "Sale Price", value: p.soldPrice ? fmtFull(p.soldPrice) : "—", color: "#ffd700" },
+                          { label: "Profit", value: p.soldPrice ? fmtFull(profit) : "—", color: profit >= 0 ? "#34d399" : "#f87171" },
+                          { label: "Exit ROI", value: p.soldPrice ? `${exitRoi.toFixed(1)}%` : "—", color: "#a78bfa" },
+                        ].map(m => (
+                          <div key={m.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: "10px", padding: "10px 12px" }}>
+                            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{m.label}</p>
+                            <p style={{ fontSize: "14px", fontWeight: "800", color: m.color }}>{m.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PropertyDetail({ property: p, onEdit, onClose }: any) {
