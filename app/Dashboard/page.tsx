@@ -402,7 +402,16 @@ export default function Dashboard() {
 </div>
 <Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={form.appreciation} onChange={e => setForm({ ...form, appreciation: e.target.value })} style={IS} /></Field>
 <div className="gs-modal-grid">
-  <Field label="Group / Building Tag (optional)"><input type="text" placeholder="e.g. Maple Portfolio, Montreal" value={form.groupTag} onChange={e => setForm({ ...form, groupTag: e.target.value })} style={IS} /></Field>
+  <Field label="Group / Building Tag (optional)">
+  <input type="text" placeholder="e.g. Maple Portfolio, Montreal" value={form.groupTag} onChange={e => setForm({ ...form, groupTag: e.target.value })} style={IS} />
+  {properties.filter(p => p.groupTag && p.groupTag !== form.groupTag).map(p => p.groupTag).filter((v, i, a) => a.indexOf(v) === i).length > 0 && (
+    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+      {properties.filter(p => p.groupTag && p.groupTag !== form.groupTag).map(p => p.groupTag).filter((v, i, a) => a.indexOf(v) === i).map((g: string) => (
+        <button key={g} type="button" onClick={() => setForm({ ...form, groupTag: g })} style={{ fontSize: "10px", padding: "3px 10px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "999px", color: "#60a5fa", cursor: "pointer", fontWeight: "700" }}>{g}</button>
+      ))}
+    </div>
+  )}
+</Field>
 </div></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "rgba(245,158,11,0.5)" : "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "Saving..." : editingId !== null ? "Save Changes" : "Add Property"}</button></div></div></div>)}
     </div>
   );
