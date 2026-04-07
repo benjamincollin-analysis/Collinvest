@@ -1395,7 +1395,7 @@ function ProjectsTab({ user }: { user: any }) {
                                       <span style={{ fontSize: "10px" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : "○"}</span>
                                     </div>
                                     <span style={{ fontSize: "10px", color: sc.color, fontWeight: "700", textAlign: "center", whiteSpace: "nowrap", marginTop: "4px" }}>{ph.name}</span>
-                                    <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ position: "absolute", top: "-6px", right: "8px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "4px", color: "#f87171", cursor: "pointer", fontSize: "11px", lineHeight: 1, padding: "1px 5px", fontWeight: "700" }}>×</button>
+                                    <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ position: "absolute", top: "0px", right: "0px", zIndex: 10, background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "4px", color: "#f87171", cursor: "pointer", fontSize: "11px", lineHeight: 1, padding: "1px 5px", fontWeight: "700" }}>×</button>
                                   </div>
                                   {!isLast && <div style={{ flex: 1, height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px", marginBottom: "20px" }} />}
                                 </div>
