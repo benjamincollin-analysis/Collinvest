@@ -116,6 +116,29 @@ function monthsToGoal(currentValue: number, annualRate: number, goal: number) { 
 function fmtTime(months: number) { if (months === 0) return "✓ Done"; if (months === Infinity) return "∞"; if (months < 12) return `${months}mo`; return `${Math.ceil(months / 12)}yr`; }
 function checkMilestone(currentPct: number, milestones: number[], seenKey: string): number | null { try { const seen: number[] = JSON.parse(localStorage.getItem(seenKey) || "[]"); for (const m of milestones) { if (currentPct >= m && !seen.includes(m)) { seen.push(m); localStorage.setItem(seenKey, JSON.stringify(seen)); return m; } } } catch {} return null; }
 
+function detectCountryFlag(address: string): { flag: string; code: string } | null {
+  if (!address) return null;
+  const a = address.toLowerCase();
+  const map: [string[], string, string][] = [
+    [["usa","united states","houston","new york","los angeles","chicago","miami","dallas","austin","denver","seattle","boston","atlanta","phoenix","las vegas","san francisco","nashville"," tx"," fl"," ca"," ny"," il"," co"," wa"," ma"," ga"," az"," nv"], "🇺🇸", "US"],
+    [["canada","toronto","vancouver","montreal","calgary","ottawa","edmonton"," bc"," on"," qc"," ab"], "🇨🇦", "CA"],
+    [["france","paris","lyon","bordeaux","marseille","nice","toulouse","nantes"," fr "], "🇫🇷", "FR"],
+    [["germany","berlin","munich","hamburg","frankfurt","cologne","düsseldorf"," de "], "🇩🇪", "DE"],
+    [["spain","madrid","barcelona","malaga","valencia","seville"," es "], "🇪🇸", "ES"],
+    [["uk","united kingdom","london","manchester","birmingham","glasgow","liverpool","edinburgh"," uk "], "🇬🇧", "UK"],
+    [["uae","dubai","abu dhabi","sharjah"," ae "], "🇦🇪", "AE"],
+    [["morocco","marrakech","casablanca","tanger","rabat","agadir"," ma "], "🇲🇦", "MA"],
+    [["portugal","lisbon","porto","faro","algarve"," pt "], "🇵🇹", "PT"],
+    [["italy","rome","milan","naples","florence","venice"," it "], "🇮🇹", "IT"],
+    [["australia","sydney","melbourne","brisbane","perth","adelaide"," au "], "🇦🇺", "AU"],
+    [["brazil","são paulo","rio de janeiro","brasilia"," br "], "🇧🇷", "BR"],
+    [["mexico","mexico city","cancun","guadalajara","monterrey"," mx "], "🇲🇽", "MX"],
+  ];
+  for (const [keywords, flag, code] of map) {
+    if (keywords.some(k => a.includes(k))) return { flag, code };
+  }
+  return null;
+}
 function TacticalMap({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void; }) {
   const mapRef = useRef<HTMLDivElement>(null); const leafletRef = useRef<any>(null); const markersRef = useRef<any[]>([]); const initDone = useRef(false);
   if (typeof window !== "undefined" && !initDone.current) { initDone.current = true; setTimeout(() => { if (!document.getElementById("leaflet-css")) { const link = document.createElement("link"); link.id = "leaflet-css"; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link); } if (!(window as any).L) { const script = document.createElement("script"); script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = () => setupMap(); document.head.appendChild(script); } else setupMap(); }, 100); }
@@ -342,7 +365,9 @@ export default function Dashboard() {
 
       <div className="gs-strip-desktop">
         {[{ label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}` }, { label: "Equity", value: fmtFull(totalEquity), color: "#f59e0b", sub: "net owned" }, { label: "Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}` }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m) => (<div key={m.label} className="strip-cell"><span className="gs-strip-label">{m.label}</span><span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span><span className="gs-strip-sub">{m.sub}</span></div>))}
-        <div className="strip-cell" style={{ paddingLeft: "16px", cursor: "pointer" }} onClick={() => setShowSettings(true)}><div style={{ display: "flex", justifyContent: "space-between" }}><span className="gs-strip-label">Goal</span><span className="gs-strip-sub">{portfolioPct.toFixed(0)}% ✎</span></div><div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginTop: "6px" }}><div style={{ height: "100%", width: `${portfolioPct}%`, background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px rgba(245,158,11,0.5)", transition: "width 0.8s" }} /></div><span className="gs-strip-sub" style={{ marginTop: "4px" }}>{fmt(totalValue)} of {fmt(GOAL_PORTFOLIO)}</span></div>
+        <div className="strip-cell" style={{ paddingLeft: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setShowSettings(true)}><div style={{ display: "flex", justifyContent: "space-between" }}><span className="gs-strip-label">Goal</span><span className="gs-strip-sub">{portfolioPct.toFixed(0)}% ✎</span></div><div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginTop: "6px" }}><div style={{ height: "100%", width: `${portfolioPct}%`, background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px rgba(245,158,11,0.5)", transition: "width 0.8s" }} /></div><span className="gs-strip-sub" style={{ marginTop: "4px" }}>{fmt(totalValue)} of {fmt(GOAL_PORTFOLIO)}</span></div><button onClick={() => { setActiveTab("portfolio"); openAdd(); }} style={{ flexShrink: 0, padding: "7px 13px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "8px", color: "#f59e0b", fontSize: "16px", fontWeight: "900", cursor: "pointer", lineHeight: 1 }} title="Add Property">+</button>
+        </div>
       </div>
 
       <div className="gs-strip-mobile">
@@ -357,7 +382,7 @@ export default function Dashboard() {
             <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
           </div>
           <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f5a623", sub: "net owned value" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff", sub: "monthly income" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171", sub: "monthly outflow" }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m: any) => (<div key={m.label} className="gs-kpi-card"><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.8px", textTransform: "uppercase", marginBottom: "10px", fontWeight: "700" }}>{m.label}</p><p style={{ fontSize: "24px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", lineHeight: 1 }}>{m.value}</p><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "6px" }}>{m.sub}</p></div>))}</div>
-          <div style={{ marginBottom: "20px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}><div><h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2><p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>All portfolio properties</p></div><button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "11px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "700" }}>⤢ Pop Out Map</button></div><TacticalMap properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} /></div>          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
+          <MapSection properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
 
@@ -413,6 +438,57 @@ export default function Dashboard() {
   )}
 </Field>
 </div></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "rgba(245,158,11,0.5)" : "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "Saving..." : editingId !== null ? "Save Changes" : "Add Property"}</button></div></div></div>)}
+    </div>
+  );
+}
+function MapSection({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void }) {
+  const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [pulseDone, setPulseDone] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setPulseDone(true), 2400); return () => clearTimeout(t); }, []);
+  const groups = Array.from(new Set(properties.map(p => p.groupTag).filter(Boolean))) as string[];
+  const filtered = filterGroup === "all" ? properties : properties.filter(p => p.groupTag === filterGroup);
+  const LEGEND = [
+    { color: "#34d399", label: "Occupied" },
+    { color: "#e879f9", label: "STR" },
+    { color: "#f87171", label: "Vacant" },
+    { color: "#60a5fa", label: "Planned" },
+    { color: "#ffd700", label: "Sold" },
+  ];
+  return (
+    <div style={{ marginBottom: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+        <div>
+          <h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Asset Map</h2>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>Tactical view · {properties.length} assets tracked</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {/* Group chips */}
+          {groups.length > 0 && (
+            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+              {["all", ...groups].map(g => (
+                <button key={g} onClick={() => setFilterGroup(g)} style={{ fontSize: "10px", padding: "4px 12px", borderRadius: "999px", fontWeight: "700", border: `1px solid ${filterGroup === g ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.08)"}`, background: filterGroup === g ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.03)", color: filterGroup === g ? "#60a5fa" : "rgba(255,255,255,0.35)", cursor: "pointer", transition: "all 0.15s" }}>{g === "all" ? "All Groups" : g}</button>
+              ))}
+            </div>
+          )}
+          {/* Pop out button — prominent */}
+          <button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "9px", fontWeight: "800", border: "none", cursor: "pointer", letterSpacing: "0.3px", boxShadow: pulseDone ? "none" : "0 0 0 4px rgba(245,158,11,0.25)", transition: "box-shadow 0.4s", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "14px" }}>↗</span> Full Map
+          </button>
+        </div>
+      </div>
+      {/* Map with legend overlay */}
+      <div style={{ position: "relative" }}>
+        <TacticalMap properties={filtered} selected={selected} onSelect={onSelect} />
+        {/* Legend — bottom left */}
+        <div style={{ position: "absolute", bottom: "14px", left: "14px", zIndex: 410, background: "rgba(5,10,15,0.88)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "10px 14px", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", gap: "6px" }}>
+          {LEGEND.map(l => (
+            <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color, boxShadow: `0 0 5px ${l.color}88`, flexShrink: 0 }} />
+              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontWeight: "600", letterSpacing: "0.5px" }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -495,7 +571,10 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     return (
       <tr onClick={() => onSelect(selected === p.id ? null : p.id)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selected === p.id ? "rgba(245,158,11,0.04)" : "transparent", transition: "background 0.15s" }}>
         <td style={{ padding: "14px 16px" }}>
-          <p style={{ fontWeight: "600" }}>{p.name}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <p style={{ fontWeight: "600" }}>{p.name}</p>
+            {(() => { const cf = detectCountryFlag(p.address); return cf ? (<span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "5px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", fontWeight: "700", letterSpacing: "0.3px", flexShrink: 0 }}>{cf.flag} {cf.code}</span>) : null; })()}
+          </div>
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>
             {p.type}{p.groupTag ? <span style={{ marginLeft: "6px", fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>{p.groupTag}</span> : null}
           </p>
