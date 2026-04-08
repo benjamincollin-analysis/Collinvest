@@ -116,28 +116,39 @@ function monthsToGoal(currentValue: number, annualRate: number, goal: number) { 
 function fmtTime(months: number) { if (months === 0) return "✓ Done"; if (months === Infinity) return "∞"; if (months < 12) return `${months}mo`; return `${Math.ceil(months / 12)}yr`; }
 function checkMilestone(currentPct: number, milestones: number[], seenKey: string): number | null { try { const seen: number[] = JSON.parse(localStorage.getItem(seenKey) || "[]"); for (const m of milestones) { if (currentPct >= m && !seen.includes(m)) { seen.push(m); localStorage.setItem(seenKey, JSON.stringify(seen)); return m; } } } catch {} return null; }
 
-function detectCountryFlag(address: string): { flag: string; code: string } | null {
+function detectCountryFlag(address: string): { code: string; iso: string } | null {
   if (!address) return null;
   const a = address.toLowerCase();
   const map: [string[], string, string][] = [
-    [["usa","united states","houston","new york","los angeles","chicago","miami","dallas","austin","denver","seattle","boston","atlanta","phoenix","las vegas","san francisco","nashville"," tx"," fl"," ca"," ny"," il"," co"," wa"," ma"," ga"," az"," nv"], "🇺🇸", "US"],
-    [["canada","toronto","vancouver","montreal","calgary","ottawa","edmonton"," bc"," on"," qc"," ab"], "🇨🇦", "CA"],
-    [["france","paris","lyon","bordeaux","marseille","nice","toulouse","nantes"," fr "], "🇫🇷", "FR"],
-    [["germany","berlin","munich","hamburg","frankfurt","cologne","düsseldorf"," de "], "🇩🇪", "DE"],
-    [["spain","madrid","barcelona","malaga","valencia","seville"," es "], "🇪🇸", "ES"],
-    [["uk","united kingdom","london","manchester","birmingham","glasgow","liverpool","edinburgh"," uk "], "🇬🇧", "UK"],
-    [["uae","dubai","abu dhabi","sharjah"," ae "], "🇦🇪", "AE"],
-    [["morocco","marrakech","casablanca","tanger","rabat","agadir"," ma "], "🇲🇦", "MA"],
-    [["portugal","lisbon","porto","faro","algarve"," pt "], "🇵🇹", "PT"],
-    [["italy","rome","milan","naples","florence","venice"," it "], "🇮🇹", "IT"],
-    [["australia","sydney","melbourne","brisbane","perth","adelaide"," au "], "🇦🇺", "AU"],
-    [["brazil","são paulo","rio de janeiro","brasilia"," br "], "🇧🇷", "BR"],
-    [["mexico","mexico city","cancun","guadalajara","monterrey"," mx "], "🇲🇽", "MX"],
+    [["usa","united states","houston","new york","los angeles","chicago","miami","dallas","austin","denver","seattle","boston","atlanta","phoenix","las vegas","san francisco","nashville"," tx"," fl"," ca"," ny"," il"," co"," wa"," ma"," ga"," az"," nv"], "US", "us"],
+    [["canada","toronto","vancouver","montreal","calgary","ottawa","edmonton"," bc"," on"," qc"," ab"], "CA", "ca"],
+    [["france","paris","lyon","bordeaux","marseille","nice","toulouse","nantes"," fr "], "FR", "fr"],
+    [["germany","berlin","munich","hamburg","frankfurt","cologne","düsseldorf"," de "], "DE", "de"],
+    [["spain","madrid","barcelona","malaga","valencia","seville"," es "], "ES", "es"],
+    [["uk","united kingdom","london","manchester","birmingham","glasgow","liverpool","edinburgh"," uk "], "UK", "gb"],
+    [["uae","dubai","abu dhabi","sharjah"," ae "], "AE", "ae"],
+    [["morocco","marrakech","casablanca","tanger","rabat","agadir"," ma "], "MA", "ma"],
+    [["portugal","lisbon","porto","faro","algarve"," pt "], "PT", "pt"],
+    [["italy","rome","milan","naples","florence","venice"," it "], "IT", "it"],
+    [["australia","sydney","melbourne","brisbane","perth","adelaide"," au "], "AU", "au"],
+    [["brazil","são paulo","rio de janeiro","brasilia"," br "], "BR", "br"],
+    [["mexico","mexico city","cancun","guadalajara","monterrey"," mx "], "MX", "mx"],
   ];
-  for (const [keywords, flag, code] of map) {
-    if (keywords.some(k => a.includes(k))) return { flag, code };
+  for (const [keywords, code, iso] of map) {
+    if (keywords.some(k => a.includes(k))) return { code, iso };
   }
   return null;
+}
+
+function FlagPill({ address }: { address: string }) {
+  const cf = detectCountryFlag(address);
+  if (!cf) return null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10px", padding: "1px 7px", borderRadius: "5px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontWeight: "700", letterSpacing: "0.3px", flexShrink: 0 }}>
+      <img src={`https://flagcdn.com/16x12/${cf.iso}.png`} width="16" height="12" alt={cf.code} style={{ borderRadius: "2px", objectFit: "cover" }} />
+      {cf.code}
+    </span>
+  );
 }
 function TacticalMap({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void; }) {
   const mapRef = useRef<HTMLDivElement>(null); const leafletRef = useRef<any>(null); const markersRef = useRef<any[]>([]); const initDone = useRef(false);
@@ -364,9 +375,10 @@ export default function Dashboard() {
       </nav>
 
       <div className="gs-strip-desktop">
-        {[{ label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}` }, { label: "Equity", value: fmtFull(totalEquity), color: "#f59e0b", sub: "net owned" }, { label: "Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}` }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m) => (<div key={m.label} className="strip-cell"><span className="gs-strip-label">{m.label}</span><span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span><span className="gs-strip-sub">{m.sub}</span></div>))}
+        {[{ label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}` }, { label: "Equity", value: fmtFull(totalEquity), color: "#f59e0b", sub: "net owned" }, { label: "Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}` }].map((m) => (<div key={m.label} className="strip-cell"><span className="gs-strip-label">{m.label}</span><span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span><span className="gs-strip-sub">{m.sub}</span></div>))}
+        <div className="strip-cell" style={{ flexDirection: "row", alignItems: "center", gap: "10px", paddingLeft: "18px" }}><div style={{ display: "flex", flexDirection: "column", gap: "3px", flex: 1 }}><span className="gs-strip-label">Properties</span><span className="gs-strip-value" style={{ color: "#fff" }}>{String(properties.length)}</span><span className="gs-strip-sub">{properties.filter(p => p.occupancyStatus === "occupied").length} occupied</span></div><button onClick={() => { setActiveTab("portfolio"); openAdd(); }} style={{ flexShrink: 0, padding: "6px 12px", background: "#f59e0b", color: "#000", borderRadius: "7px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>+ Add</button></div>
         <div className="strip-cell" style={{ paddingLeft: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setShowSettings(true)}><div style={{ display: "flex", justifyContent: "space-between" }}><span className="gs-strip-label">Goal</span><span className="gs-strip-sub">{portfolioPct.toFixed(0)}% ✎</span></div><div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginTop: "6px" }}><div style={{ height: "100%", width: `${portfolioPct}%`, background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px rgba(245,158,11,0.5)", transition: "width 0.8s" }} /></div><span className="gs-strip-sub" style={{ marginTop: "4px" }}>{fmt(totalValue)} of {fmt(GOAL_PORTFOLIO)}</span></div><button onClick={() => { setActiveTab("portfolio"); openAdd(); }} style={{ flexShrink: 0, padding: "7px 13px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "8px", color: "#f59e0b", fontSize: "16px", fontWeight: "900", cursor: "pointer", lineHeight: 1 }} title="Add Property">+</button>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setShowSettings(true)}><div style={{ display: "flex", justifyContent: "space-between" }}><span className="gs-strip-label">Goal</span><span className="gs-strip-sub">{portfolioPct.toFixed(0)}% ✎</span></div><div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginTop: "6px" }}><div style={{ height: "100%", width: `${portfolioPct}%`, background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px rgba(245,158,11,0.5)", transition: "width 0.8s" }} /></div><span className="gs-strip-sub" style={{ marginTop: "4px" }}>{fmt(totalValue)} of {fmt(GOAL_PORTFOLIO)}</span></div>
         </div>
       </div>
 
@@ -573,7 +585,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
         <td style={{ padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <p style={{ fontWeight: "600" }}>{p.name}</p>
-            {(() => { const cf = detectCountryFlag(p.address); return cf ? (<span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "5px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", fontWeight: "700", letterSpacing: "0.3px", flexShrink: 0 }}>{cf.flag} {cf.code}</span>) : null; })()}
+            <FlagPill address={p.address} />
           </div>
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>
             {p.type}{p.groupTag ? <span style={{ marginLeft: "6px", fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>{p.groupTag}</span> : null}
@@ -670,6 +682,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                             <span style={{ fontSize: "14px", fontWeight: "800" }}>{p.name}</span>
                             <span style={{ fontSize: "9px", fontWeight: "700", padding: "2px 8px", borderRadius: "999px", background: "rgba(255,215,0,0.1)", color: "#ffd700", border: "1px solid rgba(255,215,0,0.2)" }}>SOLD</span>
+                            <FlagPill address={p.address} />
                           </div>
                           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{p.type}{p.address ? ` · ${p.address}` : ""}{p.soldDate ? ` · Sold ${p.soldDate}` : ""}</p>
                         </div>
