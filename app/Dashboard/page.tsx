@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
@@ -86,7 +86,8 @@ function fromDb(row: any): Property {
   return { id: row.id, name: row.name, type: row.type, value: row.value, mortgage: row.mortgage, rent: row.rent, expenses: row.expenses, occupancyStatus: row.occupancy_status, plannedDate: row.planned_date || "", appreciation: row.appreciation, lat: row.lat, lng: row.lng, address: row.address || "", occupancyPct: row.occupancy_pct ?? 100, soldPrice: row.sold_price ?? 0, soldDate: row.sold_date ?? "", parentId: row.parent_id ?? null, groupTag: row.group_tag ?? "" };
 }
 function fmt(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K"; return "$" + n.toLocaleString("en-US"); }
-function fmtFull(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US"); }
+function fmtFull(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US"); }
+function fmtComma(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US"); }
 function pct(value: number, total: number) { return Math.min(100, Math.max(0, (value / total) * 100)); }
 function isEffectivelyOccupied(p: Property) { return p.occupancyStatus === "occupied" || p.occupancyStatus === "str"; }
 function propCashFlow(p: Property) {
@@ -376,7 +377,7 @@ export default function Dashboard() {
 
       <div className="gs-strip-desktop">
         {[{ label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}` }, { label: "Equity", value: fmtFull(totalEquity), color: "#f59e0b", sub: "net owned" }, { label: "Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}` }].map((m) => (<div key={m.label} className="strip-cell"><span className="gs-strip-label">{m.label}</span><span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span><span className="gs-strip-sub">{m.sub}</span></div>))}
-        <div className="strip-cell" style={{ flexDirection: "row", alignItems: "center", gap: "10px", paddingLeft: "18px" }}><div style={{ display: "flex", flexDirection: "column", gap: "3px", flex: 1 }}><span className="gs-strip-label">Properties</span><span className="gs-strip-value" style={{ color: "#fff" }}>{String(properties.length)}</span><span className="gs-strip-sub">{properties.filter(p => p.occupancyStatus === "occupied").length} occupied</span></div><button onClick={() => { setActiveTab("portfolio"); openAdd(); }} style={{ flexShrink: 0, padding: "6px 12px", background: "#f59e0b", color: "#000", borderRadius: "7px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>+ Add</button></div>
+        <div className="strip-cell" style={{ flexDirection: "row", alignItems: "center", gap: "10px", paddingLeft: "18px" }}><div style={{ display: "flex", flexDirection: "column", gap: "3px", flex: 1 }}><span className="gs-strip-label">Properties</span><span className="gs-strip-value" style={{ color: "#fff" }}>{String(properties.length)}</span><span className="gs-strip-sub">{properties.filter(p => p.occupancyStatus === "occupied").length} occupied</span></div><button onClick={() => { setActiveTab("portfolio"); openAdd(); }} style={{ flexShrink: 0, padding: "6px 12px", background: "#f59e0b", color: "#000", borderRadius: "7px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>+ Add Property</button></div>
         <div className="strip-cell" style={{ paddingLeft: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
           <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setShowSettings(true)}><div style={{ display: "flex", justifyContent: "space-between" }}><span className="gs-strip-label">Goal</span><span className="gs-strip-sub">{portfolioPct.toFixed(0)}% ✎</span></div><div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginTop: "6px" }}><div style={{ height: "100%", width: `${portfolioPct}%`, background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px rgba(245,158,11,0.5)", transition: "width 0.8s" }} /></div><span className="gs-strip-sub" style={{ marginTop: "4px" }}>{fmt(totalValue)} of {fmt(GOAL_PORTFOLIO)}</span></div>
         </div>
@@ -394,7 +395,9 @@ export default function Dashboard() {
             <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
           </div>
           <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f5a623", sub: "net owned value" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff", sub: "monthly income" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171", sub: "monthly outflow" }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m: any) => (<div key={m.label} className="gs-kpi-card"><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.8px", textTransform: "uppercase", marginBottom: "10px", fontWeight: "700" }}>{m.label}</p><p style={{ fontSize: "24px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", lineHeight: 1 }}>{m.value}</p><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "6px" }}>{m.sub}</p></div>))}</div>
-          <MapSection properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
+          <MapSection properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />
+          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
+          <CompareProperties properties={properties} />
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
 
@@ -455,10 +458,21 @@ export default function Dashboard() {
 }
 function MapSection({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void }) {
   const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [pulseDone, setPulseDone] = useState(false);
   useEffect(() => { const t = setTimeout(() => setPulseDone(true), 2400); return () => clearTimeout(t); }, []);
   const groups = Array.from(new Set(properties.map(p => p.groupTag).filter(Boolean))) as string[];
-  const filtered = filterGroup === "all" ? properties : properties.filter(p => p.groupTag === filterGroup);
+  const STATUS_CHIPS = [
+    { val: "all", label: "All" },
+    { val: "occupied", label: "Occupied", color: "#34d399" },
+    { val: "vacant", label: "Vacant", color: "#f87171" },
+    { val: "str", label: "STR", color: "#e879f9" },
+    { val: "planned", label: "Planned", color: "#60a5fa" },
+    { val: "sold", label: "Sold", color: "#ffd700" },
+  ];
+  const filtered = properties
+    .filter(p => filterStatus === "all" || p.occupancyStatus === filterStatus)
+    .filter(p => filterGroup === "all" || p.groupTag === filterGroup);
   const LEGEND = [
     { color: "#34d399", label: "Occupied" },
     { color: "#e879f9", label: "STR" },
@@ -474,33 +488,109 @@ function MapSection({ properties, selected, onSelect }: { properties: Property[]
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>Tactical view · {properties.length} assets tracked</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          {/* Group chips */}
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            {STATUS_CHIPS.map(s => (
+              <button key={s.val} onClick={() => setFilterStatus(s.val)} style={{ fontSize: "10px", padding: "4px 11px", borderRadius: "999px", fontWeight: "700", border: `1px solid ${filterStatus === s.val ? (s.color || "rgba(255,255,255,0.4)") + "88" : "rgba(255,255,255,0.08)"}`, background: filterStatus === s.val ? (s.color || "#fff") + "18" : "rgba(255,255,255,0.03)", color: filterStatus === s.val ? (s.color || "#fff") : "rgba(255,255,255,0.35)", cursor: "pointer", transition: "all 0.15s" }}>{s.label}</button>
+            ))}
+          </div>
           {groups.length > 0 && (
-            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", alignSelf: "center", fontWeight: "600", letterSpacing: "0.5px" }}>GROUP:</span>
               {["all", ...groups].map(g => (
-                <button key={g} onClick={() => setFilterGroup(g)} style={{ fontSize: "10px", padding: "4px 12px", borderRadius: "999px", fontWeight: "700", border: `1px solid ${filterGroup === g ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.08)"}`, background: filterGroup === g ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.03)", color: filterGroup === g ? "#60a5fa" : "rgba(255,255,255,0.35)", cursor: "pointer", transition: "all 0.15s" }}>{g === "all" ? "All Groups" : g}</button>
+                <button key={g} onClick={() => setFilterGroup(g)} style={{ fontSize: "10px", padding: "4px 11px", borderRadius: "999px", fontWeight: "700", border: `1px solid ${filterGroup === g ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.08)"}`, background: filterGroup === g ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.03)", color: filterGroup === g ? "#60a5fa" : "rgba(255,255,255,0.35)", cursor: "pointer", transition: "all 0.15s" }}>{g === "all" ? "All" : g}</button>
               ))}
             </div>
           )}
-          {/* Pop out button — prominent */}
           <button onClick={() => window.open("/map", "_blank")} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "9px", fontWeight: "800", border: "none", cursor: "pointer", letterSpacing: "0.3px", boxShadow: pulseDone ? "none" : "0 0 0 4px rgba(245,158,11,0.25)", transition: "box-shadow 0.4s", display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ fontSize: "14px" }}>↗</span> Full Map
           </button>
         </div>
       </div>
-      {/* Map with legend overlay */}
       <div style={{ position: "relative" }}>
         <TacticalMap properties={filtered} selected={selected} onSelect={onSelect} />
-        {/* Legend — bottom left */}
         <div style={{ position: "absolute", bottom: "14px", left: "14px", zIndex: 410, background: "rgba(5,10,15,0.88)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "10px 14px", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", gap: "6px" }}>
           {LEGEND.map(l => (
             <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-              <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color, boxShadow: `0 0 5px ${l.color}88`, flexShrink: 0 }} />
+              <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color, boxShadow: "0 0 5px " + l.color + "88", flexShrink: 0 }} />
               <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontWeight: "600", letterSpacing: "0.5px" }}>{l.label}</span>
             </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+function CompareProperties({ properties }: { properties: Property[] }) {
+  const [propA, setPropA] = useState<number | string>(properties[0]?.id || "");
+  const [propB, setPropB] = useState<number | string>(properties[1]?.id || "");
+  const [open, setOpen] = useState(false);
+  const pA = properties.find(p => p.id === propA);
+  const pB = properties.find(p => p.id === propB);
+  function metric(label: string, valA: string, valB: string, colorA?: string, colorB?: string, higherIsBetter = true) {
+    const numA = parseFloat(valA.replace(/[^0-9.-]/g, "")); const numB = parseFloat(valB.replace(/[^0-9.-]/g, ""));
+    const aWins = higherIsBetter ? numA > numB : numA < numB; const bWins = higherIsBetter ? numB > numA : numB < numA;
+    return (<div style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr", gap: "8px", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><div style={{ textAlign: "right" }}><span style={{ fontSize: "14px", fontWeight: "800", color: colorA || (aWins ? "#34d399" : "#fff"), background: aWins ? "rgba(52,211,153,0.08)" : "transparent", padding: "3px 10px", borderRadius: "6px" }}>{valA}</span></div><div style={{ textAlign: "center" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", fontWeight: "700", letterSpacing: "0.8px", textTransform: "uppercase" }}>{label}</span></div><div style={{ textAlign: "left" }}><span style={{ fontSize: "14px", fontWeight: "800", color: colorB || (bWins ? "#34d399" : "#fff"), background: bWins ? "rgba(52,211,153,0.08)" : "transparent", padding: "3px 10px", borderRadius: "6px" }}>{valB}</span></div></div>);
+  }
+  const activeProps = properties.filter(p => p.occupancyStatus !== "sold");
+  return (
+    <div style={{ marginBottom: "20px" }}>
+      <button onClick={() => setOpen(!open)} style={{ width: "100%", padding: "14px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: open ? "16px 16px 0 0" : "16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "16px" }}>⚖️</span>
+          <div style={{ textAlign: "left" }}>
+            <p style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.5)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Compare Properties</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>Side-by-side analysis of any two assets</p>
+          </div>
+        </div>
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>{open ? "▲ Close" : "▼ Open"}</span>
+      </button>
+      {open && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 16px 16px", padding: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 40px 1fr", gap: "10px", alignItems: "center", marginBottom: "20px" }}>
+            <select value={propA} onChange={e => setPropA(Number(e.target.value))} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", fontWeight: "700" }}>
+              {activeProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div style={{ textAlign: "center", fontSize: "16px", color: "rgba(255,255,255,0.2)", fontWeight: "800" }}>vs</div>
+            <select value={propB} onChange={e => setPropB(Number(e.target.value))} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", fontWeight: "700" }}>
+              {activeProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          {pA && pB ? (() => {
+            const cfA = propCashFlow(pA); const cfB = propCashFlow(pB);
+            const eqA = pA.value - pA.mortgage; const eqB = pB.value - pB.mortgage;
+            const roiA = eqA > 0 ? (cfA * 12 / eqA) * 100 : 0; const roiB = eqB > 0 ? (cfB * 12 / eqB) * 100 : 0;
+            const ltvA = pA.value > 0 ? (pA.mortgage / pA.value) * 100 : 0; const ltvB = pB.value > 0 ? (pB.mortgage / pB.value) * 100 : 0;
+            const yieldA = pA.value > 0 ? (pA.rent * 12 / pA.value) * 100 : 0; const yieldB = pB.value > 0 ? (pB.rent * 12 / pB.value) * 100 : 0;
+            return (
+              <div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr", gap: "8px", marginBottom: "16px" }}>
+                  <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "10px", padding: "12px", textAlign: "right" }}>
+                    <p style={{ fontSize: "13px", fontWeight: "800", color: "#f59e0b" }}>{pA.name}</p>
+                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{pA.type}</p>
+                    <FlagPill address={pA.address} />
+                  </div>
+                  <div />
+                  <div style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px", padding: "12px", textAlign: "left" }}>
+                    <p style={{ fontSize: "13px", fontWeight: "800", color: "#60a5fa" }}>{pB.name}</p>
+                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{pB.type}</p>
+                    <FlagPill address={pB.address} />
+                  </div>
+                </div>
+                {metric("Market Value", fmtFull(pA.value), fmtFull(pB.value))}
+                {metric("Equity", fmtFull(eqA), fmtFull(eqB))}
+                {metric("Monthly CF", (cfA >= 0 ? "+" : "") + fmtFull(cfA), (cfB >= 0 ? "+" : "") + fmtFull(cfB), cfA >= 0 ? "#34d399" : "#f87171", cfB >= 0 ? "#34d399" : "#f87171")}
+                {metric("Annual ROI", roiA.toFixed(1) + "%", roiB.toFixed(1) + "%")}
+                {metric("Gross Yield", yieldA.toFixed(1) + "%", yieldB.toFixed(1) + "%")}
+                {metric("LTV Ratio", ltvA.toFixed(1) + "%", ltvB.toFixed(1) + "%", undefined, undefined, false)}
+                {metric("Appreciation", pA.appreciation + "%/yr", pB.appreciation + "%/yr")}
+                {metric("Monthly Rent", fmtFull(pA.rent), fmtFull(pB.rent))}
+                {metric("Monthly Expenses", fmtFull(pA.expenses), fmtFull(pB.expenses), undefined, undefined, false)}
+                <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: "14px" }}>Green highlight = better performer on that metric</p>
+              </div>
+            );
+          })() : <p style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px", padding: "20px" }}>Select two properties to compare.</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -718,7 +808,9 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
 
 function PropertyDetail({ property: p, onEdit, onClose }: any) {
   const equity = p.value - p.mortgage; const cf = propCashFlow(p); const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) + "%" : "—";
-  return (<div style={{ background: "rgba(245,158,11,0.03)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "24px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px" }}><div style={{ flex: 1, minWidth: 0 }}><h3 style={{ fontSize: "17px", fontWeight: "800" }}>{p.name}</h3><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{p.type} · {occupancyLabel(p)}{p.address ? ` · ${p.address}` : ""}</p></div><div style={{ display: "flex", gap: "8px", flexShrink: 0 }}><button onClick={e => onEdit(p, e)} style={{ fontSize: "12px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>Edit</button><button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>×</button></div></div><div className="gs-detail-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>{[{ label: "Market Value", value: fmtFull(p.value) }, { label: "Mortgage", value: fmtFull(p.mortgage) }, { label: "Equity", value: fmtFull(equity), hi: true }, { label: "Appreciation", value: p.appreciation + "%/yr" }, { label: "Monthly Rent", value: isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—" }, { label: "Expenses", value: fmtFull(p.expenses) }, { label: "Net Cash Flow", value: fmtFull(cf) }, { label: "Annual ROI", value: roi }].map((m: any) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "14px", border: m.hi ? "1px solid rgba(245,158,11,0.2)" : "1px solid rgba(255,255,255,0.05)" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "6px", letterSpacing: "0.8px", textTransform: "uppercase" }}>{m.label}</p><p style={{ fontSize: "16px", fontWeight: "700", color: m.hi ? "#f59e0b" : "#fff" }}>{m.value}</p></div>))}</div></div>);
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
+  return (<div ref={detailRef} style={{ background: "rgba(245,158,11,0.03)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "24px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px" }}><div style={{ flex: 1, minWidth: 0 }}><h3 style={{ fontSize: "17px", fontWeight: "800" }}>{p.name}</h3><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{p.type} · {occupancyLabel(p)}{p.address ? ` · ${p.address}` : ""}</p></div><div style={{ display: "flex", gap: "8px", flexShrink: 0 }}><button onClick={e => onEdit(p, e)} style={{ fontSize: "12px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>Edit</button><button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>×</button></div></div><div className="gs-detail-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>{[{ label: "Market Value", value: fmtFull(p.value) }, { label: "Mortgage", value: fmtFull(p.mortgage) }, { label: "Equity", value: fmtFull(equity), hi: true }, { label: "Appreciation", value: p.appreciation + "%/yr" }, { label: "Monthly Rent", value: isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—" }, { label: "Expenses", value: fmtFull(p.expenses) }, { label: "Net Cash Flow", value: fmtFull(cf) }, { label: "Annual ROI", value: roi }].map((m: any) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "14px", border: m.hi ? "1px solid rgba(245,158,11,0.2)" : "1px solid rgba(255,255,255,0.05)" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "6px", letterSpacing: "0.8px", textTransform: "uppercase" }}>{m.label}</p><p style={{ fontSize: "16px", fontWeight: "700", color: m.hi ? "#f59e0b" : "#fff" }}>{m.value}</p></div>))}</div></div>);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
