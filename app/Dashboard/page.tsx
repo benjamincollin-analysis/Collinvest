@@ -2082,7 +2082,7 @@ function ProjectsTab({ user }: { user: any }) {
                                   </div>
                                   {!isLast && (
                                     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", marginBottom: "20px", gap: "4px" }}>
-                                      <div style={{ width: "100%", height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px" }} />
+                                      <div style={{ width: "100%", height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", marginTop: "0px", marginRight: "4px", marginBottom: "0px", marginLeft: "4px" }} />
                                       {daysIn !== null && ph.status === "in_progress" && (() => {
                                         const avg = PHASE_AVG_DAYS[ph.name] || 14;
                                         const isOverAvg = daysIn !== null && daysIn > avg;
