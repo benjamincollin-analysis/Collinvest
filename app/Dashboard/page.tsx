@@ -190,7 +190,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"portfolio" | "finances" | "projects" | "market" | "projections">("portfolio");
+  const [activeTab, setActiveTab] = useState<"portfolio" | "finances" | "projects" | "market" | "projections" | "deallab">("portfolio");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -369,7 +369,7 @@ const [showCompare, setShowCompare] = useState(false);
           <span style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>GOLDSTREAM</span>
           <span style={{ fontSize: "9px", fontWeight: "600", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>BETA</span>
         </div>
-        <div className="gs-tabs">{(["portfolio", "finances", "projects", "market", "projections"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
+        <div className="gs-tabs">{(["portfolio", "finances", "projects", "market", "projections", "deallab"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
           <NotificationBell user={user} properties={properties} />
@@ -423,8 +423,10 @@ const [showCompare, setShowCompare] = useState(false);
           </div>
         </>}
 
-        {activeTab === "market" && <MarketInline />}{activeTab === "projects" && <ProjectsTab user={user} />}
+        {activeTab === "market" && <MarketInline />}
+{activeTab === "projects" && <ProjectsTab user={user} />}
 {activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
+{activeTab === "deallab" && <DealLabTab user={user} />}
       </div>
 
       {showCompare && (
@@ -3655,4 +3657,442 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
+// ── DEAL LAB TAB ─────────────────────────────────────────────────────
+// Paste this entire block just before the closing brace of the file,
+// after the NotificationBell function.
 
+function DealLabTab({ user }: { user: any }) {
+  const [subTab, setSubTab] = useState<"discover" | "analysis" | "pros">("discover");
+  const [filterTier, setFilterTier] = useState<"all" | "p" | "a" | "b">("all");
+  const [search, setSearch] = useState("");
+  const [selectedCard, setSelectedCard] = useState<any>(null);
+  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(true);
+  const [showAddAnalysis, setShowAddAnalysis] = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", project_type: "", tier: "a", capital: "", geography: "", time_per_week: "", risk: "Med", notes: "", deadline: "" });
+  const [profilerCapital, setProfilerCapital] = useState("$50k–$150k");
+  const [profilerTime, setProfilerTime] = useState("5–20h/week");
+  const [profilerGeo, setProfilerGeo] = useState<string[]>(["United States"]);
+  const [imgCache, setImgCache] = useState<Record<string, string>>({});
+
+  const PEXELS_KEY = "563492ad6f91700001000001b8c1f2e2b1f44a1a9c3d1e2f3a4b5c6";
+  const PEXELS_QUERIES: Record<string, string> = {
+    "reit": "real estate investment building", "note": "mortgage paperwork signing", "crowd": "crowdfunding investment group",
+    "land": "aerial land parcel field", "turnkey": "modern furnished rental apartment", "syndlp": "large apartment complex aerial",
+    "dscr": "property manager keys rental", "str": "airbnb short term rental cozy interior", "brrrr": "house renovation before after",
+    "hack": "duplex house suburban", "midterm": "furnished apartment bedroom professional", "flip": "house flip renovation construction",
+    "small": "duplex triplex building exterior", "colive": "co-living shared house interior", "sto": "self storage facility units",
+    "rent2own": "house keys handover sale", "park": "parking lot urban city", "large": "apartment complex large building",
+    "boutique": "boutique hotel luxury small", "venue": "wedding venue outdoor elegant", "student": "student housing dormitory university",
+    "senior": "senior living community garden", "mixed": "mixed use building retail residential", "commercial": "strip mall commercial retail",
+    "ground": "new construction residential build", "datacenter": "data center server room", "rehab": "commercial building renovation",
+    "glamping": "glamping tent nature luxury",
+  };
+
+  const PROJECTS = [
+    { id:"reit", tier:"p", name:"REIT investment", roi:"8–12%", cap:"$1k min", time:"0h/wk", risk:"Low", fill:55, desc:"Buy shares in a publicly traded real estate investment trust. Fully hands-off, liquid like a stock, quarterly dividends. No tenants, no toilets, no calls at 2am.", riskDetail:"Low — publicly regulated, diversified exposure, can lose value in market downturns", chips:["Dividends","Liquid","Tax-advantaged"] },
+    { id:"note", tier:"p", name:"Mortgage note", roi:"8–13%", cap:"$50k min", time:"1h/wk", risk:"Low", fill:60, desc:"Buy an existing mortgage from a bank at a discount. You collect monthly interest payments. Secured by real property but you never own or manage it.", riskDetail:"Low — secured by property deed, but defaults and foreclosure process can be slow and costly", chips:["Monthly income","Secured","No tenants"] },
+    { id:"crowd", tier:"p", name:"Crowdfunding LP", roi:"7–14%", cap:"$5k min", time:"1h/wk", risk:"Low-Med", fill:52, desc:"Invest as a limited partner in large deals via platforms like Fundrise or CrowdStreet. Platform manages everything — you contribute capital and receive quarterly reports.", riskDetail:"Low-Med — platform risk, illiquidity, project-specific risks apply", chips:["Diversified","Platform-managed","Quarterly reports"] },
+    { id:"land", tier:"p", name:"Land banking", roi:"10–30%", cap:"$20k min", time:"2h/wk", risk:"Med", fill:58, desc:"Buy undeveloped land in the path of growth and hold for appreciation. No tenants, minimal maintenance. Long-term play requiring patience and good market timing.", riskDetail:"Med — illiquid, no income stream, zoning changes can hurt value", chips:["Long-term hold","No maintenance","Appreciation play"] },
+    { id:"turnkey", tier:"p", name:"Turnkey rental", roi:"8–11%", cap:"$80k min", time:"3h/wk", risk:"Low", fill:62, desc:"Buy a fully renovated, tenant-occupied property managed by a third-party PM. Cash flow from day one with minimal involvement. Best for remote or passive investors.", riskDetail:"Low — PM fees reduce returns, turnkey premiums can thin margins", chips:["Fully managed","Cash flow day 1","Remote-friendly"] },
+    { id:"syndlp", tier:"p", name:"Syndication LP", roi:"12–18%", cap:"$50k min", time:"2h/wk", risk:"Med", fill:65, desc:"Invest as a silent limited partner in large apartment or commercial deals. General partners run everything. You get distributions and tax benefits with a 5–7 year lockup.", riskDetail:"Med — capital is locked, depends entirely on GP competence and market conditions", chips:["Big deals access","Tax benefits","5–7yr lockup"] },
+    { id:"dscr", tier:"p", name:"DSCR rental + PM", roi:"9–13%", cap:"$70k min", time:"3h/wk", risk:"Low-Med", fill:59, desc:"Buy a long-term rental using a DSCR loan (qualified by rental income, not your salary) and hand operations to a property manager. Scalable model for building a portfolio.", riskDetail:"Low-Med — PM fees 8–10%, vacancy still hits your bottom line", chips:["Leverage","PM handles ops","Scalable"] },
+    { id:"str", tier:"a", name:"Short-term rental", roi:"20–35%", cap:"$80k min", time:"10h/wk", risk:"Med", fill:88, desc:"Airbnb/VRBO model — rent furnished units by the night or week. High nightly rates but requires active management, dynamic pricing, and constant guest communication.", riskDetail:"Med — regulation risk is high (cities banning STR), seasonality, high turnover costs", chips:["High yield","Dynamic pricing","Regulation risk"] },
+    { id:"brrrr", tier:"a", name:"BRRRR strategy", roi:"25–40%", cap:"$60k min", time:"15h/wk", risk:"Med", fill:82, desc:"Buy distressed, Rehab, Rent, Refinance, Repeat. Recycle your capital by pulling it back out via refinance to fund the next deal. Powerful wealth builder for experienced investors.", riskDetail:"Med — rehab cost overruns, appraisal risk at refinance, contractor dependency", chips:["Capital recycling","Forced appreciation","Requires contractors"] },
+    { id:"hack", tier:"a", name:"House hacking", roi:"15–25%", cap:"$50k min", time:"6h/wk", risk:"Low", fill:79, desc:"Live in one unit of a multi-family property while renting the others. Offset or eliminate your housing cost. Best entry point for first-time investors using FHA financing.", riskDetail:"Low — you must live on site, proximity to tenants can create friction", chips:["Low entry","FHA eligible","Live-in required"] },
+    { id:"midterm", tier:"a", name:"Mid-term rental", roi:"18–28%", cap:"$75k min", time:"8h/wk", risk:"Low-Med", fill:84, desc:"Furnished 1–6 month rentals targeting travel nurses, contractors, and relocating professionals. Higher than long-term rent, less regulation than STR, lower turnover costs.", riskDetail:"Low-Med — furnished unit costs more upfront, vacancy between stays possible", chips:["Stable demand","Less regulation","Furnished premium"] },
+    { id:"flip", tier:"a", name:"Fix & flip", roi:"30–50%", cap:"$100k min", time:"20h/wk", risk:"High", fill:71, desc:"Buy distressed properties at a discount, renovate fast, sell at market value. Project-based income, not recurring. Requires contractor management and fast execution.", riskDetail:"High — holding costs, construction overruns, market timing critical, no income during reno", chips:["Short cycle","High profit","Execution risk"] },
+    { id:"small", tier:"a", name:"Small multifamily (2–4)", roi:"12–20%", cap:"$100k min", time:"8h/wk", risk:"Low-Med", fill:80, desc:"Own a duplex, triplex, or quad. Multiple income streams with residential financing (up to 4 units). Easier to manage than large multifamily, scalable, and bankable.", riskDetail:"Low-Med — one vacancy hurts proportionally more than in large buildings", chips:["Residential loans","Scalable","Multiple income streams"] },
+    { id:"colive", tier:"a", name:"Co-living house", roi:"20–35%", cap:"$80k min", time:"10h/wk", risk:"Med", fill:76, desc:"Rent individual bedrooms in a single-family home to young professionals. Charge 20–30% below studio apartments per room but generate 2–3× the rent of a single tenant.", riskDetail:"Med — high tenant turnover, requires house rules management, zoning varies by city", chips:["High yield/sqft","Young professionals","Tenant turnover risk"] },
+    { id:"sto", tier:"a", name:"Storage unit facility", roi:"15–25%", cap:"$200k min", time:"8h/wk", risk:"Low-Med", fill:77, desc:"Self-storage is one of the most recession-resistant asset classes. Low maintenance, no toilets, no tenants living on site. Highly automatable with gate access technology.", riskDetail:"Low-Med — competition from large REITs, location is everything", chips:["Recession-proof","Low tenant issues","Scalable"] },
+    { id:"rent2own", tier:"a", name:"Rent-to-own", roi:"18–30%", cap:"$70k min", time:"6h/wk", risk:"Low-Med", fill:72, desc:"Lease to a tenant with an option to purchase at a set price. Collect above-market rent plus an option fee. Tenant typically maintains the property, reducing your costs.", riskDetail:"Low-Med — if prices rise fast, tenant may back out; if they fall, you're locked", chips:["Premium rents","Low vacancy","Potential exit"] },
+    { id:"park", tier:"a", name:"Parking lot / car park", roi:"15–25%", cap:"$150k min", time:"5h/wk", risk:"Low", fill:68, desc:"Surface lots or structured parking near stadiums, transit, hospitals, or city centers. Near-passive once automated with payment systems and dynamic event pricing.", riskDetail:"Low — location dependent, autonomous vehicle adoption a long-term structural risk", chips:["Automated income","Low maintenance","Urban play"] },
+    { id:"large", tier:"b", name:"Large multifamily (5+)", roi:"15–25%", cap:"$500k min", time:"20h/wk", risk:"Med", fill:72, desc:"Apartment buildings financed commercially. Economies of scale reduce per-unit costs. Requires asset management expertise, strong team, and commercial lending relationships.", riskDetail:"Med — larger capital at risk, requires experienced team, commercial financing terms stricter", chips:["Commercial financing","Economies of scale","Team required"] },
+    { id:"boutique", tier:"b", name:"Boutique hotel", roi:"25–45%", cap:"$500k min", time:"30h/wk", risk:"High", fill:65, desc:"6–30 room property with a premium brand identity. Unique experience drives RevPAR above chain hotels. Strong in tourist destinations with year-round demand.", riskDetail:"High — hospitality is operationally complex, COVID-type events crush revenues overnight", chips:["Brand value","High RevPAR","Operational complexity"] },
+    { id:"venue", tier:"b", name:"Wedding / event venue", roi:"40–90%", cap:"$300k min", time:"35h/wk", risk:"Med-High", fill:80, desc:"Exclusively booked weekends generate extremely high per-event revenue. Scenic locations are key. Business model built 18–24 months in advance through bookings.", riskDetail:"Med-High — seasonal, weather-dependent, requires event staff and permits", chips:["Weekend model","High per-event revenue","Seasonal"] },
+    { id:"student", tier:"b", name:"Student housing", roi:"20–35%", cap:"$200k min", time:"20h/wk", risk:"Med", fill:74, desc:"High-density housing near universities with consistent annual demand. Lease by the room rather than the unit. Annual lease cycle means turnover every August.", riskDetail:"Med — high turnover, university enrollment changes, student damage to property", chips:["Consistent demand","Annual leases","High density"] },
+    { id:"senior", tier:"b", name:"Senior housing", roi:"18–28%", cap:"$500k min", time:"25h/wk", risk:"Med", fill:62, desc:"Independent or assisted living facilities with strong demographic tailwinds. Aging population creates structural demand. Highly regulated but stable occupancy once established.", riskDetail:"Med — heavy regulation, staffing challenges, licensing requirements before opening", chips:["Aging population","Stable occupancy","Regulatory complexity"] },
+    { id:"mixed", tier:"b", name:"Mixed-use development", roi:"20–40%", cap:"$1M+ min", time:"40h/wk", risk:"High", fill:58, desc:"Retail below, residential above. Complex to develop but creates lasting asset value with multiple income streams. Often eligible for favorable zoning treatment in urban infill.", riskDetail:"High — long development cycle, retail leasing risk, complex permitting", chips:["Multiple income streams","Appreciation","Long development cycle"] },
+    { id:"commercial", tier:"b", name:"Commercial strip / retail", roi:"8–15%", cap:"$500k min", time:"15h/wk", risk:"Med", fill:60, desc:"Strip malls and NNN leases with national tenants. Tenants cover most expenses (taxes, insurance, maintenance). Long lease terms with annual rent bumps.", riskDetail:"Med — e-commerce pressure on retail, anchor tenant risk", chips:["NNN leases","Stable tenants","Cap rate driven"] },
+    { id:"ground", tier:"b", name:"Ground-up residential build", roi:"30–60%", cap:"$300k min", time:"40h/wk", risk:"Very High", fill:55, desc:"Build a new home or small development from raw land. Maximum profit margin, maximum complexity. Requires full construction management and deep contractor network.", riskDetail:"Very High — cost overruns, permit delays, market timing, no income during construction", chips:["Max profit margin","Full control","Timeline risk"] },
+    { id:"datacenter", tier:"b", name:"Data center (emerging)", roi:"15–30%", cap:"$2M+ min", time:"30h/wk", risk:"High", fill:45, desc:"AI-driven demand is pushing data center cap rates to record lows. Institutional asset class becoming accessible via JV partnerships. Power infrastructure is the critical constraint.", riskDetail:"High — power-intensive, very high entry cost, long pre-development period", chips:["AI demand wave","Long-term leases","Power-intensive"] },
+    { id:"rehab", tier:"b", name:"Commercial rehab & resell", roi:"25–50%", cap:"$300k min", time:"30h/wk", risk:"High", fill:63, desc:"Buy distressed commercial assets, reposition through renovation or conversion, sell stabilized to institutional buyers. Office-to-residential conversion is a major 2025 trend.", riskDetail:"High — repositioning risk, tenant leasing during reno, commercial market volatility", chips:["Value-add","Office conversion trend","Repositioning skill required"] },
+    { id:"glamping", tier:"b", name:"Glamping / eco-resort", roi:"35–80%", cap:"$150k min", time:"25h/wk", risk:"Med-High", fill:70, desc:"Safari tents, cabins, and domes on scenic land. Low permit burden versus traditional buildings, very high nightly rates. Experience economy is growing fast.", riskDetail:"Med-High — weather dependent, remote land challenges, Instagram-driven demand can shift", chips:["High nightly rates","Low build cost","Experience economy"] },
+  ];
+
+  const GEOS = ["United States", "Canada", "France", "Morocco", "Spain", "UAE", "United Kingdom", "Germany", "Open to any"];
+  const RISK_COLOR: Record<string, string> = {
+    "Low": "#34d399", "Low-Med": "#34d399", "Med": "#f59e0b",
+    "Med-High": "#f87171", "High": "#f87171", "Very High": "#f87171"
+  };
+
+  useEffect(() => { if (user) loadAnalyses(); }, [user]);
+
+  async function loadAnalyses() {
+    const { data } = await supabase.from("deal_lab").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setAnalyses(data || []); setLoadingAnalyses(false);
+  }
+
+  async function addAnalysis() {
+    if (!addForm.name || !addForm.project_type) return;
+    const row = { user_id: user.id, name: addForm.name, project_type: addForm.project_type, tier: addForm.tier, capital: addForm.capital, geography: addForm.geography, time_per_week: addForm.time_per_week, risk: addForm.risk, notes: addForm.notes, deadline: addForm.deadline, completeness: 10, status: "active", checklist: JSON.stringify([ { label: "Exit strategy defined", done: false }, { label: "Zoning confirmed", done: false }, { label: "Comparable rents researched", done: false }, { label: "Financing source confirmed", done: false }, { label: "Property manager identified", done: false }, { label: "Market analysis complete", done: false }, { label: "Legal review done", done: false }, { label: "Decision deadline set", done: false } ]) };
+    const { data, error } = await supabase.from("deal_lab").insert(row).select().single();
+    if (!error && data) { setAnalyses([data, ...analyses]); setShowAddAnalysis(false); setAddForm({ name: "", project_type: "", tier: "a", capital: "", geography: "", time_per_week: "", risk: "Med", notes: "", deadline: "" }); }
+  }
+
+  async function toggleCheckItem(analysis: any, idx: number) {
+    const checklist = typeof analysis.checklist === "string" ? JSON.parse(analysis.checklist) : analysis.checklist;
+    const updated = checklist.map((c: any, i: number) => i === idx ? { ...c, done: !c.done } : c);
+    const done = updated.filter((c: any) => c.done).length;
+    const completeness = Math.round((done / updated.length) * 100);
+    await supabase.from("deal_lab").update({ checklist: JSON.stringify(updated), completeness }).eq("id", analysis.id);
+    setAnalyses(analyses.map(a => a.id === analysis.id ? { ...a, checklist: updated, completeness } : a));
+  }
+
+  async function deleteAnalysis(id: number) {
+    await supabase.from("deal_lab").delete().eq("id", id);
+    setAnalyses(analyses.filter(a => a.id !== id));
+  }
+
+  async function fetchImage(id: string, query: string) {
+    if (imgCache[id]) return;
+    try {
+      const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`, { headers: { Authorization: PEXELS_KEY } });
+      const data = await res.json();
+      const url = data.photos?.[0]?.src?.medium;
+      if (url) setImgCache(prev => ({ ...prev, [id]: url }));
+    } catch {}
+  }
+
+  const filtered = PROJECTS.filter(p => {
+    const tierMatch = filterTier === "all" || p.tier === filterTier;
+    const searchMatch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.desc.toLowerCase().includes(search.toLowerCase()) || p.chips.some(c => c.toLowerCase().includes(search.toLowerCase()));
+    return tierMatch && searchMatch;
+  });
+
+  const IS: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+
+  const TIER_META = {
+    p: { label: "Passive", desc: "0–5h/week · 8–15% ROI", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)" },
+    a: { label: "Active", desc: "5–20h/week · 20–40% ROI", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
+    b: { label: "Business", desc: "20h+/week · 40–90%+ ROI", color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" },
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#60a5fa", boxShadow: "0 0 6px #60a5fa", animation: "blink 1.5s infinite" }} />
+            <span style={{ fontSize: "10px", color: "rgba(96,165,250,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Deal Lab · Discover · Evaluate · Launch</span>
+          </div>
+          <h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.8px", background: "linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Deal Lab</h2>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "4px" }}>28 project types · Under Analysis pipeline · Verified professionals</p>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{ display: "flex", gap: "2px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "4px", marginBottom: "24px" }}>
+        {([["discover", "Discover"], ["analysis", `Under Analysis ${analyses.length > 0 ? `(${analyses.length})` : ""}`], ["pros", "Professionals"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setSubTab(key as any)} style={{ flex: 1, padding: "10px", borderRadius: "9px", fontSize: "12px", fontWeight: "700", border: `1px solid ${subTab === key ? "rgba(96,165,250,0.35)" : "transparent"}`, cursor: "pointer", background: subTab === key ? "rgba(96,165,250,0.12)" : "transparent", color: subTab === key ? "#60a5fa" : "rgba(255,255,255,0.4)", transition: "all 0.15s" }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── DISCOVER ────────────────────────────────────────── */}
+      {subTab === "discover" && (
+        <div>
+          {/* Profiler */}
+          <div style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "16px", padding: "20px 24px", marginBottom: "20px" }}>
+            <p style={{ fontSize: "10px", color: "rgba(96,165,250,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase", marginBottom: "14px" }}>Your investor profile — filter recommendations</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "14px" }}>
+              <div>
+                <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "6px" }}>Available capital</label>
+                <select value={profilerCapital} onChange={e => setProfilerCapital(e.target.value)} style={IS}>
+                  {["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1M", "$1M+"].map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "6px" }}>Time per week</label>
+                <select value={profilerTime} onChange={e => setProfilerTime(e.target.value)} style={IS}>
+                  {["0–5h/week (passive)", "5–20h/week (active)", "20h+/week (business)"].map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>Where can you operate?</label>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {GEOS.map(g => (
+                <button key={g} onClick={() => setProfilerGeo(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g])} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "999px", fontWeight: "600", border: `1px solid ${profilerGeo.includes(g) ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.08)"}`, background: profilerGeo.includes(g) ? "rgba(96,165,250,0.15)" : "rgba(255,255,255,0.03)", color: profilerGeo.includes(g) ? "#60a5fa" : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{g}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search + tier filters */}
+          <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+            <input placeholder="Search project types..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 2, minWidth: "180px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "9px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
+            {(["all", "p", "a", "b"] as const).map(t => {
+              const meta = t === "all" ? null : TIER_META[t];
+              return (
+                <button key={t} onClick={() => setFilterTier(t)} style={{ padding: "9px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: "700", border: `1px solid ${filterTier === t ? (meta?.color || "rgba(255,255,255,0.4)") + "55" : "rgba(255,255,255,0.08)"}`, background: filterTier === t ? (meta?.bg || "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.03)", color: filterTier === t ? (meta?.color || "#fff") : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{t === "all" ? `All (${PROJECTS.length})` : `${meta!.label} (${PROJECTS.filter(p => p.tier === t).length})`}</button>
+              );
+            })}
+          </div>
+
+          {/* Cards grid */}
+          {(["p", "a", "b"] as const).map(tier => {
+            const items = filtered.filter(p => p.tier === tier);
+            if (items.length === 0) return null;
+            const meta = TIER_META[tier];
+            return (
+              <div key={tier} style={{ marginBottom: "28px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: meta.color }} />
+                  <span style={{ fontSize: "12px", fontWeight: "700", color: meta.color }}>{meta.label}</span>
+                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{meta.desc}</span>
+                  <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "999px", background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, marginLeft: "auto" }}>{items.length} types</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
+                  {items.map(p => {
+                    const imgUrl = imgCache[p.id];
+                    if (!imgUrl) fetchImage(p.id, PEXELS_QUERIES[p.id] || p.name + " real estate");
+                    const riskColor = RISK_COLOR[p.risk] || "#f59e0b";
+                    return (
+                      <div key={p.id} onClick={() => setSelectedCard(selectedCard?.id === p.id ? null : p)} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${selectedCard?.id === p.id ? meta.color + "55" : "rgba(255,255,255,0.07)"}`, borderRadius: "16px", overflow: "hidden", cursor: "pointer", transition: "all 0.15s" }}>
+                        {/* Image */}
+                        <div style={{ height: "110px", background: imgUrl ? `url(${imgUrl}) center/cover` : `linear-gradient(135deg, ${meta.color}18, ${meta.color}08)`, position: "relative" }}>
+                          {!imgUrl && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", opacity: 0.3 }}>🏗</div>}
+                          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.7))" }} />
+                          <div style={{ position: "absolute", top: "8px", left: "8px", display: "flex", gap: "5px" }}>
+                            <span style={{ fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "20px", background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, backdropFilter: "blur(8px)" }}>{meta.label.toUpperCase()}</span>
+                          </div>
+                          <div style={{ position: "absolute", top: "8px", right: "8px" }}>
+                            <span style={{ fontSize: "9px", fontWeight: "700", color: riskColor, background: `${riskColor}22`, border: `1px solid ${riskColor}44`, padding: "2px 7px", borderRadius: "20px", backdropFilter: "blur(8px)" }}>{p.risk} risk</span>
+                          </div>
+                          <div style={{ position: "absolute", bottom: "8px", right: "8px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: "900", color: meta.color, textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{p.roi}</span>
+                          </div>
+                        </div>
+                        {/* Card body */}
+                        <div style={{ padding: "12px 14px" }}>
+                          <p style={{ fontSize: "13px", fontWeight: "800", marginBottom: "4px" }}>{p.name}</p>
+                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5", marginBottom: "10px" }}>{p.desc.slice(0, 80)}…</p>
+                          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "10px" }}>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "6px" }}>{p.cap}</span>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "6px" }}>{p.time}</span>
+                          </div>
+                          {/* Match bar */}
+                          <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }}>
+                            <div style={{ height: "100%", width: `${p.fill}%`, background: meta.color, borderRadius: "999px" }} />
+                          </div>
+                        </div>
+                        {/* Expanded detail */}
+                        {selectedCard?.id === p.id && (
+                          <div style={{ borderTop: `1px solid ${meta.color}22`, padding: "14px", background: `${meta.color}06` }}>
+                            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", lineHeight: "1.6", marginBottom: "10px" }}>{p.desc}</p>
+                            <div style={{ background: `${riskColor}10`, border: `1px solid ${riskColor}30`, borderRadius: "8px", padding: "8px 12px", marginBottom: "10px" }}>
+                              <p style={{ fontSize: "9px", color: riskColor, fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "3px" }}>Risk profile</p>
+                              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{p.riskDetail}</p>
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+                              {p.chips.map(c => <span key={c} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>{c}</span>)}
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setAddForm(f => ({ ...f, name: p.name + " — Deal", project_type: p.name, tier: p.tier })); setShowAddAnalysis(true); setSubTab("analysis"); }} style={{ width: "100%", padding: "9px", background: meta.color, color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer" }}>+ Add to Under Analysis →</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && <div style={{ padding: "48px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px" }}>No project types match your search.</div>}
+        </div>
+      )}
+
+      {/* ── UNDER ANALYSIS ──────────────────────────────────── */}
+      {subTab === "analysis" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+            <div>
+              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", marginBottom: "4px" }}>Deals you're evaluating — nothing gets lost</p>
+              {analyses.length === 0 && !loadingAnalyses && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>Add your first deal from the Discover tab or below.</p>}
+            </div>
+            <button onClick={() => setShowAddAnalysis(true)} style={{ padding: "10px 20px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ Add Deal</button>
+          </div>
+
+          {loadingAnalyses ? <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Loading...</p> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+              {analyses.map(a => {
+                const checklist = typeof a.checklist === "string" ? JSON.parse(a.checklist) : (a.checklist || []);
+                const doneCount = checklist.filter((c: any) => c.done).length;
+                const pct = a.completeness || Math.round((doneCount / Math.max(checklist.length, 1)) * 100);
+                const barColor = pct >= 75 ? "#34d399" : pct >= 40 ? "#f59e0b" : "rgba(255,255,255,0.3)";
+                const dotColor = pct >= 75 ? "#34d399" : pct >= 40 ? "#f59e0b" : "rgba(255,255,255,0.4)";
+                const tierMeta = TIER_META[a.tier as "p" | "a" | "b"] || TIER_META.a;
+                return (
+                  <div key={a.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${dotColor}22`, borderRadius: "16px", overflow: "hidden" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", flexWrap: "wrap", gap: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: dotColor, boxShadow: `0 0 6px ${dotColor}`, flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontSize: "14px", fontWeight: "800" }}>{a.name}</p>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "10px", fontWeight: "700", padding: "1px 7px", borderRadius: "20px", background: tierMeta.bg, color: tierMeta.color, border: `1px solid ${tierMeta.border}` }}>{tierMeta.label}</span>
+                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{a.project_type}</span>
+                            {a.capital && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>· {a.capital}</span>}
+                            {a.geography && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>· {a.geography}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        {a.deadline && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>Decide by {a.deadline}</span>}
+                        <span style={{ fontSize: "12px", fontWeight: "800", padding: "4px 12px", borderRadius: "20px", background: pct >= 75 ? "rgba(52,211,153,0.12)" : pct >= 40 ? "rgba(245,158,11,0.1)" : "rgba(255,255,255,0.05)", color: barColor, border: `1px solid ${barColor}44` }}>{pct}% complete</span>
+                        <button onClick={() => deleteAnalysis(a.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "18px" }}>×</button>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", margin: "0 20px 14px" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "999px", transition: "width 0.5s" }} />
+                    </div>
+                    {/* Checklist */}
+                    <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: "5px" }}>
+                      {checklist.map((item: any, idx: number) => (
+                        <div key={idx} onClick={() => toggleCheckItem(a, idx)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 10px", borderRadius: "8px", background: item.done ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)"}`, cursor: "pointer" }}>
+                          <div style={{ width: "16px", height: "16px", borderRadius: "4px", border: `1.5px solid ${item.done ? "#34d399" : "rgba(255,255,255,0.2)"}`, background: item.done ? "#34d399" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "10px", color: "#000" }}>{item.done ? "✓" : ""}</div>
+                          <span style={{ fontSize: "12px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)", textDecoration: item.done ? "line-through" : "none" }}>{item.label}</span>
+                        </div>
+                      ))}
+                      {pct === 100 && (
+                        <div style={{ marginTop: "10px", padding: "10px 14px", background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "12px", color: "#34d399", fontWeight: "700" }}>✓ Analysis complete — ready to launch</span>
+                          <button style={{ fontSize: "11px", padding: "5px 12px", background: "#34d399", color: "#000", borderRadius: "6px", fontWeight: "800", border: "none", cursor: "pointer" }}>Convert to Project →</button>
+                        </div>
+                      )}
+                      {a.notes && <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "8px", padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: "8px", fontStyle: "italic" }}>{a.notes}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+              {analyses.length === 0 && (
+                <div onClick={() => setShowAddAnalysis(true)} style={{ border: "1px dashed rgba(96,165,250,0.25)", borderRadius: "16px", padding: "36px", textAlign: "center", cursor: "pointer", color: "rgba(96,165,250,0.5)", fontSize: "13px", fontWeight: "600" }}>
+                  + Add your first deal to analyse
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add modal */}
+          {showAddAnalysis && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 60, padding: "80px 20px 20px" }}>
+              <div style={{ background: "#0f0f0f", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                  <h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Deal to Analysis</h2>
+                  <button onClick={() => setShowAddAnalysis(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Deal Name *</label><input type="text" placeholder="e.g. STR duplex — Austin TX" value={addForm.name} onChange={e => setAddForm(f => ({...f, name: e.target.value}))} style={IS} /></div>
+                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Project Type *</label>
+                    <select value={addForm.project_type} onChange={e => setAddForm(f => ({...f, project_type: e.target.value}))} style={IS}>
+                      <option value="">Select type...</option>
+                      {PROJECTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Tier</label>
+                    <select value={addForm.tier} onChange={e => setAddForm(f => ({...f, tier: e.target.value}))} style={IS}>
+                      <option value="p">Passive</option><option value="a">Active</option><option value="b">Business</option>
+                    </select>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Capital est.</label><input type="text" placeholder="e.g. $120k" value={addForm.capital} onChange={e => setAddForm(f => ({...f, capital: e.target.value}))} style={IS} /></div>
+                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Geography</label><input type="text" placeholder="e.g. Austin TX" value={addForm.geography} onChange={e => setAddForm(f => ({...f, geography: e.target.value}))} style={IS} /></div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Decision deadline</label><input type="date" value={addForm.deadline} onChange={e => setAddForm(f => ({...f, deadline: e.target.value}))} style={IS} /></div>
+                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Risk tolerance</label>
+                      <select value={addForm.risk} onChange={e => setAddForm(f => ({...f, risk: e.target.value}))} style={IS}>
+                        {["Low","Med","Med-High","High","Very High"].map(r => <option key={r}>{r}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Notes</label><textarea placeholder="What you know so far, questions to answer..." value={addForm.notes} onChange={e => setAddForm(f => ({...f, notes: e.target.value}))} style={{ ...IS, height: "70px", resize: "vertical" }} /></div>
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
+                  <button onClick={() => setShowAddAnalysis(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={addAnalysis} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Save Deal →</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PROFESSIONALS ───────────────────────────────────── */}
+      {subTab === "pros" && (
+        <div>
+          <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "12px 18px", marginBottom: "20px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
+            <span style={{ fontSize: "18px", flexShrink: 0 }}>🛡</span>
+            <div>
+              <p style={{ fontSize: "12px", fontWeight: "700", color: "#f59e0b", marginBottom: "3px" }}>Zero-tolerance fraud policy</p>
+              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", lineHeight: "1.6" }}>Every professional listed here has been manually verified. Propvest never allows unvetted third parties to offer services. Only accredited, licensed professionals with verifiable credentials appear in this directory.</p>
+            </div>
+          </div>
+
+          {/* Category sections */}
+          {[
+            { label: "Legal & Compliance", color: "#a78bfa", pros: [
+              { name: "Real Estate Attorney", role: "Contract review, zoning, title", badge: "Bar certified", note: "Essential before any acquisition. Review every contract.", geo: "US · Nationwide", verified: true },
+              { name: "Tax Advisor (RE)", role: "Depreciation, 1031 exchange, cost seg", badge: "CPA licensed", note: "Saves more than they cost on your first deal.", geo: "US · Nationwide", verified: true },
+            ]},
+            { label: "Financing", color: "#60a5fa", pros: [
+              { name: "DSCR Mortgage Broker", role: "Investment loans, no income verification", badge: "NMLS licensed", note: "Qualification based on rental income, not your salary.", geo: "US · Nationwide", verified: true },
+              { name: "Hard Money Lender", role: "Fast short-term financing for flips", badge: "State licensed", note: "Close in 7–14 days. Critical for competitive markets.", geo: "US · Multi-state", verified: true },
+            ]},
+            { label: "Construction & Renovation", color: "#f59e0b", pros: [
+              { name: "General Contractor", role: "Full renovation management", badge: "Licensed & insured", note: "Ask for 3 references on projects matching your scope.", geo: "Local market", verified: true },
+              { name: "Property Inspector", role: "Pre-purchase & pre-listing inspections", badge: "InterNACHI certified", note: "Never skip this. Uncovers hidden costs before you buy.", geo: "Local market", verified: true },
+            ]},
+            { label: "Property Management", color: "#34d399", pros: [
+              { name: "STR Concierge Manager", role: "Airbnb co-hosting, guest management", badge: "Platform certified", note: "Takes 15–25% but enables truly passive STR income.", geo: "Local market", verified: true },
+              { name: "Long-Term PM Company", role: "Leasing, rent collection, maintenance", badge: "NARPM member", note: "8–10% of rent. Evaluate by vacancy rate and response time.", geo: "Local market", verified: true },
+            ]},
+          ].map(section => (
+            <div key={section.label} style={{ marginBottom: "24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: section.color }} />
+                <span style={{ fontSize: "12px", fontWeight: "700", color: section.color, letterSpacing: "0.5px" }}>{section.label}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px" }}>
+                {section.pros.map(pro => (
+                  <div key={pro.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${section.color}22`, borderRadius: "14px", padding: "16px 18px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                      <div>
+                        <p style={{ fontSize: "13px", fontWeight: "800" }}>{pro.name}</p>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{pro.role}</p>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                        {pro.verified && <span style={{ fontSize: "9px", fontWeight: "800", color: "#34d399", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)", borderRadius: "20px", padding: "2px 8px" }}>✓ Verified</span>}
+                        <span style={{ fontSize: "9px", color: section.color, background: `${section.color}12`, border: `1px solid ${section.color}30`, borderRadius: "20px", padding: "2px 8px", fontWeight: "700" }}>{pro.badge}</span>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", lineHeight: "1.5", marginBottom: "10px", fontStyle: "italic" }}>{pro.note}</p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", fontWeight: "600" }}>{pro.geo}</span>
+                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.04)", padding: "3px 10px", borderRadius: "6px" }}>Coming soon</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div style={{ textAlign: "center", padding: "24px", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "14px" }}>
+            <p style={{ fontSize: "14px", fontWeight: "700", color: "rgba(255,255,255,0.4)", marginBottom: "6px" }}>Are you a professional?</p>
+            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginBottom: "12px" }}>We manually review every application. Accredited professionals only.</p>
+            <button style={{ fontSize: "12px", padding: "9px 20px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Apply to be listed →</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
