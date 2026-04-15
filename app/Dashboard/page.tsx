@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
@@ -205,6 +205,7 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
   const [goalReached, setGoalReached] = useState<{ type: "portfolio" | "cashflow"; label: string } | null>(null);
+const [showCompare, setShowCompare] = useState(false);
 
   useEffect(() => { supabase.auth.getSession().then(({ data: { session } }) => { if (!session) { window.location.href = "/auth"; return; } setUser(session.user); loadProperties(session.user.id); loadSettings(session.user.id); }); }, []);
   function loadSettings(userId: string) { try { const raw = localStorage.getItem(`gs_settings_${userId}`); if (raw) { const s = JSON.parse(raw); setSettings(s); if (!s.onboardingDone) setShowOnboarding(true); } else setShowOnboarding(true); } catch { setShowOnboarding(true); } }
@@ -262,6 +263,8 @@ export default function Dashboard() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         select option { background: #0d0d0d; color: #fff; }
         @keyframes tPulse { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.4} 100%{transform:translate(-50%,-50%) scale(2.8);opacity:0} }
+        @keyframes phaseDone { 0%{box-shadow:0 0 0 0 rgba(52,211,153,0.8)} 50%{box-shadow:0 0 0 12px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+        @keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
         input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.5); }
@@ -358,6 +361,7 @@ export default function Dashboard() {
       {milestoneToast && <MilestoneToast message={milestoneToast} onClose={() => setMilestoneToast(null)} />}
       {goalReached && (<GoalReachedOverlay name={settings.firstName || "Champion"} goalLabel={goalReached.label} goalType={goalReached.type} onNewGoal={(val) => { const ns = { ...settings, [goalReached.type === "portfolio" ? "goalPortfolio" : "goalCashFlow"]: val }; handleSettingsSave(ns); setGoalReached(null); }} onDismiss={() => setGoalReached(null)} />)}
       <div style={{ position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)", width: "800px", height: "300px", background: "radial-gradient(ellipse at top,rgba(251,191,36,0.05) 0%,transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
+      <LiveIncomeCounter monthlyCashFlow={monthlyCashFlow} />
 
       <nav className="gs-nav">
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -391,13 +395,13 @@ export default function Dashboard() {
       <div className="gs-main">
         {activeTab === "portfolio" && <>
           <div className="gs-grid-2">
-            <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} />
-            <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} />
+            <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} nextGap={([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO) - totalValue} nextTarget={fmt([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO)} />
+            <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} nextGap={([500,1000,2000,3000,5000,10000].find(m => m > monthlyCashFlow) || GOAL_CASHFLOW) - monthlyCashFlow} nextTarget={`$${([500,1000,2000,3000,5000,10000].find(m => m > monthlyCashFlow) || GOAL_CASHFLOW).toLocaleString()}/mo`} />
           </div>
           <div className="gs-grid-4">{[{ label: "Total Equity", value: fmtFull(totalEquity), color: "#f5a623", sub: "net owned value" }, { label: "Gross Rent", value: fmtFull(totalRent) + "/mo", color: "#fff", sub: "monthly income" }, { label: "Total Expenses", value: fmtFull(totalExpenses) + "/mo", color: "#f87171", sub: "monthly outflow" }, { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} occupied` }].map((m: any) => (<div key={m.label} className="gs-kpi-card"><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.8px", textTransform: "uppercase", marginBottom: "10px", fontWeight: "700" }}>{m.label}</p><p style={{ fontSize: "24px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", lineHeight: 1 }}>{m.value}</p><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "6px" }}>{m.sub}</p></div>))}</div>
+          
           <MapSection properties={properties} selected={selected} onSelect={(id) => setSelected(selected === id ? null : id)} />
-          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} />
-          <CompareProperties properties={properties} />
+          <PropertyTable properties={properties} selected={selected} onSelect={setSelected} onEdit={openEdit} onDelete={handleDelete} onAdd={openAdd} onCompare={() => setShowCompare(true)} />
           {active && <PropertyDetail property={active} onEdit={openEdit} onClose={() => setSelected(null)} />}
         </>}
 
@@ -423,9 +427,20 @@ export default function Dashboard() {
 {activeTab === "finances" && <FinancesTab properties={properties} user={user} />}
       </div>
 
-      {confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
-      {showAddScenarioProp && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div className="gs-modal" style={{ border: "1px solid rgba(96,165,250,0.25)" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Hypothetical Property</h2><button onClick={() => setShowAddScenarioProp(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Name"><input type="text" value={scenPropForm.name} onChange={e => setScenPropForm(f => ({ ...f, name: e.target.value }))} style={IS} /></Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="300000" value={scenPropForm.value || ""} onChange={e => setScenPropForm(f => ({ ...f, value: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Mortgage ($)"><input type="number" placeholder="240000" value={scenPropForm.mortgage || ""} onChange={e => setScenPropForm(f => ({ ...f, mortgage: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="2000" value={scenPropForm.rent || ""} onChange={e => setScenPropForm(f => ({ ...f, rent: parseFloat(e.target.value) || 0 }))} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="400" value={scenPropForm.expenses || ""} onChange={e => setScenPropForm(f => ({ ...f, expenses: parseFloat(e.target.value) || 0 }))} style={IS} /></Field></div><Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={scenPropForm.appreciation} onChange={e => setScenPropForm(f => ({ ...f, appreciation: parseFloat(e.target.value) || 3.5 }))} style={IS} /></Field></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => setShowAddScenarioProp(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={addScenarioProp} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Add to Scenario</button></div></div></div>)}
-      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)"><div style={{ display: "flex", gap: "8px" }}><input type="text" placeholder="e.g. 1234 Main St, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ ...IS, flex: 1 }} /><button onClick={handleGeocodeClick} disabled={geocoding} style={{ padding: "10px 12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", color: "#f59e0b", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}>{geocoding ? "..." : "Locate"}</button></div>{form.lat && form.lng && <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px" }}>✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</p>}</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><input type="number" placeholder="200000" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} style={IS} /></Field><Field label="Mortgage Balance ($)"><input type="number" placeholder="160000" value={form.mortgage} onChange={e => setForm({ ...form, mortgage: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><input type="number" placeholder="1200" value={form.rent} onChange={e => setForm({ ...form, rent: e.target.value })} style={IS} /></Field><Field label="Monthly Expenses ($)"><input type="number" placeholder="300" value={form.expenses} onChange={e => setForm({ ...form, expenses: e.target.value })} style={IS} /></Field></div><div className="gs-modal-grid">
+      {showCompare && (
+  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}>
+    <div style={{ background: "#0a0a0a", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "24px", padding: "36px", width: "90vw", maxWidth: "1100px", height: "88vh", overflowY: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
+        <div><p style={{ fontSize: "9px", color: "#f59e0b", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>Property Intelligence</p><h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.5px" }}>Compare Assets</h2></div>
+        <button onClick={() => setShowCompare(false)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "18px", width: "36px", height: "36px" }}>×</button>
+      </div>
+      <CompareModal properties={properties} />
+    </div>
+  </div>
+)}
+{confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
+      {showAddScenarioProp && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div className="gs-modal" style={{ border: "1px solid rgba(96,165,250,0.25)" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Hypothetical Property</h2><button onClick={() => setShowAddScenarioProp(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Name"><input type="text" value={scenPropForm.name} onChange={e => setScenPropForm(f => ({ ...f, name: e.target.value }))} style={IS} /></Field><div className="gs-modal-grid"><Field label="Market Value ($)"><NumberInput value={String(scenPropForm.value || "")} onChange={v => setScenPropForm(f => ({ ...f, value: parseFloat(v) || 0 }))} placeholder="300,000" style={IS} /></Field><Field label="Mortgage ($)"><NumberInput value={String(scenPropForm.mortgage || "")} onChange={v => setScenPropForm(f => ({ ...f, mortgage: parseFloat(v) || 0 }))} placeholder="240,000" style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><NumberInput value={String(scenPropForm.rent || "")} onChange={v => setScenPropForm(f => ({ ...f, rent: parseFloat(v) || 0 }))} placeholder="2,000" style={IS} /></Field><Field label="Monthly Expenses ($)"><NumberInput value={String(scenPropForm.expenses || "")} onChange={v => setScenPropForm(f => ({ ...f, expenses: parseFloat(v) || 0 }))} placeholder="400" style={IS} /></Field></div><Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={scenPropForm.appreciation} onChange={e => setScenPropForm(f => ({ ...f, appreciation: parseFloat(e.target.value) || 3.5 }))} style={IS} /></Field></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => setShowAddScenarioProp(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={addScenarioProp} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Add to Scenario</button></div></div></div>)}
+      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)"><div style={{ display: "flex", gap: "8px" }}><input type="text" placeholder="e.g. 1234 Main St, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ ...IS, flex: 1 }} /><button onClick={handleGeocodeClick} disabled={geocoding} style={{ padding: "10px 12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", color: "#f59e0b", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}>{geocoding ? "..." : "Locate"}</button></div>{form.lat && form.lng && <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px" }}>✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</p>}</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><NumberInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="200,000" style={IS} /></Field><Field label="Mortgage Balance ($)"><NumberInput value={form.mortgage} onChange={v => setForm({ ...form, mortgage: v })} placeholder="160,000" style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><NumberInput value={form.rent} onChange={v => setForm({ ...form, rent: v })} placeholder="1,200" style={IS} /></Field><Field label="Monthly Expenses ($)"><NumberInput value={form.expenses} onChange={v => setForm({ ...form, expenses: v })} placeholder="300" style={IS} /></Field></div><div className="gs-modal-grid">
   <Field label="Occupancy Status">
     <select value={form.occupancyStatus} onChange={e => setForm({ ...form, occupancyStatus: e.target.value as OccupancyStatus })} style={IS}>
       <option value="occupied">✓ Occupied</option>
@@ -453,6 +468,7 @@ export default function Dashboard() {
   )}
 </Field>
 </div></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "rgba(245,158,11,0.5)" : "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "Saving..." : editingId !== null ? "Save Changes" : "Add Property"}</button></div></div></div>)}
+ 
     </div>
   );
 }
@@ -520,82 +536,230 @@ function MapSection({ properties, selected, onSelect }: { properties: Property[]
     </div>
   );
 }
-function CompareProperties({ properties }: { properties: Property[] }) {
-  const [propA, setPropA] = useState<number | string>(properties[0]?.id || "");
-  const [propB, setPropB] = useState<number | string>(properties[1]?.id || "");
-  const [open, setOpen] = useState(false);
-  const pA = properties.find(p => p.id === propA);
-  const pB = properties.find(p => p.id === propB);
-  function metric(label: string, valA: string, valB: string, colorA?: string, colorB?: string, higherIsBetter = true) {
-    const numA = parseFloat(valA.replace(/[^0-9.-]/g, "")); const numB = parseFloat(valB.replace(/[^0-9.-]/g, ""));
-    const aWins = higherIsBetter ? numA > numB : numA < numB; const bWins = higherIsBetter ? numB > numA : numB < numA;
-    return (<div style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr", gap: "8px", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}><div style={{ textAlign: "right" }}><span style={{ fontSize: "14px", fontWeight: "800", color: colorA || (aWins ? "#34d399" : "#fff"), background: aWins ? "rgba(52,211,153,0.08)" : "transparent", padding: "3px 10px", borderRadius: "6px" }}>{valA}</span></div><div style={{ textAlign: "center" }}><span style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", fontWeight: "700", letterSpacing: "0.8px", textTransform: "uppercase" }}>{label}</span></div><div style={{ textAlign: "left" }}><span style={{ fontSize: "14px", fontWeight: "800", color: colorB || (bWins ? "#34d399" : "#fff"), background: bWins ? "rgba(52,211,153,0.08)" : "transparent", padding: "3px 10px", borderRadius: "6px" }}>{valB}</span></div></div>);
-  }
-  const activeProps = properties.filter(p => p.occupancyStatus !== "sold");
+function propertyHealthScore(p: Property): number {
+  let score = 0;
+  if (p.occupancyStatus === "occupied") score += 30;
+  else if (p.occupancyStatus === "str") score += 25;
+  else if (p.occupancyStatus === "planned") score += 10;
+  if (p.rent > 0) { const cf = propCashFlow(p); const margin = (cf / p.rent) * 100; if (margin >= 40) score += 25; else if (margin >= 20) score += 18; else if (margin >= 0) score += 10; }
+  const ltv = p.value > 0 ? (p.mortgage / p.value) * 100 : 100; if (ltv <= 60) score += 20; else if (ltv <= 75) score += 14; else if (ltv <= 85) score += 8;
+  const expRatio = p.rent > 0 ? (p.expenses / p.rent) * 100 : 100; if (expRatio <= 30) score += 15; else if (expRatio <= 50) score += 10; else if (expRatio <= 70) score += 5;
+  if (p.appreciation >= 4) score += 10; else if (p.appreciation >= 2.5) score += 7; else score += 3;
+  return Math.min(100, Math.round(score));
+}
+
+function HealthBadge({ score }: { score: number }) {
+  const color = score >= 70 ? "#34d399" : score >= 45 ? "#f59e0b" : "#f87171";
+  const label = score >= 70 ? "Healthy" : score >= 45 ? "Watch" : "At Risk";
   return (
-    <div style={{ marginBottom: "20px" }}>
-      <button onClick={() => setOpen(!open)} style={{ width: "100%", padding: "14px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: open ? "16px 16px 0 0" : "16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "16px" }}>⚖️</span>
-          <div style={{ textAlign: "left" }}>
-            <p style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.5)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Compare Properties</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>Side-by-side analysis of any two assets</p>
-          </div>
-        </div>
-        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>{open ? "▲ Close" : "▼ Open"}</span>
-      </button>
-      {open && (
-        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 16px 16px", padding: "20px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 40px 1fr", gap: "10px", alignItems: "center", marginBottom: "20px" }}>
-            <select value={propA} onChange={e => setPropA(Number(e.target.value))} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", fontWeight: "700" }}>
-              {activeProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <div style={{ textAlign: "center", fontSize: "16px", color: "rgba(255,255,255,0.2)", fontWeight: "800" }}>vs</div>
-            <select value={propB} onChange={e => setPropB(Number(e.target.value))} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", fontWeight: "700" }}>
-              {activeProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          {pA && pB ? (() => {
-            const cfA = propCashFlow(pA); const cfB = propCashFlow(pB);
-            const eqA = pA.value - pA.mortgage; const eqB = pB.value - pB.mortgage;
-            const roiA = eqA > 0 ? (cfA * 12 / eqA) * 100 : 0; const roiB = eqB > 0 ? (cfB * 12 / eqB) * 100 : 0;
-            const ltvA = pA.value > 0 ? (pA.mortgage / pA.value) * 100 : 0; const ltvB = pB.value > 0 ? (pB.mortgage / pB.value) * 100 : 0;
-            const yieldA = pA.value > 0 ? (pA.rent * 12 / pA.value) * 100 : 0; const yieldB = pB.value > 0 ? (pB.rent * 12 / pB.value) * 100 : 0;
-            return (
-              <div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr", gap: "8px", marginBottom: "16px" }}>
-                  <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "10px", padding: "12px", textAlign: "right" }}>
-                    <p style={{ fontSize: "13px", fontWeight: "800", color: "#f59e0b" }}>{pA.name}</p>
-                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{pA.type}</p>
-                    <FlagPill address={pA.address} />
-                  </div>
-                  <div />
-                  <div style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px", padding: "12px", textAlign: "left" }}>
-                    <p style={{ fontSize: "13px", fontWeight: "800", color: "#60a5fa" }}>{pB.name}</p>
-                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{pB.type}</p>
-                    <FlagPill address={pB.address} />
-                  </div>
-                </div>
-                {metric("Market Value", fmtFull(pA.value), fmtFull(pB.value))}
-                {metric("Equity", fmtFull(eqA), fmtFull(eqB))}
-                {metric("Monthly CF", (cfA >= 0 ? "+" : "") + fmtFull(cfA), (cfB >= 0 ? "+" : "") + fmtFull(cfB), cfA >= 0 ? "#34d399" : "#f87171", cfB >= 0 ? "#34d399" : "#f87171")}
-                {metric("Annual ROI", roiA.toFixed(1) + "%", roiB.toFixed(1) + "%")}
-                {metric("Gross Yield", yieldA.toFixed(1) + "%", yieldB.toFixed(1) + "%")}
-                {metric("LTV Ratio", ltvA.toFixed(1) + "%", ltvB.toFixed(1) + "%", undefined, undefined, false)}
-                {metric("Appreciation", pA.appreciation + "%/yr", pB.appreciation + "%/yr")}
-                {metric("Monthly Rent", fmtFull(pA.rent), fmtFull(pB.rent))}
-                {metric("Monthly Expenses", fmtFull(pA.expenses), fmtFull(pB.expenses), undefined, undefined, false)}
-                <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", textAlign: "center", marginTop: "14px" }}>Green highlight = better performer on that metric</p>
-              </div>
-            );
-          })() : <p style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px", padding: "20px" }}>Select two properties to compare.</p>}
-        </div>
-      )}
+    <div title={`Health Score: ${score}/100`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 9px", borderRadius: "999px", background: `${color}12`, border: `1px solid ${color}33` }}>
+      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: color, boxShadow: `0 0 5px ${color}` }} />
+      <span style={{ fontSize: "10px", fontWeight: "800", color }}>{score}</span>
+      <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>{label}</span>
     </div>
   );
 }
 
-function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, barColor, glow, min, mid, max, onEdit }: any) {
+function VacancyCost({ property: p }: { property: Property }) {
+  if (p.occupancyStatus !== "vacant" || p.rent === 0) return null;
+  let days = 0;
+  try { const stored = localStorage.getItem(`gs_vacant_${p.id}`); if (!stored) localStorage.setItem(`gs_vacant_${p.id}`, new Date().toISOString()); days = Math.max(0, Math.floor((Date.now() - new Date(localStorage.getItem(`gs_vacant_${p.id}`) || "").getTime()) / 86400000)); } catch {}
+  const lost = Math.round((p.rent / 30) * days);
+  return <div style={{ fontSize: "10px", color: "#f87171", fontWeight: "700", marginTop: "2px" }}>🔴 ${lost.toLocaleString()} lost · {days}d vacant</div>;
+}
+function LiveIncomeCounter({ monthlyCashFlow }: { monthlyCashFlow: number }) {
+  const [earned, setEarned] = useState(0);
+  const perSecond = monthlyCashFlow / 30 / 24 / 3600;
+  useEffect(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const secondsToday = (Date.now() - startOfDay) / 1000;
+    setEarned(perSecond * secondsToday);
+    const interval = setInterval(() => setEarned(e => e + perSecond), 1000);
+    return () => clearInterval(interval);
+  }, [perSecond]);
+  if (monthlyCashFlow <= 0) return null;
+  return (
+    <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 50, background: "rgba(5,10,15,0.97)", border: "1px solid rgba(52,211,153,0.3)", borderRadius: "16px", padding: "14px 20px", boxShadow: "0 0 40px rgba(52,211,153,0.1)", minWidth: "220px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s infinite" }} />
+        <span style={{ fontSize: "9px", color: "rgba(52,211,153,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Today's Income</span>
+      </div>
+      <p style={{ fontSize: "28px", fontWeight: "900", color: "#34d399", letterSpacing: "-1px", lineHeight: 1 }}>+${earned.toFixed(2)}</p>
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>${(perSecond * 3600).toFixed(2)}/hr · ${(perSecond * 86400).toFixed(2)}/day</p>
+    </div>
+  );
+}
+function CompareModal({ properties }: { properties: Property[] }) {
+  const COLORS = ["#f59e0b","#34d399","#60a5fa","#e879f9","#f87171","#a78bfa","#fb923c","#22d3ee"];
+  const activeProps = properties.filter(p => p.occupancyStatus !== "sold");
+  const [selected, setSelected] = useState<number[]>(activeProps.slice(0,2).map(p => p.id));
+  const selectedProps = activeProps.filter(p => selected.includes(p.id));
+  function toggle(id: number) { setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
+
+  function buildChart(p: Property) {
+    const base = p.mortgage > 0 ? p.mortgage / 0.8 : p.value * 0.85;
+    const app = (p.appreciation || 3.5) / 100;
+    return [0,1,2,3,4,5].map(y => Math.round(base * Math.pow(1 + app, y)));
+  }
+
+function ValueChart() {
+    if (selectedProps.length === 0) return null;
+    const allSeries = selectedProps.map(p => ({ prop: p, data: buildChart(p), color: COLORS[activeProps.indexOf(p) % COLORS.length] }));
+    function fmtK(n: number) { return n >= 1000000 ? "$"+(n/1000000).toFixed(1)+"M" : "$"+(n/1000).toFixed(0)+"K"; }
+    const W = 400; const H = 160;
+    const PAD = { t: 16, r: 16, b: 24, l: 56 };
+    const cW = W - PAD.l - PAD.r; const cH = H - PAD.t - PAD.b;
+    function xPos(i: number) { return PAD.l + (i / 5) * cW; }
+    return (
+      <div style={{ marginBottom: "32px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "20px" }}>
+        <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "16px" }}>5-Year Estimated Value Trajectory — Independent Scale Per Property</p>
+        <div style={{ display: "grid", gridTemplateColumns: allSeries.map(() => "1fr").join(" "), gap: "16px" }}>
+          {allSeries.map(({ prop, data, color }) => {
+            const minV = Math.min(...data) * 0.97;
+            const maxV = Math.max(...data) * 1.03;
+            function yPos(v: number) { return PAD.t + cH - ((v - minV) / (maxV - minV)) * cH; }
+            const pts = data.map((v, i) => `${xPos(i)},${yPos(v)}`).join(" ");
+            const uid = `grad_${prop.id}`;
+            const growth = ((data[5] - data[0]) / data[0] * 100).toFixed(1);
+            return (
+              <div key={prop.id} style={{ background: `${color}08`, border: `1px solid ${color}22`, borderRadius: "12px", padding: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "800", color }}>{prop.name}</span>
+                  <span style={{ fontSize: "12px", fontWeight: "800", color: "#34d399" }}>+{growth}% in 5yr</span>
+                </div>
+                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
+                  {[0, 0.5, 1].map(t => {
+                    const v = minV + t * (maxV - minV); const y = yPos(v);
+                    return <g key={t}><line x1={PAD.l} y1={y} x2={W - PAD.r} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/><text x={PAD.l - 4} y={y + 4} fill="rgba(255,255,255,0.25)" fontSize="11" textAnchor="end">{fmtK(v)}</text></g>;
+                  })}
+                  {["Now","Y1","Y2","Y3","Y4","Y5"].map((l, i) => <text key={l} x={xPos(i)} y={H - 4} fill="rgba(255,255,255,0.2)" fontSize="10" textAnchor="middle">{l}</text>)}
+                  <defs><linearGradient id={uid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.2"/><stop offset="100%" stopColor={color} stopOpacity="0"/></linearGradient></defs>
+                  <polygon points={`${pts} ${xPos(5)},${PAD.t + cH} ${PAD.l},${PAD.t + cH}`} fill={`url(#${uid})`}/>
+                  <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round"/>
+                  {data.map((v, i) => <circle key={i} cx={xPos(i)} cy={yPos(v)} r={i === 0 || i === 5 ? 5 : 3} fill={color}/>)}
+                </svg>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px" }}>
+                  <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>NOW</p><p style={{ fontSize: "14px", fontWeight: "900", color }}>{fmtK(data[0])}</p></div>
+                  <div style={{ textAlign: "right" }}><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>YEAR 5</p><p style={{ fontSize: "14px", fontWeight: "900", color }}>{fmtK(data[5])}</p></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const rows = [
+    { label: "Market Value",  get: (p: Property) => p.value,                                        fmt: (v: number) => "$"+Math.round(v).toLocaleString(), higher: true },
+    { label: "Equity",        get: (p: Property) => p.value - p.mortgage,                           fmt: (v: number) => "$"+Math.round(v).toLocaleString(), higher: true },
+    { label: "Cash Flow/mo",  get: (p: Property) => propCashFlow(p),                                fmt: (v: number) => (v>=0?"+":"")+Math.round(v).toLocaleString(), higher: true },
+    { label: "Gross Yield",   get: (p: Property) => p.value > 0 ? (p.rent*12/p.value)*100 : 0,      fmt: (v: number) => v.toFixed(1)+"%", higher: true },
+    { label: "LTV",           get: (p: Property) => p.value > 0 ? (p.mortgage/p.value)*100 : 0,     fmt: (v: number) => v.toFixed(1)+"%", higher: false },
+    { label: "Health Score",  get: (p: Property) => propertyHealthScore(p),                         fmt: (v: number) => String(Math.round(v)), higher: true },
+    { label: "Appreciation",  get: (p: Property) => p.appreciation,                                 fmt: (v: number) => v.toFixed(1)+"%/yr", higher: true },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: "28px" }}>
+        <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>Select Properties</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          {activeProps.map((p) => {
+            const isSelected = selected.includes(p.id);
+            const color = COLORS[activeProps.indexOf(p) % COLORS.length];
+            const cf = propCashFlow(p);
+            return (
+              <button key={p.id} onClick={() => toggle(p.id)} style={{ padding: "10px 18px", borderRadius: "12px", fontSize: "13px", fontWeight: "700", border: `1px solid ${isSelected ? color : "rgba(255,255,255,0.1)"}`, background: isSelected ? `${color}18` : "rgba(255,255,255,0.03)", color: isSelected ? color : "rgba(255,255,255,0.4)", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s" }}>
+                {isSelected && <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }}/>}
+                <div style={{ textAlign: "left" }}>
+                  <div>{p.name}</div>
+                  <div style={{ fontSize: "10px", color: isSelected ? `${color}99` : "rgba(255,255,255,0.25)", fontWeight: "600", marginTop: "2px" }}>{fmt(p.value)} · {cf >= 0 ? "+" : ""}{fmtFull(cf)}/mo</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {selectedProps.length > 0 && <ValueChart />}
+
+      {selectedProps.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: selectedProps.map(() => "1fr").join(" "), gap: "16px", marginBottom: "32px" }}>
+          {selectedProps.map((p) => {
+            const color = COLORS[activeProps.indexOf(p) % COLORS.length];
+            const cf = propCashFlow(p);
+            const equity = p.value - p.mortgage;
+            const roi = equity > 0 ? (cf * 12 / equity) * 100 : 0;
+            return (
+              <div key={p.id} style={{ background: `${color}08`, border: `1px solid ${color}33`, borderRadius: "18px", padding: "24px", textAlign: "center" }}>
+                <p style={{ fontSize: "11px", fontWeight: "800", color, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "16px" }}>{p.name}</p>
+                <p style={{ fontSize: "42px", fontWeight: "900", color, letterSpacing: "-2px", lineHeight: 1, marginBottom: "4px" }}>{fmt(p.value)}</p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", marginBottom: "20px" }}>Market Value</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  {[
+                    { label: "Equity", value: fmt(equity), color },
+                    { label: "Cash Flow", value: `${cf >= 0 ? "+" : ""}${fmtFull(cf)}/mo`, color: cf >= 0 ? "#34d399" : "#f87171" },
+                    { label: "ROI", value: `${roi.toFixed(1)}%`, color: "#fff" },
+                    { label: "Health", value: `${propertyHealthScore(p)}/100`, color: "#fff" },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: "rgba(0,0,0,0.25)", borderRadius: "10px", padding: "10px 8px" }}>
+                      <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{m.label}</p>
+                      <p style={{ fontSize: "16px", fontWeight: "900", color: m.color }}>{m.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedProps.length >= 2 && (
+        <div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>Head-to-Head</p>
+          <div style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `180px ${selectedProps.map(() => "1fr").join(" ")}`, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <div style={{ padding: "12px 16px", fontSize: "9px", color: "rgba(255,255,255,0.25)", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px" }}>Metric</div>
+              {selectedProps.map((p) => { const color = COLORS[activeProps.indexOf(p) % COLORS.length]; return <div key={p.id} style={{ padding: "12px 12px", fontSize: "12px", fontWeight: "800", color, textAlign: "center", borderLeft: "1px solid rgba(255,255,255,0.07)" }}>{p.name}</div>; })}
+            </div>
+            {rows.map(row => {
+              const vals = selectedProps.map(p => row.get(p));
+              const best = row.higher ? Math.max(...vals) : Math.min(...vals);
+              return (
+                <div key={row.label} style={{ display: "grid", gridTemplateColumns: `180px ${selectedProps.map(() => "1fr").join(" ")}`, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div style={{ padding: "14px 16px", fontSize: "12px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>{row.label}</div>
+                  {selectedProps.map((p, i) => {
+                    const val = row.get(p); const color = COLORS[activeProps.indexOf(p) % COLORS.length];
+                    const isBest = val === best;
+                    const pct = vals[0] !== 0 && i > 0 ? ((val - vals[0]) / Math.abs(vals[0]) * 100) : null;
+                    return (
+                      <div key={p.id} style={{ padding: "14px 12px", textAlign: "center", borderLeft: "1px solid rgba(255,255,255,0.04)", background: isBest ? `${color}08` : "transparent" }}>
+                        <div style={{ fontSize: "22px", fontWeight: "900", color: isBest ? color : "#fff", letterSpacing: "-0.5px" }}>{row.fmt(val)}</div>
+                        {pct !== null && <div style={{ fontSize: "10px", fontWeight: "700", color: (row.higher ? pct > 0 : pct < 0) ? "#34d399" : "#f87171", marginTop: "3px" }}>{pct > 0 ? "+" : ""}{pct.toFixed(0)}%</div>}
+                        {isBest && <div style={{ fontSize: "8px", fontWeight: "800", color, marginTop: "3px", letterSpacing: "0.8px", textTransform: "uppercase" }}>★ Best</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", textAlign: "center", marginTop: "14px" }}>% relative to first selected · ★ = best performer · Trajectory estimated from appreciation rate</p>
+        </div>
+      )}
+
+      {selectedProps.length === 0 && <p style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", padding: "40px", fontSize: "13px" }}>Select at least one property above.</p>}
+    </div>
+  );
+}
+
+function CompareProperties({ properties }: { properties: Property[] }) {
+  return <CompareModal properties={properties} />;
+}
+
+function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, barColor, glow, min, mid, max, onEdit, nextGap, nextTarget }: any) {
   return (
     <div style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.015) 100%)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "22px", padding: "28px", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, right: 0, width: "200px", height: "200px", background: `radial-gradient(circle at top right, ${glow ? glow.replace("0.4", "0.06").replace("0.3", "0.06") : "transparent"} 0%, transparent 70%)`, pointerEvents: "none" }} />
@@ -606,6 +770,11 @@ function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, ba
           <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "5px", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "11px", padding: "2px 7px", lineHeight: 1.4 }}>✎</button>
         </div>
       </div>
+      {nextGap !== undefined && nextTarget !== undefined && (
+        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", fontWeight: "600", marginBottom: "6px", letterSpacing: "0.2px" }}>
+          <span style={{ color: barColor, fontWeight: "800" }}>${Math.round(nextGap).toLocaleString()}</span> away from next milestone · {nextTarget}
+        </p>
+      )}
       <p className="gs-goal-value" style={{ fontWeight: "900", letterSpacing: "-1.5px", marginBottom: "4px", color: valueColor || "#fff", lineHeight: 1 }}>{value}</p>
       <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginBottom: "20px", fontWeight: "500" }}>{sub}</p>
       <div style={{ position: "relative", height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "12px" }}>
@@ -621,7 +790,7 @@ function GoalCard({ label, p, milestonePct, value, valueColor, sub, pctLabel, ba
   );
 }
 
-function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd }: any) {
+function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd, onCompare }: any) {
   const [sortBy, setSortBy] = useState<"name"|"value"|"cashflow"|"roi"|"equity">("value");
   const [sortDir, setSortDir] = useState<"desc"|"asc">("desc");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -677,6 +846,10 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
             <p style={{ fontWeight: "600" }}>{p.name}</p>
             <FlagPill address={p.address} />
           </div>
+          <div style={{ marginTop: "4px" }}>
+            <HealthBadge score={propertyHealthScore(p)} />
+          </div>
+          <VacancyCost property={p} />
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>
             {p.type}{p.groupTag ? <span style={{ marginLeft: "6px", fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>{p.groupTag}</span> : null}
           </p>
@@ -707,7 +880,10 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px 20px 0 0", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
           <h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Properties</h2>
-          <button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={() => onCompare()} style={{ fontSize: "12px", padding: "8px 16px", background: "transparent", color: "#f59e0b", borderRadius: "8px", fontWeight: "700", border: "1px solid rgba(245,158,11,0.4)", cursor: "pointer" }}>⚖ Compare</button>
+            <button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button>
+          </div>
         </div>
         {/* Search + filters */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -811,6 +987,31 @@ function PropertyDetail({ property: p, onEdit, onClose }: any) {
   const detailRef = useRef<HTMLDivElement>(null);
   useEffect(() => { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
   return (<div ref={detailRef} style={{ background: "rgba(245,158,11,0.03)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "24px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px" }}><div style={{ flex: 1, minWidth: 0 }}><h3 style={{ fontSize: "17px", fontWeight: "800" }}>{p.name}</h3><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{p.type} · {occupancyLabel(p)}{p.address ? ` · ${p.address}` : ""}</p></div><div style={{ display: "flex", gap: "8px", flexShrink: 0 }}><button onClick={e => onEdit(p, e)} style={{ fontSize: "12px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>Edit</button><button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>×</button></div></div><div className="gs-detail-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>{[{ label: "Market Value", value: fmtFull(p.value) }, { label: "Mortgage", value: fmtFull(p.mortgage) }, { label: "Equity", value: fmtFull(equity), hi: true }, { label: "Appreciation", value: p.appreciation + "%/yr" }, { label: "Monthly Rent", value: isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—" }, { label: "Expenses", value: fmtFull(p.expenses) }, { label: "Net Cash Flow", value: fmtFull(cf) }, { label: "Annual ROI", value: roi }].map((m: any) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "14px", border: m.hi ? "1px solid rgba(245,158,11,0.2)" : "1px solid rgba(255,255,255,0.05)" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "6px", letterSpacing: "0.8px", textTransform: "uppercase" }}>{m.label}</p><p style={{ fontSize: "16px", fontWeight: "700", color: m.hi ? "#f59e0b" : "#fff" }}>{m.value}</p></div>))}</div></div>);
+}
+
+function NumberInput({ value, onChange, placeholder, style }: { value: string; onChange: (v: string) => void; placeholder?: string; style?: React.CSSProperties }) {
+  const [display, setDisplay] = useState(value ? Number(value).toLocaleString("en-US") : "");
+  useEffect(() => { if (document.activeElement?.getAttribute("data-ni") !== "true") { setDisplay(value ? Number(value).toLocaleString("en-US") : ""); } }, [value]);
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/,/g, "");
+    if (raw === "" || raw === "-" || /^-?\d*\.?\d*$/.test(raw)) {
+      onChange(raw);
+      const num = parseFloat(raw);
+      setDisplay(isNaN(num) ? raw : num.toLocaleString("en-US", { maximumFractionDigits: 2 }));
+    }
+  }
+  function handleFocus() { setDisplay(value || ""); }
+  function handleBlur() { const num = parseFloat(value); setDisplay(isNaN(num) ? "" : num.toLocaleString("en-US", { maximumFractionDigits: 2 })); }
+  return (
+    <div style={{ position: "relative" }}>
+      <input data-ni="true" type="text" inputMode="decimal" value={display} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} placeholder={placeholder} style={{ ...style, fontSize: "16px", fontWeight: "700", letterSpacing: "0.3px" }} />
+      {value && !isNaN(parseFloat(value)) && parseFloat(value) >= 1000 && (
+        <div style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "9px", color: "rgba(245,158,11,0.5)", fontWeight: "700", pointerEvents: "none", letterSpacing: "0.5px" }}>
+          {parseFloat(value) >= 1000000 ? `${(parseFloat(value)/1000000).toFixed(2)}M` : `${(parseFloat(value)/1000).toFixed(1)}K`}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -1444,7 +1645,7 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <Field label="Amount ($)">
-                  <input type="number" placeholder="1200" value={form.amount} onChange={e => { setForm({ ...form, amount: e.target.value }); setExpenseErrors(f => ({ ...f, amount: false })); }} style={{ ...IS, border: expenseErrors.amount ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)" }} />
+                  <NumberInput value={form.amount} onChange={v => { setForm({ ...form, amount: v }); setExpenseErrors(f => ({ ...f, amount: false })); }} placeholder="1,200" style={{ ...IS, border: expenseErrors.amount ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)" }} />
                 </Field>
                 <Field label="Date">
                   <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={IS} />
@@ -1479,6 +1680,34 @@ function FinancesTab({ properties, user }: { properties: Property[]; user: any }
 
 function ProjectsTab({ user }: { user: any }) {
   const PROJECT_TYPES = ["Renovation", "Rehabilitation", "Flip", "New Build", "Commercial", "Mixed-Use", "Land Development", "Condo Conversion", "Short-Term Rental Setup", "Other"];
+  const PHASE_AVG_DAYS: Record<string, number> = {
+    "Planning": 14, "Permits": 30, "Demo": 7, "Foundation": 21,
+    "Framing": 21, "MEP": 14, "Plumbing": 10, "Electrical": 10,
+    "HVAC": 7, "Insulation": 5, "Drywall": 10, "Flooring": 7,
+    "Painting": 7, "Roofing": 10, "Windows": 5, "Finishing": 14,
+    "Inspection": 7, "Delivery": 3, "Staging": 5, "Listing": 14,
+    "Closing": 30, "Acquisition": 45, "Assessment": 14, "Structural": 21,
+    "Systems": 14, "Certificate": 14, "Design": 21, "Feasibility": 30,
+    "Fit-Out": 21, "Opening": 7, "Handover": 5, "Launch": 3,
+    "Due Diligence": 21, "Site Prep": 14, "Infrastructure": 30,
+    "Lot Sales": 60, "Unit Setup": 14, "HOA Setup": 21,
+    "Photography": 2, "Listing Setup": 3, "Execution": 30,
+    "Review": 7, "Construction": 60, "Management": 30,
+  };
+  const PHASE_ICONS: Record<string, string> = {
+    "Planning": "🗺️", "Permits": "📋", "Demo": "🔨", "Foundation": "🏗️",
+    "Framing": "🪵", "MEP": "⚙️", "Plumbing": "🔧", "Electrical": "⚡",
+    "HVAC": "🌀", "Insulation": "🧱", "Drywall": "🪣", "Flooring": "🟫",
+    "Painting": "🎨", "Roofing": "🏠", "Windows": "🪟", "Finishing": "✨",
+    "Inspection": "🔍", "Delivery": "🚚", "Staging": "🛋️", "Listing": "📣",
+    "Closing": "🤝", "Acquisition": "🔑", "Assessment": "📊", "Structural": "⚙️",
+    "Systems": "🔌", "Certificate": "📜", "Design": "✏️", "Feasibility": "📈",
+    "Fit-Out": "🪑", "Opening": "🎉", "Handover": "🤝", "Launch": "🚀",
+    "Due Diligence": "🔎", "Site Prep": "🚜", "Infrastructure": "🛣️",
+    "Lot Sales": "💰", "Unit Setup": "🏘️", "HOA Setup": "📝",
+    "Photography": "📸", "Listing Setup": "💻", "Execution": "▶️",
+    "Review": "👁️", "Construction": "🏗️", "Management": "👷",
+  };
   const PHASE_TEMPLATES: Record<string, string[]> = {
     "Renovation":            ["Planning", "Permits", "Demo", "Construction", "Finishing", "Inspection", "Delivery"],
     "Rehabilitation":        ["Assessment", "Planning", "Permits", "Structural", "Systems", "Finishing", "Certificate"],
@@ -1676,24 +1905,7 @@ function ProjectsTab({ user }: { user: any }) {
         <button onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ New Project</button>
       </div>
 
-      {/* #46 — Cash Available Tracker */}
-      <CashTracker totalEquity={projects.reduce((s, p) => s + (p.budget || 0) - (p.spent || 0), 0)} totalRemaining={projects.reduce((s, p) => s + Math.max(0, (p.budget || 0) - (p.spent || 0)), 0)} userId={user?.id} />
-
-      {/* Summary KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }}>
-        {[
-          { label: "Total Projects", value: String(projects.length), color: "#fff", sub: `${activeProjects.length} active` },
-          { label: "Total Budget", value: fmtMoney(totalBudget), color: "#a78bfa", sub: "across all projects" },
-          { label: "Total Spent", value: fmtMoney(totalSpent), color: "#f87171", sub: totalBudget > 0 ? `${((totalSpent / totalBudget) * 100).toFixed(1)}% of budget` : "no budget set" },
-          { label: "Remaining", value: fmtMoney(totalBudget - totalSpent), color: totalBudget > totalSpent ? "#34d399" : "#f87171", sub: "budget left" },
-        ].map(m => (
-          <div key={m.label} className="gs-kpi-card">
-            <p style={{ fontSize: "8px", color: "rgba(255,255,255,0.25)", letterSpacing: "1.8px", textTransform: "uppercase", marginBottom: "10px", fontWeight: "700" }}>{m.label}</p>
-            <p style={{ fontSize: "24px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", lineHeight: 1 }}>{m.value}</p>
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "6px" }}>{m.sub}</p>
-          </div>
-        ))}
-      </div>
+<MissionControl projects={projects} userId={user?.id} totalEquity={projects.reduce((s,p)=>s+(p.budget||0)-(p.spent||0),0)} />
 
       {/* Project Cards */}
       {loading ? <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Loading...</p> : projects.length === 0 ? (
@@ -1801,16 +2013,88 @@ function ProjectsTab({ user }: { user: any }) {
                             {p.phases.map((ph: any, i: number) => {
                               const sc = STATUS_COLORS[ph.status] || STATUS_COLORS.not_started;
                               const isLast = i === p.phases.length - 1;
-                              return (
+                              const phaseDate = ph.date || p.start_date || null;
+                              const daysIn = phaseDate ? Math.floor((Date.now() - new Date(phaseDate).getTime()) / 86400000) : null;
+                              const isOverdue = daysIn !== null && daysIn > 30 && ph.status === "in_progress";
+                    return (
                                 <div key={i} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "90px", position: "relative", paddingTop: "18px" }}>
-                                    <div onClick={() => { const statuses = ["not_started","in_progress","done","delayed"]; const next = statuses[(statuses.indexOf(ph.status) + 1) % statuses.length]; updatePhase(p, i, { status: next }); }} style={{ width: "32px", height: "32px", borderRadius: "50%", background: sc.bg, border: `2px solid ${sc.color}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: ph.status === "in_progress" ? `0 0 10px ${sc.color}66` : "none", transition: "all 0.2s" }}>
-                                      <span style={{ fontSize: "10px" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : "○"}</span>
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", minWidth: "110px", position: "relative", paddingTop: "18px" }}>
+                                    <div onClick={() => { const statuses = ["not_started","in_progress","done","delayed"]; const next = statuses[(statuses.indexOf(ph.status) + 1) % statuses.length]; updatePhase(p, i, { status: next }); }} style={{ width: "48px", height: "48px", borderRadius: "50%", background: sc.bg, border: `2px solid ${sc.color}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: ph.status === "in_progress" ? `0 0 10px ${sc.color}66` : "none", transition: "all 0.3s", flexDirection: "column" as const, gap: "1px", animation: ph.status === "done" ? "phaseDone 0.6s ease-out" : "none" }}>
+                                      <span style={{ fontSize: "16px", lineHeight: 1 }}>{PHASE_ICONS[ph.name] || "📌"}</span>
+                                      <span style={{ fontSize: "9px", color: sc.color, fontWeight: "800" }}>{ph.status === "done" ? "✓" : ph.status === "delayed" ? "!" : ph.status === "in_progress" ? "▶" : ""}</span>
                                     </div>
-                                    <span style={{ fontSize: "10px", color: sc.color, fontWeight: "700", textAlign: "center", whiteSpace: "nowrap", marginTop: "4px" }}>{ph.name}</span>
+                                    <span style={{ fontSize: "12px", color: sc.color, fontWeight: "800", textAlign: "center", whiteSpace: "nowrap", marginTop: "2px" }}>{ph.name}</span>
+                                    {ph.status === "delayed" && (() => {
+                                      const blocking = p.phases.slice(i + 1).filter((pp: any) => pp.status === "not_started").length;
+                                      return blocking > 0 ? (
+                                        <span style={{ fontSize: "8px", fontWeight: "800", color: "#f87171", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "999px", padding: "1px 6px", whiteSpace: "nowrap" }}>⚠ blocking {blocking}</span>
+                                      ) : null;
+                                    })()}
+                                    {(() => {
+                                      const avgKey = `avg_${p.id}_${i}`;
+                                      const storedAvg = (() => { try { const v = localStorage.getItem(avgKey); return v ? parseInt(v) : null; } catch { return null; } })();
+                                      const avg = storedAvg ?? PHASE_AVG_DAYS[ph.name] ?? 14;
+                                      return (
+                                        <div style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "2px" }}>
+                                          <span style={{ fontSize: "9px", color: "rgba(96,165,250,0.5)", whiteSpace: "nowrap" }}>d</span>
+                                        {(() => {
+                                          const baseDate = p.start_date ? new Date(p.start_date) : new Date();
+                                          let cumDays = 0;
+                                          for (let k = 0; k <= i; k++) {
+                                            const kAvgKey = `avg_${p.id}_${k}`;
+                                            const kStored = (() => { try { const v = localStorage.getItem(kAvgKey); return v ? parseInt(v) : null; } catch { return null; } })();
+                                            cumDays += kStored ?? PHASE_AVG_DAYS[p.phases[k]?.name] ?? 14;
+                                          }
+                                          const estDate = new Date(baseDate.getTime() + cumDays * 86400000);
+                                          const today = new Date();
+                                          const isLate = ph.status === "in_progress" && estDate < today;
+                                          const isDone = ph.status === "done";
+                                          const dateStr = estDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                          const color = isDone ? "#34d399" : isLate ? "#f87171" : "#f59e0b";
+                                          return (
+                                            <span style={{ fontSize: "9px", fontWeight: "700", color, background: `${color}12`, border: `1px solid ${color}30`, borderRadius: "999px", padding: "1px 6px", whiteSpace: "nowrap", marginTop: "1px" }}>
+                                              {isDone ? "✓" : isLate ? "⚠" : "→"} {dateStr}
+                                            </span>
+                                          );
+                                        })()}
+                                          <input
+                                            type="number"
+                                            defaultValue={avg}
+                                            onBlur={e => { try { localStorage.setItem(avgKey, e.target.value); } catch {} }}
+                                            onClick={e => e.stopPropagation()}
+                                            style={{ width: "52px", fontSize: "11px", fontWeight: "800", color: "#60a5fa", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "6px", padding: "2px 4px", outline: "none", textAlign: "center", fontFamily: "inherit", letterSpacing: "-0.5px" }}
+                                          />
+                                          <span style={{ fontSize: "10px", color: "rgba(96,165,250,0.5)", whiteSpace: "nowrap" }}>d</span>
+                                        </div>
+                                      );
+                                    })()}
+                                    {isLast && daysIn !== null && ph.status === "in_progress" && (() => {
+                                      const avg = PHASE_AVG_DAYS[ph.name] || 14;
+                                      const isOverAvg = daysIn > avg;
+                                      return (
+                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                          <span style={{ fontSize: "9px", fontWeight: "800", color: isOverAvg ? "#f87171" : "#34d399", background: isOverAvg ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.08)", border: `1px solid ${isOverAvg ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.2)"}`, borderRadius: "999px", padding: "2px 7px", whiteSpace: "nowrap" }}>{isOverAvg ? "⚠ " : "✓ "}{daysIn}d</span>
+                                          <span style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", whiteSpace: "nowrap" }}>avg {avg}d</span>
+                                        </div>
+                                      );
+                                    })()}
                                     <button onClick={() => deletePhase(p, i)} title="Remove phase" style={{ position: "absolute", top: "0px", right: "0px", zIndex: 10, background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "4px", color: "#f87171", cursor: "pointer", fontSize: "11px", lineHeight: 1, padding: "1px 5px", fontWeight: "700" }}>×</button>
                                   </div>
-                                  {!isLast && <div style={{ flex: 1, height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px", marginBottom: "20px" }} />}
+                                  {!isLast && (
+                                    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", marginBottom: "20px", gap: "4px" }}>
+                                      <div style={{ width: "100%", height: "2px", background: ph.status === "done" ? "#34d399" : "rgba(255,255,255,0.08)", margin: "0 4px" }} />
+                                      {daysIn !== null && ph.status === "in_progress" && (() => {
+                                        const avg = PHASE_AVG_DAYS[ph.name] || 14;
+                                        const isOverAvg = daysIn !== null && daysIn > avg;
+                                        return (
+                                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                            <span style={{ fontSize: "9px", fontWeight: "800", color: isOverAvg ? "#f87171" : "#34d399", background: isOverAvg ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.08)", border: `1px solid ${isOverAvg ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.2)"}`, borderRadius: "999px", padding: "2px 7px", whiteSpace: "nowrap" }}>{isOverAvg ? "⚠ " : "✓ "}{daysIn}d</span>
+                                            {avg && <span style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", whiteSpace: "nowrap" }}>avg {avg}d</span>}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -2165,7 +2449,7 @@ onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; awai
                 </select>
               </Field>
               <Field label="Address"><input type="text" placeholder="e.g. 14 Maple Street, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={IS} /></Field>
-              <Field label="Total Budget ($)"><input type="number" placeholder="150000" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} style={IS} /></Field>
+              <Field label="Total Budget ($)"><NumberInput value={form.budget} onChange={v => setForm({ ...form, budget: v })} placeholder="150,000" style={IS} /></Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <Field label="Start Date"><input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} style={IS} /></Field>
                 <Field label="End Date"><input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} style={IS} /></Field>
@@ -2381,23 +2665,688 @@ function PhaseChecklist({ phase, onUpdate }: { phase: any; onUpdate: (checklist:
     </div>
   );
 }
-
-function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: number; totalRemaining: number; userId: string }) {
-  const storageKey = `gs_warChest_${userId}`;
+function WarChestColumn({ userId, totalEquity }: { userId: string | undefined; totalEquity: number }) {
   const [warChest, setWarChest] = useState(0);
   const [equityPct, setEquityPct] = useState(20);
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) { const d = JSON.parse(raw); setWarChest(d.warChest || 0); setEquityPct(d.equityPct || 20); }
-    } catch {}
-  }, [storageKey]);
+    if (!userId) return;
+    supabase.from("user_settings").select("war_chest, equity_pct").eq("user_id", userId).single()
+      .then(({ data }) => { if (data) { setWarChest(data.war_chest||0); setEquityPct(data.equity_pct||20); } });
+  }, [userId]);
 
-  function save(wc: number, ep: number) {
-    try { localStorage.setItem(storageKey, JSON.stringify({ warChest: wc, equityPct: ep })); } catch {}
+  async function save(wc: number, ep: number) {
+    if (!userId) return;
+    await supabase.from("user_settings").upsert({ user_id: userId, war_chest: wc, equity_pct: ep, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  }
+
+  function fmtM(n: number) { if (n>=1_000_000) return "$"+(n/1_000_000).toFixed(2)+"M"; if (n>=1_000) return "$"+Math.round(n).toLocaleString("en-US"); return "$"+n.toFixed(0); }
+  const autoCash = Math.round((totalEquity/100)*equityPct);
+  const total = warChest + autoCash;
+
+  return (
+    <div style={{ padding: "22px 20px", position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <span style={{ fontSize: "8px", color: "rgba(52,211,153,0.6)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800" }}>💰 War Chest</span>
+        <button onClick={() => setEditing(!editing)} style={{ fontSize: "9px", padding: "2px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontWeight: "600" }}>✎</button>
+      </div>
+      <div style={{ fontSize: "22px", fontWeight: "900", color: "#34d399", letterSpacing: "-1px", lineHeight: 1, marginBottom: "7px" }}>{fmtM(total)}</div>
+      <div style={{ display: "flex", gap: "8px", marginBottom: editing ? "10px" : "0" }}>
+        <div style={{ flex: 1, background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.12)", borderRadius: "8px", padding: "6px 8px" }}>
+          <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", marginBottom: "2px" }}>LIQUID</div>
+          <div style={{ fontSize: "13px", fontWeight: "800", color: "#34d399" }}>{fmtM(warChest)}</div>
+        </div>
+        <div style={{ flex: 1, background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.12)", borderRadius: "8px", padding: "6px 8px" }}>
+          <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", marginBottom: "2px" }}>EQUITY {equityPct}%</div>
+          <div style={{ fontSize: "13px", fontWeight: "800", color: "#60a5fa" }}>{fmtM(autoCash)}</div>
+        </div>
+      </div>
+      {editing && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input type="number" placeholder="Cash in bank" value={inputVal} onChange={e => setInputVal(e.target.value)} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "6px", padding: "6px 8px", fontSize: "12px", fontWeight: "800", color: "#34d399", outline: "none", fontFamily: "inherit" }} />
+            <button onClick={() => { const v=parseFloat(inputVal)||0; setWarChest(v); save(v,equityPct); setInputVal(""); }} style={{ padding: "6px 10px", background: "#34d399", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer" }}>Set</button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input type="range" min="0" max="100" step="5" value={equityPct} onChange={e => { const v=parseInt(e.target.value); setEquityPct(v); save(warChest,v); }} style={{ flex: 1, accentColor: "#60a5fa" }} />
+            <span style={{ fontSize: "11px", fontWeight: "800", color: "#60a5fa", minWidth: "28px" }}>{equityPct}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function WarChestStrip({ userId, totalEquity }: { userId: string | undefined; totalEquity: number }) {
+  const [warChest, setWarChest] = useState(0);
+  const [equityPct, setEquityPct] = useState(20);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("user_settings").select("war_chest, equity_pct").eq("user_id", userId).single()
+      .then(({ data }) => {
+        if (data) { setWarChest(data.war_chest || 0); setEquityPct(data.equity_pct || 20); }
+      });
+  }, [userId]);
+
+  async function save(wc: number, ep: number) {
+    if (!userId) return;
+    await supabase.from("user_settings").upsert({ user_id: userId, war_chest: wc, equity_pct: ep, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  }
+
+  function fmtM(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + Math.round(n).toLocaleString("en-US"); return "$" + n.toFixed(0); }
+
+  const autoCash = Math.round((totalEquity / 100) * equityPct);
+  const total = warChest + autoCash;
+
+  return (
+    <div style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: "12px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "9px", color: "rgba(52,211,153,0.6)", letterSpacing: "2px", fontWeight: "800", textTransform: "uppercase", flexShrink: 0 }}>💰 War Chest</span>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+            <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", fontWeight: "600", alignSelf: "center" }}>TOTAL</span>
+            <span style={{ fontSize: "16px", fontWeight: "900", color: "#34d399", letterSpacing: "-0.5px" }}>{fmtM(total)}</span>
+          </div>
+          <div style={{ width: "1px", background: "rgba(255,255,255,0.06)", alignSelf: "stretch" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+            <span style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", fontWeight: "600", letterSpacing: "0.5px" }}>LIQUID</span>
+            <span style={{ fontSize: "13px", fontWeight: "800", color: "#34d399" }}>{fmtM(warChest)}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+            <span style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", fontWeight: "600", letterSpacing: "0.5px" }}>FROM EQUITY</span>
+            <span style={{ fontSize: "13px", fontWeight: "800", color: "#60a5fa" }}>{fmtM(autoCash)}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+            <span style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", fontWeight: "600", letterSpacing: "0.5px" }}>EQUITY %</span>
+            <span style={{ fontSize: "13px", fontWeight: "800", color: "#a78bfa" }}>{equityPct}%</span>
+          </div>
+        </div>
+      </div>
+      <button onClick={() => setEditing(!editing)} style={{ fontSize: "10px", padding: "4px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontWeight: "600", flexShrink: 0 }}>✎</button>
+      {editing && (
+        <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px" }}>
+          <div>
+            <p style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Cash in Bank ($)</p>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input type="number" placeholder={String(warChest)} value={inputVal} onChange={e => setInputVal(e.target.value)} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "6px", padding: "7px 10px", fontSize: "13px", fontWeight: "800", color: "#34d399", outline: "none", fontFamily: "inherit" }} />
+              <button onClick={() => { const v = parseFloat(inputVal) || 0; setWarChest(v); save(v, equityPct); setInputVal(""); setEditing(false); }} style={{ padding: "7px 12px", background: "#34d399", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer" }}>Set</button>
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", letterSpacing: "1px", textTransform: "uppercase" }}>Deployable Equity — {equityPct}%</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <input type="range" min="0" max="100" step="5" value={equityPct} onChange={e => { const v = parseInt(e.target.value); setEquityPct(v); save(warChest, v); }} style={{ flex: 1, accentColor: "#60a5fa" }} />
+              <span style={{ fontSize: "13px", fontWeight: "800", color: "#60a5fa", minWidth: "32px" }}>{equityPct}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommandBoard({ projects, userId, totalEquity }: { projects: any[]; userId?: string; totalEquity: number }) {
+  const [warChest, setWarChest] = useState(0);
+  const [equityPct, setEquityPct] = useState(20);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  const totalBudget = projects.reduce((s, p) => s + (p.budget || 0), 0);
+  const totalSpent = projects.reduce((s, p) => s + (p.spent || 0), 0);
+  const activeProjects = projects.filter(p => p.phases?.some((ph: any) => ph.status === "in_progress"));
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("user_settings").select("war_chest, equity_pct").eq("user_id", userId).single()
+      .then(({ data }) => { if (data) { setWarChest(data.war_chest || 0); setEquityPct(data.equity_pct || 20); } });
+  }, [userId]);
+
+  async function save(wc: number, ep: number) {
+    if (!userId) return;
+    await supabase.from("user_settings").upsert({ user_id: userId, war_chest: wc, equity_pct: ep, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  }
+
+  function fmtM(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + Math.round(n).toLocaleString("en-US"); return "$" + n.toFixed(0); }
+
+  const autoCash = Math.round((totalEquity / 100) * equityPct);
+  const total = warChest + autoCash;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 1.4fr", background: "rgba(0,0,0,0.25)", borderRadius: "14px", overflow: "hidden", border: "1px solid rgba(167,139,250,0.12)", marginBottom: "20px" }}>
+      <div style={{ padding: "18px 22px", borderRight: "1px solid rgba(167,139,250,0.1)", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: "3px", height: "100%", background: "linear-gradient(180deg, #a78bfa, transparent)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+          <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 6px #a78bfa", animation: "blink 2s infinite" }} />
+          <span style={{ fontSize: "8px", color: "rgba(167,139,250,0.6)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800" }}>Total Budget</span>
+        </div>
+        <div style={{ fontSize: "30px", fontWeight: "900", color: "#fff", letterSpacing: "-1.5px", lineHeight: 1, marginBottom: "6px" }}>{fmtM(totalBudget)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>across</span>
+          <span style={{ fontSize: "11px", fontWeight: "800", color: "#a78bfa" }}>{projects.length}</span>
+          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>projects</span>
+          <span style={{ fontSize: "10px", color: "#a78bfa", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "999px", padding: "1px 7px", fontWeight: "700" }}>{activeProjects.length} active</span>
+        </div>
+      </div>
+      <div style={{ padding: "18px 16px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <span style={{ fontSize: "8px", color: "rgba(248,113,113,0.5)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800", display: "block", marginBottom: "8px" }}>Deployed</span>
+        <div style={{ fontSize: "20px", fontWeight: "900", color: "#f87171", letterSpacing: "-0.5px", lineHeight: 1, marginBottom: "6px" }}>{fmtM(totalSpent)}</div>
+        <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "5px" }}>
+          <div style={{ height: "100%", width: `${totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0}%`, background: "linear-gradient(90deg, #f87171aa, #f87171)", borderRadius: "999px", boxShadow: "0 0 6px rgba(248,113,113,0.4)", minWidth: totalSpent > 0 ? "4px" : "0" }} />
+        </div>
+        <span style={{ fontSize: "10px", color: "rgba(248,113,113,0.5)", fontWeight: "700" }}>{totalBudget > 0 ? `${((totalSpent / totalBudget) * 100).toFixed(1)}%` : "—"}</span>
+      </div>
+      <div style={{ padding: "18px 16px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <span style={{ fontSize: "8px", color: totalBudget > totalSpent ? "rgba(52,211,153,0.5)" : "rgba(248,113,113,0.5)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800", display: "block", marginBottom: "8px" }}>Remaining</span>
+        <div style={{ fontSize: "20px", fontWeight: "900", color: totalBudget > totalSpent ? "#34d399" : "#f87171", letterSpacing: "-0.5px", lineHeight: 1, marginBottom: "6px" }}>{fmtM(Math.max(0, totalBudget - totalSpent))}</div>
+        <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "5px" }}>
+          <div style={{ height: "100%", width: `${totalBudget > 0 ? Math.min(100, ((totalBudget - totalSpent) / totalBudget) * 100) : 0}%`, background: totalBudget > totalSpent ? "linear-gradient(90deg, #34d39988, #34d399)" : "linear-gradient(90deg, #f8717188, #f87171)", borderRadius: "999px", boxShadow: totalBudget > totalSpent ? "0 0 6px rgba(52,211,153,0.35)" : "0 0 6px rgba(248,113,113,0.35)" }} />
+        </div>
+        <span style={{ fontSize: "10px", color: totalBudget > totalSpent ? "rgba(52,211,153,0.5)" : "rgba(248,113,113,0.5)", fontWeight: "700" }}>{totalBudget > totalSpent ? "intact" : "⚠ over"}</span>
+      </div>
+      <div style={{ padding: "18px 16px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <span style={{ fontSize: "8px", color: "rgba(245,158,11,0.5)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800", display: "block", marginBottom: "8px" }}>Burn Rate</span>
+        <div style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-0.5px", lineHeight: 1, marginBottom: "6px" }}>{totalBudget > 0 ? `${((totalSpent / totalBudget) * 100).toFixed(1)}%` : "—"}</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", marginBottom: "5px" }}>
+          {[0,1,2,3,4].map(i => { const thr=(i+1)*20; const bp=totalBudget>0?(totalSpent/totalBudget)*100:0; const act=bp>=thr-20; const c=thr<=60?"#34d399":thr<=80?"#f59e0b":"#f87171"; return <div key={i} style={{ flex:1, height:`${5+i*2}px`, borderRadius:"2px", background:act?c:"rgba(255,255,255,0.06)", boxShadow:act?`0 0 4px ${c}66`:"none" }} />; })}
+        </div>
+        <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.4)", fontWeight: "600" }}>{totalBudget>0&&(totalSpent/totalBudget)<0.5?"✓ On track":totalBudget>0&&(totalSpent/totalBudget)<0.85?"⚡ Monitor":"⚠ Review"}</span>
+      </div>
+      <div style={{ padding: "18px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+          <span style={{ fontSize: "8px", color: "rgba(52,211,153,0.6)", letterSpacing: "2px", textTransform: "uppercase", fontWeight: "800" }}>💰 War Chest</span>
+          <button onClick={() => setEditing(!editing)} style={{ fontSize: "9px", padding: "2px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontWeight: "600" }}>✎</button>
+        </div>
+        <div style={{ fontSize: "20px", fontWeight: "900", color: "#34d399", letterSpacing: "-0.5px", lineHeight: 1, marginBottom: "8px" }}>{fmtM(total)}</div>
+        <div style={{ display: "flex", gap: "6px", marginBottom: editing ? "10px" : "0" }}>
+          <div style={{ flex: 1, background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.12)", borderRadius: "7px", padding: "5px 7px" }}>
+            <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.2)", marginBottom: "2px" }}>LIQUID</div>
+            <div style={{ fontSize: "12px", fontWeight: "800", color: "#34d399" }}>{fmtM(warChest)}</div>
+          </div>
+          <div style={{ flex: 1, background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.12)", borderRadius: "7px", padding: "5px 7px" }}>
+            <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.2)", marginBottom: "2px" }}>EQUITY {equityPct}%</div>
+            <div style={{ fontSize: "12px", fontWeight: "800", color: "#60a5fa" }}>{fmtM(autoCash)}</div>
+          </div>
+        </div>
+        {editing && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "flex", gap: "5px" }}>
+              <input type="number" placeholder="Cash in bank" value={inputVal} onChange={e => setInputVal(e.target.value)} style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "6px", padding: "5px 7px", fontSize: "12px", fontWeight: "800", color: "#34d399", outline: "none", fontFamily: "inherit" }} />
+              <button onClick={() => { const v = parseFloat(inputVal)||0; setWarChest(v); save(v, equityPct); setInputVal(""); }} style={{ padding: "5px 9px", background: "#34d399", color: "#000", borderRadius: "6px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer" }}>Set</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <input type="range" min="0" max="100" step="5" value={equityPct} onChange={e => { const v=parseInt(e.target.value); setEquityPct(v); save(warChest,v); }} style={{ flex: 1, accentColor: "#60a5fa" }} />
+              <span style={{ fontSize: "11px", fontWeight: "800", color: "#60a5fa", minWidth: "26px" }}>{equityPct}%</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MissionControl({ projects, userId, totalEquity }: { projects: any[]; userId?: string; totalEquity?: number }) {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [calYear, setCalYear] = useState(today.getFullYear());
+
+  const PHASE_ICONS: Record<string, string> = {
+    "Planning":"🗺️","Permits":"📋","Demo":"🔨","Foundation":"🏗️","Framing":"🪵","MEP":"⚙️",
+    "Plumbing":"🔧","Electrical":"⚡","HVAC":"🌀","Insulation":"🧱","Drywall":"🪣","Flooring":"🟫",
+    "Painting":"🎨","Roofing":"🏠","Windows":"🪟","Finishing":"✨","Inspection":"🔍","Delivery":"🚚",
+    "Staging":"🛋️","Listing":"📣","Closing":"🤝","Acquisition":"🔑","Assessment":"📊","Design":"✏️",
+    "Feasibility":"📈","Fit-Out":"🪑","Opening":"🎉","Handover":"🤝","Launch":"🚀",
+  };
+
+  const AVG: Record<string, number> = {
+    "Planning":14,"Permits":30,"Demo":7,"Foundation":21,"Framing":21,"MEP":14,"Plumbing":10,
+    "Electrical":10,"HVAC":7,"Insulation":5,"Drywall":10,"Flooring":7,"Painting":7,"Roofing":10,
+    "Windows":5,"Finishing":14,"Inspection":7,"Delivery":3,"Staging":5,"Listing":14,"Closing":30,
+    "Acquisition":45,"Assessment":14,"Structural":21,"Systems":14,"Certificate":14,"Design":21,
+    "Feasibility":30,"Construction":60,"Management":30,"Execution":30,"Review":7,
+  };
+
+  function getPhaseEst(project: any, phaseIdx: number) {
+    const base = project.start_date ? new Date(project.start_date) : (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d; })();
+    let cum = 0;
+    for (let k = 0; k <= phaseIdx; k++) {
+      const stored = (() => { try { const v = localStorage.getItem(`avg_${project.id}_${k}`); return v ? parseInt(v) : null; } catch { return null; } })();
+      const ph = project.phases[k];
+      cum += stored ?? (ph ? (AVG[ph.name] ?? 14) : 14);
+    }
+    return new Date(base.getTime() + cum * 86400000);
+  }
+
+  function fmtDate(d: Date) { return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+  function daysFromNow(d: Date) { return Math.ceil((d.getTime() - today.getTime()) / 86400000); }
+
+  const activeProjects = projects.filter(p => p.phases?.length > 0);
+
+  type PhaseItem = { projectName: string; phaseName: string; estDate: Date; days: number; status: string; projectId: number; color: string; };
+  const allPhaseItems: PhaseItem[] = [];
+  activeProjects.forEach(proj => {
+    proj.phases.forEach((ph: any, i: number) => {
+      if (ph.status !== "done") {
+        const est = getPhaseEst(proj, i);
+        const days = daysFromNow(est);
+        const color = ph.status === "delayed" ? "#f87171" : days < 0 ? "#f87171" : days <= 7 ? "#f59e0b" : "#60a5fa";
+        allPhaseItems.push({ projectName: proj.name, phaseName: ph.name, estDate: est, days, status: ph.status, projectId: proj.id, color });
+      }
+    });
+  });
+
+  const overdue = allPhaseItems.filter(x => x.days < 0).sort((a,b) => a.days - b.days);
+  const thisWeek = allPhaseItems.filter(x => x.days >= 0 && x.days <= 7).sort((a,b) => a.days - b.days);
+  const upcoming = allPhaseItems.filter(x => x.days > 7 && x.days <= 30).sort((a,b) => a.days - b.days);
+
+  const tickerItems = [
+    ...overdue.map(x => ({ label: `⚠ ${x.phaseName} · ${x.projectName}`, sub: `${Math.abs(x.days)}d overdue`, color: "#f87171" })),
+    ...thisWeek.map(x => ({ label: `🔥 ${x.phaseName} · ${x.projectName}`, sub: `Due ${fmtDate(x.estDate)}`, color: "#f59e0b" })),
+    ...upcoming.map(x => ({ label: `→ ${x.phaseName} · ${x.projectName}`, sub: `Est. ${fmtDate(x.estDate)}`, color: "#60a5fa" })),
+    ...activeProjects.map(proj => {
+      const done = proj.phases.filter((ph: any) => ph.status === "done").length;
+      const total = proj.phases.length || 1;
+      return { label: `${proj.name}`, sub: `${Math.round((done/total)*100)}% complete`, color: "#a78bfa" };
+    }),
+  ];
+
+  // Calendar logic
+  const calDays = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const calName = new Date(calYear, calMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  // Map est dates to calendar
+  const calEvents: Record<number, PhaseItem[]> = {};
+  allPhaseItems.forEach(item => {
+    if (item.estDate.getMonth() === calMonth && item.estDate.getFullYear() === calYear) {
+      const d = item.estDate.getDate();
+      if (!calEvents[d]) calEvents[d] = [];
+      calEvents[d].push(item);
+    }
+  });
+
+  return (
+    <div style={{ background: "linear-gradient(135deg, rgba(8,8,18,0.99), rgba(4,4,12,0.97))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", marginBottom: "24px", overflow: "hidden", position: "relative" }}>
+
+      {/* Ticker */}
+      {tickerItems.length > 0 && (
+        <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", height: "34px", display: "flex", alignItems: "center", background: "rgba(0,0,0,0.4)", overflow: "hidden" }}>
+          <div style={{ display: "flex", animation: "tickerScroll 35s linear infinite", whiteSpace: "nowrap" }}>
+            {[...tickerItems, ...tickerItems].map((item, i) => (
+              <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 28px", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                <span style={{ fontSize: "10px", fontWeight: "800", color: item.color }}>{item.label}</span>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>{item.sub}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: "20px 24px" }}>
+        {/* Header */}
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s infinite" }} />
+              <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Mission Control · {todayStr}</span>
+            </div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              {overdue.length > 0 && <span style={{ fontSize: "11px", fontWeight: "800", color: "#f87171", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "999px", padding: "3px 12px" }}>⚠ {overdue.length} overdue</span>}
+              {thisWeek.length > 0 && <span style={{ fontSize: "11px", fontWeight: "800", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "999px", padding: "3px 12px" }}>🔥 {thisWeek.length} this week</span>}
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.3)" }}>{activeProjects.length} projects</span>
+            </div>
+          </div>
+          <CommandBoard projects={projects} userId={userId} totalEquity={totalEquity || 0} />
+        </div>
+
+        {/* Phase cards */}
+        {allPhaseItems.length > 0 && (() => {
+          const featured = [...overdue, ...thisWeek, ...upcoming].slice(0, 4);
+          const PROJECT_COLORS = ["#f59e0b","#34d399","#60a5fa","#a78bfa","#f87171","#e879f9","#fb923c","#22d3ee"];
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(featured.length, 4)}, 1fr)`, gap: "10px", marginBottom: "24px" }}>
+              {featured.map((item, i) => {
+                const isHero = i === 0;
+                const projIdx = activeProjects.findIndex((p: any) => p.name === item.projectName);
+                const projColor = PROJECT_COLORS[projIdx % PROJECT_COLORS.length] || item.color;
+                const urgencyColor = item.days < 0 ? "#f87171" : item.days <= 7 ? "#f59e0b" : projColor;
+                return (
+                  <div key={i} style={{ background: `linear-gradient(135deg, ${urgencyColor}10, ${urgencyColor}04)`, border: `1px solid ${urgencyColor}35`, borderRadius: "16px", padding: isHero ? "16px 18px" : "13px 15px", position: "relative", overflow: "hidden", opacity: i === 2 ? 0.75 : 1 }}>
+                    {/* Top accent line */}
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${urgencyColor}66, ${urgencyColor})` }} />
+                    {/* Glow corner */}
+                    <div style={{ position: "absolute", top: 0, right: 0, width: "80px", height: "80px", background: `radial-gradient(circle at top right, ${urgencyColor}20, transparent 70%)`, pointerEvents: "none" }} />
+
+                    {/* Badge row */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+                      <span style={{ fontSize: isHero ? "18px" : "14px" }}>{PHASE_ICONS[item.phaseName] || "📌"}</span>
+                      <span style={{ fontSize: isHero ? "10px" : "9px", fontWeight: "800", color: urgencyColor, letterSpacing: "1.5px", textTransform: "uppercase" }}>{item.phaseName}</span>
+                      {item.days < 0 && <span style={{ marginLeft: "auto", fontSize: "8px", fontWeight: "800", color: "#f87171", background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "999px", padding: "2px 8px" }}>OVERDUE</span>}
+                      {item.days >= 0 && item.days <= 7 && <span style={{ marginLeft: "auto", fontSize: "8px", fontWeight: "800", color: "#f59e0b", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "999px", padding: "2px 8px" }}>THIS WEEK</span>}
+                      {item.days > 7 && <span style={{ marginLeft: "auto", fontSize: "8px", fontWeight: "800", color: projColor, background: `${projColor}12`, border: `1px solid ${projColor}30`, borderRadius: "999px", padding: "2px 8px" }}>UPCOMING</span>}
+                    </div>
+
+                    {/* Project name */}
+                    <p style={{ fontSize: isHero ? "12px" : "11px", fontWeight: "700", color: projColor, marginBottom: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: `${projColor}12`, border: `1px solid ${projColor}25`, borderRadius: "6px", padding: "3px 8px", display: "inline-block", maxWidth: "100%" }}>{item.projectName}</p>
+
+                    {/* Date — BIG */}
+                    <p style={{ fontSize: isHero ? "22px" : "16px", fontWeight: "900", color: urgencyColor, letterSpacing: "-1px", lineHeight: 1, marginBottom: "5px" }}>
+                      {item.days < 0 ? `⚠ ${Math.abs(item.days)}d late` : item.days === 0 ? "Today" : `→ ${fmtDate(item.estDate)}`}
+                    </p>
+
+                    {/* Days away */}
+                    <p style={{ fontSize: isHero ? "11px" : "9px", color: item.days < 0 ? "#f87171" : "rgba(255,255,255,0.35)", fontWeight: "600" }}>
+                      {item.days < 0 ? "Action required" : item.days === 0 ? "Due today" : `in ${item.days} day${item.days > 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Two column layout: Project Tracker + Calendar */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: "20px", alignItems: "start" }}>
+
+          {/* Left: Project tracker — MILITARY COMMAND CARDS */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+              <div style={{ width: "3px", height: "14px", background: "#f59e0b", borderRadius: "999px", boxShadow: "0 0 6px #f59e0b" }} />
+              <p style={{ fontSize: "9px", color: "rgba(245,158,11,0.7)", letterSpacing: "2.5px", textTransform: "uppercase", fontWeight: "800" }}>Asset Deployment Status</p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {activeProjects.map((proj, projIdx) => {
+                const PROJECT_COLORS = ["#f59e0b","#34d399","#60a5fa","#a78bfa","#f87171","#e879f9","#fb923c","#22d3ee"];
+                const projColor = PROJECT_COLORS[projIdx % PROJECT_COLORS.length];
+                const phases = proj.phases;
+                const doneCount = phases.filter((ph: any) => ph.status === "done").length;
+                const total = phases.length || 1;
+                const pct = Math.round((doneCount / total) * 100);
+                const currentPhase = phases.find((ph: any) => ph.status === "in_progress");
+                const nextPhase = phases.find((ph: any) => ph.status === "not_started");
+                const prevDonePh = [...phases].reverse().find((ph: any) => ph.status === "done");
+
+                const base = proj.start_date ? new Date(proj.start_date) : (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d; })();
+                let totalDays = 0;
+                phases.forEach((_: any, k: number) => {
+                  const stored = (() => { try { const v = localStorage.getItem(`avg_${proj.id}_${k}`); return v ? parseInt(v) : null; } catch { return null; } })();
+                  totalDays += stored ?? (AVG[phases[k]?.name] ?? 14);
+                });
+                const estEnd = new Date(base.getTime() + totalDays * 86400000);
+                const daysLeft = Math.ceil((estEnd.getTime() - new Date().getTime()) / 86400000);
+                const endStr = estEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                const dl = proj.end_date ? Math.ceil((new Date(proj.end_date).getTime() - new Date().getTime()) / 86400000) : daysLeft;
+                const dlColor = dl < 0 ? "#f87171" : dl < 14 ? "#f59e0b" : "#34d399";
+                const hc = pct >= 70 ? "#34d399" : pct >= 35 ? "#f59e0b" : projColor;
+                const statusLabel = pct === 100 ? "COMPLETE" : currentPhase ? "ACTIVE" : "STANDBY";
+                const statusColor = pct === 100 ? "#34d399" : currentPhase ? "#f59e0b" : "rgba(255,255,255,0.3)";
+
+                return (
+                  <div key={proj.id} style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3))", border: `1px solid ${projColor}25`, borderLeft: `3px solid ${projColor}`, borderRadius: "16px", padding: "18px 20px", position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: 0, right: 0, width: "100px", height: "100px", background: `radial-gradient(circle at top right, ${projColor}10, transparent 70%)`, pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", bottom: "8px", right: "16px", fontSize: "52px", opacity: 0.04, fontWeight: "900", color: projColor, lineHeight: 1, pointerEvents: "none" }}>{pct}%</div>
+
+                    {/* Header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
+                          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: projColor, boxShadow: `0 0 8px ${projColor}`, animation: currentPhase ? "blink 2s infinite" : "none" }} />
+                          <span style={{ fontSize: "13px", fontWeight: "900", color: "#fff", letterSpacing: "0.3px" }}>{proj.name.toUpperCase()}</span>
+                          <span style={{ fontSize: "8px", fontWeight: "800", color: statusColor, background: `${statusColor}15`, border: `1px solid ${statusColor}40`, borderRadius: "4px", padding: "2px 7px", letterSpacing: "1.5px" }}>{statusLabel}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>
+                            {proj.start_date ? `Started ${new Date(proj.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No start date"}
+                          </span>
+                          <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)" }}>→</span>
+                          <span style={{ fontSize: "10px", color: dlColor, fontWeight: "700" }}>
+                            Ends {proj.end_date ? new Date(proj.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : endStr}
+                          </span>
+                          <span style={{ fontSize: "10px", fontWeight: "800", color: dlColor, background: `${dlColor}12`, border: `1px solid ${dlColor}30`, borderRadius: "999px", padding: "2px 9px" }}>
+                            {dl < 0 ? `⚠ ${Math.abs(dl)}d overdue` : `⏱ ${dl}d left`}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "30px", fontWeight: "900", color: projColor, letterSpacing: "-1px", lineHeight: 1 }}>{pct}<span style={{ fontSize: "14px", color: `${projColor}88` }}>%</span></div>
+                        <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", letterSpacing: "1px", marginTop: "2px" }}>{doneCount}/{total} PHASES</div>
+                      </div>
+                    </div>
+
+                    {/* Phase ribbon */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0", marginBottom: "14px", overflowX: "auto", paddingBottom: "4px" }}>
+                      {phases.map((ph: any, i: number) => {
+                        const isDone = ph.status === "done";
+                        const isCurrent = ph.status === "in_progress";
+                        const isNextUp = i === phases.findIndex((p: any) => p.status === "not_started");
+                        const phColor = isDone ? "#34d399" : isCurrent ? "#f59e0b" : isNextUp ? projColor : "rgba(255,255,255,0.1)";
+                        const est = getPhaseEst(proj, i);
+                        const estStr = est.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        return (
+                          <div key={i} style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+                              <span style={{ fontSize: "8px", color: isCurrent ? "#f59e0b" : "rgba(255,255,255,0.12)", fontWeight: isCurrent ? "800" : "400", whiteSpace: "nowrap" }}>{isCurrent ? estStr : isDone ? "✓" : isNextUp ? estStr : ""}</span>
+                              <div style={{ width: isCurrent ? "48px" : "38px", height: isCurrent ? "48px" : "38px", borderRadius: "50%", background: isDone ? "rgba(52,211,153,0.12)" : isCurrent ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.03)", border: `2px solid ${phColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: isCurrent ? `0 0 14px rgba(245,158,11,0.5), 0 0 0 4px rgba(245,158,11,0.08)` : "none", transition: "all 0.3s" }}>
+                                <span style={{ fontSize: isCurrent ? "20px" : "16px" }}>{isDone ? "✅" : PHASE_ICONS[ph.name] || "📌"}</span>
+                              </div>
+                              <span style={{ fontSize: isCurrent ? "11px" : "10px", color: isDone ? "#34d399" : isCurrent ? "#f59e0b" : isNextUp ? projColor : "rgba(255,255,255,0.18)", fontWeight: isCurrent ? "800" : "600", whiteSpace: "nowrap", maxWidth: "64px", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis" }}>{ph.name}</span>
+                              {isCurrent && <span style={{ fontSize: "7px", color: "#f59e0b", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" }}>◀ HERE</span>}
+                            </div>
+                            {i < phases.length - 1 && (
+                              <div style={{ width: "28px", height: "2px", background: isDone ? "#34d399" : "rgba(255,255,255,0.06)", marginTop: "0px", marginRight: "6px", marginBottom: "22px", marginLeft: "6px", flexShrink: 0, boxShadow: isDone ? "0 0 4px rgba(52,211,153,0.4)" : "none" }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ position: "relative", height: "8px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", marginBottom: "10px", overflow: "visible" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${hc}55, ${hc})`, borderRadius: "999px", transition: "width 0.8s", boxShadow: `0 0 10px ${hc}66`, position: "relative" }}>
+                        <div style={{ position: "absolute", right: "-5px", top: "50%", transform: "translateY(-50%)", width: "14px", height: "14px", borderRadius: "50%", background: hc, boxShadow: `0 0 0 3px rgba(0,0,0,0.5), 0 0 12px ${hc}`, border: "2px solid #0a0a0a", display: pct > 0 && pct < 100 ? "block" : "none" }} />
+                      </div>
+                      {phases.map((_: any, i: number) => (
+                        <div key={i} style={{ position: "absolute", top: "-3px", left: `${((i + 1) / total) * 100}%`, transform: "translateX(-50%)", width: "2px", height: "14px", background: "rgba(0,0,0,0.5)", borderRadius: "999px", zIndex: 1 }} />
+                      ))}
+                    </div>
+
+                    {/* ── PLANNING STRIP: Next 3 phases ── */}
+                    {(() => {
+                      const upcomingPhases = phases
+                        .map((ph: any, i: number) => ({ ...ph, idx: i, est: getPhaseEst(proj, i) }))
+                        .filter((ph: any) => ph.status !== "done")
+                        .slice(0, 3);
+                      return (
+                        <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                          {upcomingPhases.length === 0 ? (
+                            <div style={{ flex: 1, background: "rgba(52,211,153,0.04)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: "10px", padding: "10px 12px", textAlign: "center" }}>
+                              <span style={{ fontSize: "11px", color: "#34d399", fontWeight: "700" }}>✓ All phases complete</span>
+                            </div>
+                          ) : upcomingPhases.map((ph: any, ui: number) => {
+                            const isNext = ui === 0;
+                            const phColor = isNext ? projColor : "rgba(255,255,255,0.12)";
+                            const daysAway = Math.ceil((ph.est.getTime() - new Date().getTime()) / 86400000);
+                            const estStr = ph.est.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                            const isOverdue = daysAway < 0 && ph.status === "in_progress";
+                            return (
+                              <div key={ui} style={{ flex: isNext ? 1.6 : 1, background: isNext ? `${projColor}10` : "rgba(255,255,255,0.02)", border: `1px solid ${isNext ? projColor+"35" : "rgba(255,255,255,0.05)"}`, borderRadius: "10px", padding: isNext ? "10px 12px" : "8px 10px", position: "relative", overflow: "hidden", opacity: ui === 2 ? 0.4 : ui === 1 ? 0.65 : 1, transition: "all 0.3s" }}>
+                                {isNext && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${projColor}66, ${projColor})`, borderRadius: "10px 10px 0 0" }} />}
+                                <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "4px" }}>
+                                  <span style={{ fontSize: isNext ? "13px" : "10px" }}>{PHASE_ICONS[ph.name] || "📌"}</span>
+                                  <span style={{ fontSize: isNext ? "11px" : "9px", fontWeight: "800", color: isNext ? phColor : "rgba(255,255,255,0.35)", letterSpacing: "0.3px" }}>{ph.name}</span>
+                                  {isNext && <span style={{ marginLeft: "auto", fontSize: "8px", fontWeight: "800", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "999px", padding: "1px 6px" }}>NEXT ▶</span>}
+                                </div>
+                                <div style={{ fontSize: isNext ? "10px" : "9px", color: isOverdue ? "#f87171" : isNext ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.18)", fontWeight: isNext ? "700" : "400" }}>
+                                  {isOverdue ? `⚠ ${Math.abs(daysAway)}d late` : daysAway === 0 ? "Today" : `→ ${estStr}`}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Footer: team + budget */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        {(proj.team || []).slice(0,4).map((m: any, ti: number) => (
+                          <div key={ti} title={`${m.name} · ${m.role}`} style={{ width: "20px", height: "20px", borderRadius: "50%", background: `${projColor}20`, border: `1px solid ${projColor}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: "800", color: projColor, marginLeft: ti > 0 ? "-5px" : "0" }}>
+                            {(m.name?.[0] || "?").toUpperCase()}
+                          </div>
+                        ))}
+                        {(proj.team || []).length === 0 && <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", fontStyle: "italic" }}>No team</span>}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        {proj.budget > 0 && (
+                          <span style={{ fontSize: "9px", fontWeight: "700", color: (proj.spent / proj.budget) > 0.9 ? "#f87171" : "#34d399", background: (proj.spent / proj.budget) > 0.9 ? "rgba(248,113,113,0.08)" : "rgba(52,211,153,0.08)", border: `1px solid ${(proj.spent / proj.budget) > 0.9 ? "rgba(248,113,113,0.2)" : "rgba(52,211,153,0.2)"}`, borderRadius: "999px", padding: "2px 9px" }}>
+                            💰 {((proj.spent / proj.budget) * 100).toFixed(0)}% budget
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Military Calendar — upgraded */}
+          <div style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3))", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "16px", padding: "16px", position: "relative", overflow: "hidden" }}>
+            {/* Corner glow */}
+            <div style={{ position: "absolute", top: 0, right: 0, width: "80px", height: "80px", background: "radial-gradient(circle at top right, rgba(245,158,11,0.08), transparent 70%)", pointerEvents: "none" }} />
+
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <button onClick={() => { let m = calMonth - 1; let y = calYear; if (m < 0) { m = 11; y--; } setCalMonth(m); setCalYear(y); }} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "13px", padding: "3px 8px", fontWeight: "700" }}>‹</button>
+              <div style={{ textAlign: "center" }}>
+                <span style={{ fontSize: "10px", fontWeight: "900", color: "#f59e0b", letterSpacing: "1.5px", textTransform: "uppercase" }}>{calName}</span>
+              </div>
+              <button onClick={() => { let m = calMonth + 1; let y = calYear; if (m > 11) { m = 0; y++; } setCalMonth(m); setCalYear(y); }} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "13px", padding: "3px 8px", fontWeight: "700" }}>›</button>
+            </div>
+
+            {/* Project color legend pills */}
+            {activeProjects.length > 0 && (
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "10px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                {activeProjects.map((proj, idx) => {
+                  const PROJECT_COLORS = ["#f59e0b","#34d399","#60a5fa","#a78bfa","#f87171","#e879f9","#fb923c","#22d3ee"];
+                  const c = PROJECT_COLORS[idx % PROJECT_COLORS.length];
+                  const initial = proj.name?.[0]?.toUpperCase() || "?";
+                  return (
+                    <div key={proj.id} title={proj.name} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "2px 7px", borderRadius: "999px", background: `${c}15`, border: `1px solid ${c}40` }}>
+                      <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: c, boxShadow: `0 0 4px ${c}` }} />
+                      <span style={{ fontSize: "8px", fontWeight: "800", color: c, letterSpacing: "0.3px" }}>{initial}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Day headers */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "1px", marginBottom: "4px" }}>
+              {["Su","Mo","Tu","We","Th","Fr","Sa"].map((d,i) => (
+                <div key={i} style={{ textAlign: "center", fontSize: "8px", color: "rgba(255,255,255,0.2)", fontWeight: "800", padding: "2px 0", letterSpacing: "0.3px" }}>{d}</div>
+              ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "2px" }}>
+              {Array.from({ length: firstDay }).map((_,i) => <div key={`e${i}`} style={{ height: "36px" }} />)}
+              {Array.from({ length: calDays }).map((_, i) => {
+                const day = i + 1;
+                const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+                const events = calEvents[day] || [];
+                const hasOverdue = events.some(e => e.days < 0);
+                const hasThisWeek = events.some(e => e.days >= 0 && e.days <= 7);
+
+                // Get unique projects for this day
+                const dayProjects = events.reduce((acc: any[], ev) => {
+                  if (!acc.find(a => a.projectId === ev.projectId)) acc.push(ev);
+                  return acc;
+                }, []);
+
+                return (
+                  <div key={day} title={events.map(e => `${e.phaseName} · ${e.projectName}`).join("\n")} style={{ height: "36px", textAlign: "center", borderRadius: "7px", background: isToday ? "rgba(245,158,11,0.18)" : events.length > 0 ? "rgba(255,255,255,0.03)" : "transparent", border: isToday ? "1px solid rgba(245,158,11,0.5)" : events.length > 0 ? "1px solid rgba(255,255,255,0.07)" : "1px solid transparent", cursor: events.length > 0 ? "pointer" : "default", position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "4px 1px 2px", boxShadow: isToday ? "0 0 10px rgba(245,158,11,0.2)" : "none", transition: "all 0.15s" }}>
+                    <span style={{ fontSize: "9px", fontWeight: isToday ? "900" : "500", color: isToday ? "#f59e0b" : events.length > 0 ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.4)", lineHeight: 1 }}>{day}</span>
+                    {/* Project color dots — up to 3 */}
+                    {dayProjects.length > 0 && (
+                      <div style={{ display: "flex", gap: "2px", marginTop: "3px", flexWrap: "wrap", justifyContent: "center" }}>
+                        {dayProjects.slice(0,3).map((ev, di) => {
+                          const PROJECT_COLORS = ["#f59e0b","#34d399","#60a5fa","#a78bfa","#f87171","#e879f9","#fb923c","#22d3ee"];
+                          const projIdx = activeProjects.findIndex((p: any) => p.id === ev.projectId);
+                          const c = hasOverdue ? "#f87171" : hasThisWeek ? "#f59e0b" : PROJECT_COLORS[projIdx % PROJECT_COLORS.length];
+                          return <div key={di} style={{ width: "5px", height: "5px", borderRadius: "50%", background: c, boxShadow: `0 0 4px ${c}88` }} />;
+                        })}
+                        {dayProjects.length > 3 && <span style={{ fontSize: "7px", color: "rgba(255,255,255,0.3)", lineHeight: "5px" }}>+</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Today indicator line */}
+            <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 6px #f59e0b", animation: "blink 1.5s infinite" }} />
+                <span style={{ fontSize: "8px", color: "rgba(245,158,11,0.7)", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" }}>
+                  {today.toLocaleDateString("en-US", { month: "short", day: "numeric" })} — {allPhaseItems.filter(x => x.estDate.getMonth() === calMonth && x.estDate.getFullYear() === calYear).length} phases this month
+                </span>
+              </div>
+
+              {/* Upcoming phases this month — mini list */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "120px", overflowY: "auto" }}>
+                {allPhaseItems
+                  .filter(x => x.estDate.getMonth() === calMonth && x.estDate.getFullYear() === calYear)
+                  .sort((a,b) => a.estDate.getTime() - b.estDate.getTime())
+                  .slice(0, 6)
+                  .map((item, idx) => {
+                    const PROJECT_COLORS = ["#f59e0b","#34d399","#60a5fa","#a78bfa","#f87171","#e879f9","#fb923c","#22d3ee"];
+                    const projIdx = activeProjects.findIndex((p: any) => p.id === item.projectId);
+                    const c = item.days < 0 ? "#f87171" : item.days <= 7 ? "#f59e0b" : PROJECT_COLORS[projIdx % PROJECT_COLORS.length];
+                    const initial = item.projectName?.[0]?.toUpperCase() || "?";
+                    return (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "3px 6px", borderRadius: "6px", background: `${c}08`, border: `1px solid ${c}20` }}>
+                        <div style={{ width: "14px", height: "14px", borderRadius: "4px", background: `${c}20`, border: `1px solid ${c}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "7px", fontWeight: "900", color: c, flexShrink: 0 }}>{initial}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.phaseName}</div>
+                          <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.projectName}</div>
+                        </div>
+                        <span style={{ fontSize: "8px", fontWeight: "800", color: c, flexShrink: 0 }}>
+                          {item.days < 0 ? `${Math.abs(item.days)}d late` : item.days === 0 ? "Today" : fmtDate(item.estDate)}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: number; totalRemaining: number; userId: string }) {
+  const [warChest, setWarChest] = useState(0);
+  const [equityPct, setEquityPct] = useState(20);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("user_settings").select("war_chest, equity_pct").eq("user_id", userId).single()
+      .then(({ data }) => {
+        if (data) { setWarChest(data.war_chest || 0); setEquityPct(data.equity_pct || 20); }
+      });
+  }, [userId]);
+
+  async function save(wc: number, ep: number) {
+    await supabase.from("user_settings").upsert({ user_id: userId, war_chest: wc, equity_pct: ep, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   }
 
   const autoCash = Math.round((totalEquity / 100) * equityPct);
@@ -2413,9 +3362,9 @@ function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: num
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399" }} />
-            <span style={{ fontSize: "10px", color: "rgba(52,211,153,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Cash Available · War Chest</span>
+            <span style={{ fontSize: "10px", color: "rgba(52,211,153,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>💰 Capital Reserve · What You Can Deploy</span>
           </div>
-          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)" }}>Manual savings + auto-calculated from portfolio equity</p>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>Money available for <span style={{ color: "#34d399", fontWeight: "700" }}>renovations</span> · <span style={{ color: "#60a5fa", fontWeight: "700" }}>new projects</span> · <span style={{ color: "#f87171", fontWeight: "700" }}>difficult times</span></p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "11px", color: coverageColor, fontWeight: "700", background: `${coverageColor}15`, padding: "4px 10px", borderRadius: "999px", border: `1px solid ${coverageColor}33` }}>
@@ -2427,14 +3376,18 @@ function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: num
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: editing ? "16px" : "0" }}>
         {[
-          { label: "War Chest", sublabel: "manual cash input", value: fmtM(warChest), color: "#34d399" },
-          { label: "Equity Deployable", sublabel: `${equityPct}% of project equity`, value: fmtM(autoCash), color: "#60a5fa" },
-          { label: "Total Available", sublabel: "combined liquidity", value: fmtM(totalAvailable), color: "#f59e0b", big: true },
+          { label: "💰 Money in the Bank", sublabel: "Cash you've saved — ready to deploy immediately", value: fmtM(warChest), color: "#34d399", tag: "Liquid" },
+          { label: "🏗 Equity You Can Use", sublabel: `${equityPct}% of your project equity — deployable capital`, value: fmtM(autoCash), color: "#60a5fa", tag: "From equity" },
+          { label: "⚡ Total War Chest", sublabel: "Full amount available for projects or emergencies", value: fmtM(totalAvailable), color: "#f59e0b", tag: "Combined", big: true },
         ].map(m => (
-          <div key={m.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: "12px", padding: "14px 16px", border: `1px solid ${m.color}22` }}>
-            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600", marginBottom: "2px" }}>{m.label}</p>
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>{m.sublabel}</p>
-            <p style={{ fontSize: m.big ? "22px" : "18px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px" }}>{m.value}</p>
+          <div key={m.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: "14px", padding: "16px 18px", border: `1px solid ${m.color}22`, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, right: 0, width: "60px", height: "60px", background: `radial-gradient(circle at top right, ${m.color}08, transparent 70%)`, pointerEvents: "none" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", fontWeight: "700" }}>{m.label}</p>
+              <span style={{ fontSize: "8px", fontWeight: "800", color: m.color, background: `${m.color}15`, border: `1px solid ${m.color}30`, borderRadius: "999px", padding: "2px 7px" }}>{m.tag}</span>
+            </div>
+            <p style={{ fontSize: (m as any).big ? "26px" : "22px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px", marginBottom: "4px" }}>{m.value}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>{m.sublabel}</p>
           </div>
         ))}
       </div>
@@ -2702,7 +3655,4 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
-
-
-
 
