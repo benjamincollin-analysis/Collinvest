@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -85,6 +85,16 @@ function toDb(p: Omit<Property, "id">) {
 function fromDb(row: any): Property {
   return { id: row.id, name: row.name, type: row.type, value: row.value, mortgage: row.mortgage, rent: row.rent, expenses: row.expenses, occupancyStatus: row.occupancy_status, plannedDate: row.planned_date || "", appreciation: row.appreciation, lat: row.lat, lng: row.lng, address: row.address || "", occupancyPct: row.occupancy_pct ?? 100, soldPrice: row.sold_price ?? 0, soldDate: row.sold_date ?? "", parentId: row.parent_id ?? null, groupTag: row.group_tag ?? "" };
 }
+function daysUntil(deadline: string | undefined): number | null {
+  if (!deadline) return null;
+  const d = new Date(deadline);
+  if (isNaN(d.getTime())) return null;
+  return Math.ceil((d.getTime() - Date.now()) / 86400000);
+}
+
+function fmtPct(n: number): string {
+  return n.toFixed(1) + "%";
+}
 function fmt(n: number) { if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M"; if (n >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K"; return "$" + n.toLocaleString("en-US"); }
 function fmtFull(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US"); }
 function fmtComma(n: number) { return (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-US"); }
@@ -157,7 +167,7 @@ function TacticalMap({ properties, selected, onSelect }: { properties: Property[
   function setupMap() { const L = (window as any).L; if (!mapRef.current || leafletRef.current) return; const center: [number, number] = [20, 10]; const zoom = properties.length > 0 ? 4 : 2; const map = L.map(mapRef.current, { center, zoom, zoomControl: false, attributionControl: false }); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map); const s = document.createElement("style"); s.textContent = `.leaflet-layer{filter:invert(1) hue-rotate(195deg) brightness(0.82) contrast(1.1) saturate(0.45)}.leaflet-container{background:#050a0f!important}.leaflet-control-zoom{display:none}.leaflet-popup-content-wrapper{background:rgba(5,10,15,0.96)!important;border:1px solid rgba(245,158,11,0.4)!important;border-radius:12px!important;color:#fff!important;font-family:'DM Sans',sans-serif!important}.leaflet-popup-tip{background:rgba(5,10,15,0.96)!important}.leaflet-popup-close-button{color:rgba(255,255,255,0.4)!important}`; document.head.appendChild(s); leafletRef.current = { map, L }; renderMarkers(map, L, properties, selected, onSelect); }
   const prevPropsRef = useRef<string>(""); const cur = JSON.stringify({ properties, selected }); if (cur !== prevPropsRef.current && leafletRef.current) { prevPropsRef.current = cur; const { map, L } = leafletRef.current; renderMarkers(map, L, properties, selected, onSelect); }
   function renderMarkers(map: any, L: any, props: Property[], sel: number | null, onSel: (id: number) => void) { markersRef.current.forEach((m) => m.remove()); markersRef.current = []; props.forEach((p) => { const isSelected = sel === p.id; const cf = propCashFlow(p); const oc = occupancyColor(p); const borderColor = isSelected ? "#f59e0b" : oc.color; const bgColor = isSelected ? "rgba(245,158,11,0.92)" : "rgba(5,10,15,0.92)"; const valueColor = isSelected ? "#000" : "#f59e0b"; const cfColor = isSelected ? "#000" : (cf >= 0 ? "#34d399" : "#f87171"); const iconHtml = `<div style="position:relative;text-align:center;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:1px solid ${borderColor};border-radius:50%;opacity:0.35;animation:tPulse 2s ease-out infinite;"></div><div style="background:${bgColor};border:2px solid ${borderColor};border-radius:10px;padding:7px 12px;min-width:110px;box-shadow:0 0 14px ${borderColor}44;position:relative;"><div style="font-size:9px;color:${isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)'};letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:2px;">${p.name.length > 14 ? p.name.slice(0, 13) + "…" : p.name}</div><div style="font-size:12px;font-weight:800;color:${valueColor};">${fmt(p.value)}</div><div style="font-size:10px;font-weight:700;color:${cfColor};margin-top:2px;">${cf >= 0 ? "+" : ""}${fmtFull(cf)}/mo</div><div style="font-size:9px;color:${isSelected ? 'rgba(0,0,0,0.4)' : oc.color};margin-top:2px;font-weight:600;">${occupancyLabel(p).toUpperCase()}</div></div><div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid ${borderColor};margin:0 auto;"></div></div>`; const icon = L.divIcon({ html: iconHtml, className: "", iconSize: [130, 72], iconAnchor: [65, 79], popupAnchor: [0, -82] }); const equity = p.value - p.mortgage; const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) : "—"; const popup = `<div style="padding:6px 8px;min-width:190px;"><div style="font-size:13px;font-weight:800;margin-bottom:10px;">${p.name}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Value</div><div style="font-size:13px;font-weight:700;color:#f59e0b;">${fmtFull(p.value)}</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Equity</div><div style="font-size:13px;font-weight:700;">${fmtFull(equity)}</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Cash Flow</div><div style="font-size:13px;font-weight:700;color:${cf >= 0 ? '#34d399' : '#f87171'};">${cf >= 0 ? "+" : ""}${fmtFull(cf)}/mo</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">ROI</div><div style="font-size:13px;font-weight:700;">${roi}%</div></div></div>${p.address ? `<div style="margin-top:8px;font-size:10px;color:rgba(255,255,255,0.2);">${p.address}</div>` : ""}</div>`; const marker = L.marker([p.lat, p.lng], { icon }); marker.bindPopup(popup); marker.on("click", () => onSel(p.id)); marker.addTo(map); markersRef.current.push(marker); }); if (props.length > 1) { try { map.fitBounds(L.latLngBounds(props.map((p) => [p.lat, p.lng])), { padding: [60, 60] }); } catch {} } }
-  return (<div style={{ position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid rgba(245,158,11,0.15)" }}><div style={{ position: "absolute", inset: 0, zIndex: 400, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(245,158,11,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} /><div style={{ position: "absolute", top: "14px", left: "18px", zIndex: 402, pointerEvents: "none", display: "flex", alignItems: "center", gap: "8px" }}><div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s ease-in-out infinite" }} /><span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>GOLDSTREAM · TACTICAL VIEW</span></div><div style={{ position: "absolute", top: "14px", right: "18px", zIndex: 402, pointerEvents: "none", fontSize: "10px", color: "rgba(245,158,11,0.5)", letterSpacing: "1px", fontWeight: "600" }}>{String(properties.length).padStart(2, "0")} ASSETS TRACKED</div><div ref={mapRef} className="gs-map" style={{ height: "380px", width: "100%" }} /></div>);
+  return (<div style={{ position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid rgba(245,158,11,0.15)" }}><div style={{ position: "absolute", inset: 0, zIndex: 400, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(245,158,11,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} /><div style={{ position: "absolute", top: "14px", left: "18px", zIndex: 402, pointerEvents: "none", display: "flex", alignItems: "center", gap: "8px" }}><div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s ease-in-out infinite" }} /><span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>GOLDSTREAM · TACTICAL VIEW</span></div><div style={{ position: "absolute", top: "14px", right: "18px", zIndex: 402, pointerEvents: "none", fontSize: "10px", color: "rgba(245,158,11,0.5)", letterSpacing: "1px", fontWeight: "600" }}>{String(Math.max(0, properties.length)).padStart(2, "0")} ASSETS TRACKED</div><div ref={mapRef} className="gs-map" style={{ height: "380px", width: "100%" }} /></div>);
 }
 
 function MilestoneToast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -182,7 +192,7 @@ function SettingsModal({ settings, onSave, onClose }: { settings: UserSettings; 
   return (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "420px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}><h2 style={{ fontSize: "17px", fontWeight: "800" }}>Edit Goals</h2><button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "16px" }}><div><label style={LS}>Your Name</label><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} style={IS} /></div><div><label style={LS}>Portfolio Goal ($)</label><input type="number" value={goalPortfolio} onChange={e => setGoalPortfolio(e.target.value)} style={IS} /></div><div><label style={LS}>Monthly Cash Flow Goal ($)</label><input type="number" value={goalCashFlow} onChange={e => setGoalCashFlow(e.target.value)} style={IS} /></div></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={onClose} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={() => onSave({ firstName, goalPortfolio: parseFloat(goalPortfolio) || DEFAULT_GOAL_PORTFOLIO, goalCashFlow: parseFloat(goalCashFlow) || DEFAULT_GOAL_CASHFLOW, onboardingDone: true })} style={{ flex: 1, padding: "12px", background: "#f59e0b", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Save Goals</button></div></div></div>);
 }
 
-export default function Dashboard() {
+function Dashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -372,7 +382,7 @@ const [showCompare, setShowCompare] = useState(false);
         <div className="gs-tabs">{(["portfolio", "finances", "projects", "market", "projections", "deallab"] as const).map((t) => (<button key={t} onClick={() => setActiveTab(t)} style={tabStyle(t)}>{t}</button>))}</div>
         <div className="gs-nav-user">
           <span>{displayName}</span>
-          <NotificationBell user={user} properties={properties} />
+          {/* <NotificationBell user={user} properties={properties} /> */}
           <button onClick={() => setShowSettings(true)} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "6px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>⚙ Goals</button>
           <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", fontWeight: "800", fontSize: "11px" }}>{(settings.firstName?.[0] || user?.email?.[0] || "U").toUpperCase()}</div>
           <button onClick={handleLogout} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "600" }}>Log out</button>
@@ -984,11 +994,222 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
   );
 }
 
+function SatelliteMockup({ address, hasPool, lat, lng }: { address: string; hasPool?: boolean; lat?: number; lng?: number }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const initDone = useRef(false);
+
+  useEffect(() => {
+    if (initDone.current || !mapRef.current) return;
+    initDone.current = true;
+
+    const load = () => {
+      if (!document.getElementById("leaflet-css-sat")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css-sat";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+      const init = () => {
+        const L = (window as any).L;
+        if (!mapRef.current || mapInstance.current) return;
+        const center: [number, number] = lat && lng ? [lat, lng] : [29.7604, -95.3698];
+        const map = L.map(mapRef.current, { center, zoom: 17, zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }).addTo(map);
+        mapInstance.current = map;
+        if (hasPool) {
+          const poolIcon = L.divIcon({ html: `<div style="background:#0ea5e9;width:28px;height:18px;border-radius:4px;box-shadow:0 0 12px rgba(14,165,233,0.8);border:2px solid #fff;"></div>`, className: "", iconSize: [28, 18], iconAnchor: [14, 9] });
+          L.marker(center, { icon: poolIcon }).addTo(map);
+        }
+      };
+      if (!(window as any).L) {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = init;
+        document.head.appendChild(script);
+      } else init();
+    };
+    setTimeout(load, 100);
+  }, [lat, lng, hasPool]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#0a0a0a" }}>
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+      {!hasPool && <div style={{ position: "absolute", top: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.8)", background: "rgba(10,12,16,0.8)", padding: "2px 7px", borderRadius: "4px", zIndex: 1000 }}>Live Satellite</div>}
+      {hasPool && <div style={{ position: "absolute", top: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "#a78bfa", background: "rgba(124,58,237,0.25)", border: "1px solid #4c1d95", padding: "2px 7px", borderRadius: "4px", zIndex: 1000 }}>AI Mockup ✦</div>}
+    </div>
+  );
+}
+
+function BeforeAfterSlider({ address }: { address: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pct, setPct] = useState(50);
+  const dragging = useRef(false);
+
+  function getPos(e: MouseEvent | TouchEvent) {
+    const rect = containerRef.current!.getBoundingClientRect();
+    const x = "touches" in e ? e.touches[0].clientX : e.clientX;
+    return Math.max(2, Math.min(98, ((x - rect.left) / rect.width) * 100));
+  }
+
+  useEffect(() => {
+    function onMove(e: MouseEvent | TouchEvent) { if (dragging.current) setPct(getPos(e)); }
+    function onUp() { dragging.current = false; }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onMove as any, { passive: true });
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("touchmove", onMove as any);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
+    };
+  }, []);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+        <span style={{ fontSize: "10px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "0.8px", textTransform: "uppercase" }}>Current State</span>
+        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>← drag →</span>
+        <span style={{ fontSize: "10px", fontWeight: "700", color: "#a78bfa", letterSpacing: "0.8px", textTransform: "uppercase" }}>AI Mockup ✦</span>
+      </div>
+      <div
+        ref={containerRef}
+        onMouseDown={e => { dragging.current = true; setPct(getPos(e.nativeEvent)); }}
+        onTouchStart={e => { dragging.current = true; setPct(getPos(e.nativeEvent)); }}
+        style={{ position: "relative", width: "100%", height: "200px", borderRadius: "12px", overflow: "hidden", cursor: "ew-resize", userSelect: "none", border: "1px solid rgba(255,255,255,0.1)" }}
+      >
+        <div style={{ position: "absolute", inset: 0 }}><SatelliteMockup address={address} hasPool={false} /></div>
+        <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${100 - pct}% 0 0)` }}><SatelliteMockup address={address} hasPool={true} /></div>
+        <div style={{ position: "absolute", top: 0, bottom: 0, left: `${pct}%`, width: "2px", background: "#fff", transform: "translateX(-50%)", zIndex: 10 }} />
+        <div style={{ position: "absolute", top: "50%", left: `${pct}%`, transform: "translate(-50%,-50%)", width: "36px", height: "36px", background: "#fff", borderRadius: "50%", zIndex: 11, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.5)", fontWeight: "700" }}>⟺</div>
+        <div style={{ position: "absolute", bottom: "8px", left: "8px", fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.6)", background: "rgba(10,12,16,0.85)", padding: "2px 7px", borderRadius: "4px" }}>Before</div>
+        <div style={{ position: "absolute", bottom: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "#a78bfa", background: "rgba(124,58,237,0.25)", border: "1px solid #4c1d95", padding: "2px 7px", borderRadius: "4px" }}>After ✦</div>
+      </div>
+    </div>
+  );
+}
+
+function PoolAnimation({ playing, onToggle }: { playing: boolean; onToggle: () => void }) {
+  const [progress, setProgress] = useState(0);
+  const [poolVisible, setPoolVisible] = useState(false);
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (playing) {
+      setPoolVisible(true);
+      timerRef.current = setInterval(() => {
+        setProgress(p => { if (p >= 100) { clearInterval(timerRef.current); return 100; } return p + 1.25; });
+      }, 100);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [playing]);
+
+  useEffect(() => { if (!playing) { setProgress(0); setPoolVisible(false); } }, [playing]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+        <span style={{ fontSize: "10px", fontWeight: "700", color: "#7c3aed", letterSpacing: "0.8px", textTransform: "uppercase" }}>⬡ Pool Animation — AI Generated ✦</span>
+      </div>
+      <div style={{ position: "relative", width: "100%", height: "160px", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", background: "linear-gradient(135deg,#0a1a0a,#0a150a,#111a0a)" }}>
+        <div style={{ position: "absolute", top: "48%", left: 0, right: 0, height: "14px", background: "#1a1a14" }} />
+        <div style={{ position: "absolute", left: "38%", top: 0, bottom: 0, width: "14px", background: "#1a1a14" }} />
+        <div style={{ position: "absolute", top: "14%", left: "8%", width: "26%", height: "22%", background: "#2a3a1a", border: "1px solid #3a4a2a", borderRadius: "2px" }} />
+        <div style={{ position: "absolute", top: "12%", left: "48%", width: "30%", height: "26%", background: "#2a3a1a", border: "1px solid #3a4a2a", borderRadius: "2px" }} />
+        <div style={{ position: "absolute", top: "62%", left: "12%", width: "20%", height: "18%", background: "#2a3a1a", border: "1px solid #3a4a2a", borderRadius: "2px" }} />
+        {poolVisible && (
+          <div style={{ position: "absolute", top: "38%", left: "12%", height: "12%", width: `${(progress / 100) * 18}%`, background: "#0ea5e9", borderRadius: "4px", boxShadow: "0 0 16px rgba(14,165,233,0.6)", transition: "width 0.1s linear" }} />
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
+        <button onClick={onToggle} style={{ width: "28px", height: "28px", background: "#7c3aed", border: "none", borderRadius: "50%", cursor: "pointer", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{playing ? "⏸" : "▶"}</button>
+        <div style={{ flex: 1, height: "3px", background: "rgba(255,255,255,0.08)", borderRadius: "2px" }}>
+          <div style={{ height: "100%", width: `${progress}%`, background: "#7c3aed", borderRadius: "2px", transition: "width 0.1s" }} />
+        </div>
+        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", minWidth: "60px" }}>0:{String(Math.max(0,Math.min(8,Math.round(progress * 0.08)))).padStart(2,"0")} / 0:08</span>
+      </div>
+    </div>
+  );
+}
+
 function PropertyDetail({ property: p, onEdit, onClose }: any) {
-  const equity = p.value - p.mortgage; const cf = propCashFlow(p); const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) + "%" : "—";
+  const equity = p.value - p.mortgage;
+  const cf = propCashFlow(p);
+  const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) + "%" : "—";
   const detailRef = useRef<HTMLDivElement>(null);
+  const [activeView, setActiveView] = useState<"satellite"|"mockup"|"animation">("satellite");
+  const [animPlaying, setAnimPlaying] = useState(false);
+  const improvementVal = Math.round(p.value * 0.06);
+
   useEffect(() => { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
-  return (<div ref={detailRef} style={{ background: "rgba(245,158,11,0.03)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "24px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px" }}><div style={{ flex: 1, minWidth: 0 }}><h3 style={{ fontSize: "17px", fontWeight: "800" }}>{p.name}</h3><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{p.type} · {occupancyLabel(p)}{p.address ? ` · ${p.address}` : ""}</p></div><div style={{ display: "flex", gap: "8px", flexShrink: 0 }}><button onClick={e => onEdit(p, e)} style={{ fontSize: "12px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>Edit</button><button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>×</button></div></div><div className="gs-detail-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>{[{ label: "Market Value", value: fmtFull(p.value) }, { label: "Mortgage", value: fmtFull(p.mortgage) }, { label: "Equity", value: fmtFull(equity), hi: true }, { label: "Appreciation", value: p.appreciation + "%/yr" }, { label: "Monthly Rent", value: isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—" }, { label: "Expenses", value: fmtFull(p.expenses) }, { label: "Net Cash Flow", value: fmtFull(cf) }, { label: "Annual ROI", value: roi }].map((m: any) => (<div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "14px", border: m.hi ? "1px solid rgba(245,158,11,0.2)" : "1px solid rgba(255,255,255,0.05)" }}><p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "6px", letterSpacing: "0.8px", textTransform: "uppercase" }}>{m.label}</p><p style={{ fontSize: "16px", fontWeight: "700", color: m.hi ? "#f59e0b" : "#fff" }}>{m.value}</p></div>))}</div></div>);
+  useEffect(() => { if (activeView !== "animation") setAnimPlaying(false); }, [activeView]);
+
+  return (
+    <div ref={detailRef} style={{ background: "rgba(245,158,11,0.03)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", gap: "12px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{ fontSize: "17px", fontWeight: "800" }}>{p.name}</h3>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{p.type} · {occupancyLabel(p)}{p.address ? ` · ${p.address}` : ""}</p>
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+          <button onClick={e => onEdit(p, e)} style={{ fontSize: "12px", padding: "6px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#f59e0b", cursor: "pointer", fontWeight: "600" }}>Edit</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "20px", lineHeight: 1 }}>×</button>
+        </div>
+      </div>
+
+      {/* View toggle */}
+      <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "3px", marginBottom: "14px" }}>
+        {([
+          { key: "satellite", label: "Satellite" },
+          { key: "mockup", label: "AI Mockup ✦" },
+          { key: "animation", label: "Animation ✦" },
+        ] as const).map(v => (
+          <button key={v.key} onClick={() => setActiveView(v.key)} style={{ flex: 1, padding: "7px", borderRadius: "7px", fontSize: "11px", fontWeight: "700", border: `1px solid ${activeView === v.key ? "rgba(245,158,11,0.4)" : "transparent"}`, cursor: "pointer", background: activeView === v.key ? "rgba(245,158,11,0.12)" : "transparent", color: activeView === v.key ? "#f59e0b" : "rgba(255,255,255,0.4)", transition: "all 0.15s" }}>{v.label}</button>
+        ))}
+      </div>
+
+      {/* Visual section */}
+      <div style={{ marginBottom: "16px" }}>
+        {activeView === "satellite" && (
+          <div style={{ height: "200px", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <SatelliteMockup address={p.address} hasPool={false} />
+          </div>
+        )}
+        {activeView === "mockup" && <BeforeAfterSlider address={p.address} />}
+        {activeView === "animation" && <PoolAnimation playing={animPlaying} onToggle={() => setAnimPlaying(v => !v)} />}
+      </div>
+
+      {/* Improvement banner */}
+      <div style={{ background: "linear-gradient(90deg,rgba(5,46,22,0.8),rgba(10,48,32,0.6))", border: "1px solid rgba(20,83,45,0.6)", borderRadius: "10px", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: "600" }}>🔥 Improvement opportunity detected</span>
+        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", fontWeight: "900", color: "#22c55e" }}>+{fmtFull(improvementVal)} potential</span>
+      </div>
+
+      {/* Metrics */}
+      <div className="gs-detail-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>
+        {[
+          { label: "Market Value", value: fmtFull(p.value) },
+          { label: "Mortgage", value: fmtFull(p.mortgage) },
+          { label: "Equity", value: fmtFull(equity), hi: true },
+          { label: "Appreciation", value: p.appreciation + "%/yr" },
+          { label: "Monthly Rent", value: isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—" },
+          { label: "Expenses", value: fmtFull(p.expenses) },
+          { label: "Net Cash Flow", value: fmtFull(cf) },
+          { label: "Annual ROI", value: roi },
+        ].map((m: any) => (
+          <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "14px", border: m.hi ? "1px solid rgba(245,158,11,0.2)" : "1px solid rgba(255,255,255,0.05)" }}>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "6px", letterSpacing: "0.8px", textTransform: "uppercase" }}>{m.label}</p>
+            <p style={{ fontSize: "16px", fontWeight: "700", color: m.hi ? "#f59e0b" : "#fff" }}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function NumberInput({ value, onChange, placeholder, style }: { value: string; onChange: (v: string) => void; placeholder?: string; style?: React.CSSProperties }) {
@@ -3657,246 +3878,1075 @@ function NotificationBell({ user, properties }: { user: any; properties: Propert
     </div>
   );
 }
-// ── DEAL LAB TAB ─────────────────────────────────────────────────────
-// Paste this entire block just before the closing brace of the file,
-// after the NotificationBell function.
+// ═══════════════════════════════════════════════════════════════════════
+// GOLDSTREAM — DEAL LAB v2.0
+// Features: Deal Analyzer · Deal Score · Deadline Counter · Strategy Engine
+//           Market Pulse · AI Deal Coach · Deal Room · Professionals
+// Psychology: Variable reward · Loss aversion · Progress visibility · Identity
+// ═══════════════════════════════════════════════════════════════════════
 
+
+// ── Types ────────────────────────────────────────────────────────────
+type DealTier = "p" | "a" | "b";
+type DealVerdict = "STRONG BUY" | "WATCH" | "PASS" | "ANALYZE";
+
+interface AnalyzerResult {
+  cashFlow: number;
+  capRate: number;
+  roi: number;
+  cocReturn: number;
+  breakEven: number;
+  paybackYears: number;
+  grm: number;
+  ltv: number;
+  dscr: number;
+  verdict: DealVerdict;
+  score: number;
+  strengths: string[];
+  warnings: string[];
+}
+
+interface DealAnalysis {
+  id: number;
+  name: string;
+  project_type: string;
+  tier: DealTier;
+  capital?: string;
+  geography?: string;
+  risk?: string;
+  notes?: string;
+  deadline?: string;
+  completeness: number;
+  status: string;
+  checklist: { label: string; done: boolean }[];
+  deal_score?: number;
+  analyzer_data?: string;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────
+const TIER_META = {
+  p: { label: "Passive",  desc: "0–5h/week · 8–15%",  color: "#34d399", bg: "rgba(52,211,153,0.08)",  border: "rgba(52,211,153,0.2)"  },
+  a: { label: "Active",   desc: "5–20h/week · 20–40%", color: "#f59e0b", bg: "rgba(245,158,11,0.08)",  border: "rgba(245,158,11,0.2)"  },
+  b: { label: "Business", desc: "20h+/week · 40–90%+", color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" },
+};
+
+const VERDICT_META: Record<DealVerdict, { color: string; bg: string; icon: string; pulse: boolean }> = {
+  "STRONG BUY": { color: "#34d399", bg: "rgba(52,211,153,0.15)",  icon: "🚀", pulse: true  },
+  "WATCH":      { color: "#f59e0b", bg: "rgba(245,158,11,0.15)",  icon: "👁", pulse: false },
+  "PASS":       { color: "#f87171", bg: "rgba(248,113,113,0.15)", icon: "🚫", pulse: false },
+  "ANALYZE":    { color: "#60a5fa", bg: "rgba(96,165,250,0.15)",  icon: "🔍", pulse: false },
+};
+
+const PROJECTS = [
+  { id:"reit",    tier:"p" as DealTier, name:"REIT investment",          roi:"8–12%",  cap:"$1k min",   time:"0h/wk",   risk:"Low",      fill:55, desc:"Buy shares in a publicly traded real estate investment trust. Fully hands-off, liquid like a stock, quarterly dividends.", chips:["Dividends","Liquid","Tax-advantaged"], riskDetail:"Low — publicly regulated, diversified, can lose value in downturns" },
+  { id:"note",    tier:"p" as DealTier, name:"Mortgage note",            roi:"8–13%",  cap:"$50k min",  time:"1h/wk",   risk:"Low",      fill:60, desc:"Buy an existing mortgage at a discount. You collect monthly interest secured by real property.", chips:["Monthly income","Secured","No tenants"], riskDetail:"Low — secured by deed, defaults can be slow/costly" },
+  { id:"crowd",   tier:"p" as DealTier, name:"Crowdfunding LP",          roi:"7–14%",  cap:"$5k min",   time:"1h/wk",   risk:"Low-Med",  fill:52, desc:"Invest as LP in large deals via Fundrise or CrowdStreet. Platform manages everything.", chips:["Diversified","Platform-managed","Quarterly reports"], riskDetail:"Low-Med — platform risk, illiquidity, project-specific" },
+  { id:"land",    tier:"p" as DealTier, name:"Land banking",             roi:"10–30%", cap:"$20k min",  time:"2h/wk",   risk:"Med",      fill:58, desc:"Buy undeveloped land in the path of growth. No tenants, minimal maintenance. Long-term play.", chips:["Long-term hold","No maintenance","Appreciation"], riskDetail:"Med — illiquid, no income stream, zoning risk" },
+  { id:"turnkey", tier:"p" as DealTier, name:"Turnkey rental",           roi:"8–11%",  cap:"$80k min",  time:"3h/wk",   risk:"Low",      fill:62, desc:"Buy fully renovated, tenant-occupied property managed by a PM. Cash flow from day one.", chips:["Fully managed","Cash flow day 1","Remote-friendly"], riskDetail:"Low — PM fees reduce returns, turnkey premiums thin margins" },
+  { id:"syndlp",  tier:"p" as DealTier, name:"Syndication LP",           roi:"12–18%", cap:"$50k min",  time:"2h/wk",   risk:"Med",      fill:65, desc:"Silent LP in large apartment/commercial deals. GP runs everything. 5–7yr lockup.", chips:["Big deals access","Tax benefits","5–7yr lockup"], riskDetail:"Med — capital locked, depends entirely on GP competence" },
+  { id:"dscr",    tier:"p" as DealTier, name:"DSCR rental + PM",         roi:"9–13%",  cap:"$70k min",  time:"3h/wk",   risk:"Low-Med",  fill:59, desc:"DSCR loan (qualified by rental income) + property manager. Scalable portfolio model.", chips:["Leverage","PM handles ops","Scalable"], riskDetail:"Low-Med — PM fees 8–10%, vacancy still hurts" },
+  { id:"str",     tier:"a" as DealTier, name:"Short-term rental",        roi:"20–35%", cap:"$80k min",  time:"10h/wk",  risk:"Med",      fill:88, desc:"Airbnb/VRBO. High nightly rates, active management, dynamic pricing, guest comms.", chips:["High yield","Dynamic pricing","Regulation risk"], riskDetail:"Med — regulation risk high, seasonality, high turnover costs" },
+  { id:"brrrr",   tier:"a" as DealTier, name:"BRRRR strategy",           roi:"25–40%", cap:"$60k min",  time:"15h/wk",  risk:"Med",      fill:82, desc:"Buy distressed, Rehab, Rent, Refinance, Repeat. Recycle capital to fund next deal.", chips:["Capital recycling","Forced appreciation","Contractors required"], riskDetail:"Med — rehab cost overruns, appraisal risk at refinance" },
+  { id:"hack",    tier:"a" as DealTier, name:"House hacking",            roi:"15–25%", cap:"$50k min",  time:"6h/wk",   risk:"Low",      fill:79, desc:"Live in one unit of a multi-family, rent the others. Offset/eliminate housing cost.", chips:["Low entry","FHA eligible","Live-in required"], riskDetail:"Low — must live on site, proximity to tenants" },
+  { id:"midterm", tier:"a" as DealTier, name:"Mid-term rental",          roi:"18–28%", cap:"$75k min",  time:"8h/wk",   risk:"Low-Med",  fill:84, desc:"Furnished 1–6 month rentals for nurses, contractors. Higher than LTR, less reg than STR.", chips:["Stable demand","Less regulation","Furnished premium"], riskDetail:"Low-Med — furnished costs more upfront, vacancy between stays" },
+  { id:"flip",    tier:"a" as DealTier, name:"Fix & flip",               roi:"30–50%", cap:"$100k min", time:"20h/wk",  risk:"High",     fill:71, desc:"Buy distressed, renovate fast, sell at market. Short-cycle project income.", chips:["Short cycle","High profit","Execution risk"], riskDetail:"High — holding costs, overruns, market timing critical" },
+  { id:"small",   tier:"a" as DealTier, name:"Small multifamily (2–4)",  roi:"12–20%", cap:"$100k min", time:"8h/wk",   risk:"Low-Med",  fill:80, desc:"Duplex/triplex/quad. Multiple income streams, residential financing, scalable.", chips:["Residential loans","Scalable","Multiple incomes"], riskDetail:"Low-Med — one vacancy hurts proportionally more" },
+  { id:"colive",  tier:"a" as DealTier, name:"Co-living house",          roi:"20–35%", cap:"$80k min",  time:"10h/wk",  risk:"Med",      fill:76, desc:"Rent individual bedrooms. 2–3× rent of single tenant, 20–30% below studio per room.", chips:["High yield/sqft","Young professionals","High turnover"], riskDetail:"Med — high tenant turnover, house rules management" },
+  { id:"sto",     tier:"a" as DealTier, name:"Storage unit facility",    roi:"15–25%", cap:"$200k min", time:"8h/wk",   risk:"Low-Med",  fill:77, desc:"Recession-resistant. Low maintenance, no live-in tenants, automatable with gate tech.", chips:["Recession-proof","Low tenant issues","Scalable"], riskDetail:"Low-Med — competition from REITs, location is everything" },
+  { id:"large",   tier:"b" as DealTier, name:"Large multifamily (5+)",   roi:"15–25%", cap:"$500k min", time:"20h/wk",  risk:"Med",      fill:72, desc:"Apartment buildings with commercial financing. Economies of scale.", chips:["Commercial financing","Scale","Team required"], riskDetail:"Med — larger capital at risk, commercial financing stricter" },
+  { id:"boutique",tier:"b" as DealTier, name:"Boutique hotel",           roi:"25–45%", cap:"$500k min", time:"30h/wk",  risk:"High",     fill:65, desc:"6–30 room premium property. Unique experience drives RevPAR above chain hotels.", chips:["Brand value","High RevPAR","Operational complexity"], riskDetail:"High — hospitality complex, event risks crush revenue" },
+  { id:"venue",   tier:"b" as DealTier, name:"Wedding / event venue",    roi:"40–90%", cap:"$300k min", time:"35h/wk",  risk:"Med-High", fill:80, desc:"Weekend bookings drive high per-event revenue. Built 18–24mo in advance.", chips:["Weekend model","High per-event","Seasonal"], riskDetail:"Med-High — seasonal, weather-dependent, permits required" },
+  { id:"student", tier:"b" as DealTier, name:"Student housing",          roi:"20–35%", cap:"$200k min", time:"20h/wk",  risk:"Med",      fill:74, desc:"High-density near universities. Annual demand cycle. Lease by room.", chips:["Consistent demand","Annual leases","High density"], riskDetail:"Med — high turnover, university enrollment changes" },
+  { id:"mixed",   tier:"b" as DealTier, name:"Mixed-use development",    roi:"20–40%", cap:"$1M+ min",  time:"40h/wk",  risk:"High",     fill:58, desc:"Retail below, residential above. Complex but multiple income streams.", chips:["Multiple incomes","Appreciation","Long cycle"], riskDetail:"High — long development, retail leasing risk, complex permits" },
+  { id:"ground",  tier:"b" as DealTier, name:"Ground-up residential",    roi:"30–60%", cap:"$300k min", time:"40h/wk",  risk:"Very High",fill:55, desc:"Build new from raw land. Maximum margin, maximum complexity.", chips:["Max profit","Full control","Timeline risk"], riskDetail:"Very High — overruns, permit delays, no income during construction" },
+  { id:"glamping",tier:"b" as DealTier, name:"Glamping / eco-resort",    roi:"35–80%", cap:"$150k min", time:"25h/wk",  risk:"Med-High", fill:70, desc:"Safari tents, domes on scenic land. High nightly rates, low permit burden.", chips:["High nightly rates","Low build cost","Experience economy"], riskDetail:"Med-High — weather dependent, remote challenges" },
+];
+
+const GEOS = ["United States","Canada","France","Morocco","Spain","UAE","United Kingdom","Germany","Australia","Open to any"];
+const RISK_COLOR: Record<string, string> = {
+  "Low":"#34d399","Low-Med":"#34d399","Med":"#f59e0b","Med-High":"#f87171","High":"#f87171","Very High":"#f87171"
+};
+
+
+// ── Deal Score Calculator ─────────────────────────────────────────────
+function calcDealScore(checklist: {done:boolean}[], deadline: string | undefined, completeness: number): number {
+  let score = completeness * 0.6;
+  const days = deadline ? daysUntil(deadline) : null;
+  if (days !== null) {
+    if (days > 30) score += 20;
+    else if (days > 14) score += 15;
+    else if (days > 7) score += 10;
+    else if (days > 0) score += 5;
+  }
+  const done = checklist.filter(c => c.done).length;
+  if (done >= checklist.length * 0.8) score += 20;
+  return Math.min(100, Math.round(score));
+}
+
+// ── Analyzer Engine ───────────────────────────────────────────────────
+function runAnalyzer(inputs: {
+  purchasePrice: number; downPayment: number; interestRate: number;
+  loanTerm: number; monthlyRent: number; monthlyExpenses: number;
+  annualAppreciation: number; closingCosts: number; rehabCost: number;
+}): AnalyzerResult {
+  const { purchasePrice, downPayment, interestRate, loanTerm, monthlyRent, monthlyExpenses, annualAppreciation, closingCosts, rehabCost } = inputs;
+  const loanAmount = purchasePrice - downPayment;
+  const monthlyRate = interestRate / 100 / 12;
+  const n = loanTerm * 12;
+  const monthlyMortgage = loanAmount > 0 && monthlyRate > 0
+    ? loanAmount * (monthlyRate * Math.pow(1+monthlyRate, n)) / (Math.pow(1+monthlyRate, n)-1)
+    : 0;
+  const totalMonthlyExpenses = monthlyExpenses + monthlyMortgage;
+  const cashFlow = monthlyRent - totalMonthlyExpenses;
+  const noi = (monthlyRent - monthlyExpenses) * 12;
+  const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
+  const totalInvested = downPayment + closingCosts + rehabCost;
+  const roi = totalInvested > 0 ? (((cashFlow * 12) / totalInvested) * 100) : 0;
+  const cocReturn = totalInvested > 0 ? ((cashFlow * 12) / totalInvested) * 100 : 0;
+  const ltv = purchasePrice > 0 ? (loanAmount / purchasePrice) * 100 : 0;
+  const grm = monthlyRent > 0 ? purchasePrice / (monthlyRent * 12) : 0;
+  const dscr = monthlyMortgage > 0 ? (monthlyRent - monthlyExpenses) / monthlyMortgage : 0;
+  const breakEven = monthlyRent > 0 ? (totalMonthlyExpenses / monthlyRent) * 100 : 100;
+  const paybackYears = cashFlow > 0 && totalInvested > 0 ? totalInvested / (cashFlow * 12) : Infinity;
+
+  const strengths: string[] = [];
+  const warnings: string[] = [];
+
+  if (cashFlow > 0) strengths.push("Positive cash flow");
+  if (capRate >= 8) strengths.push(`Strong cap rate (${fmtPct(capRate)})`);
+  if (dscr >= 1.25) strengths.push(`Healthy DSCR (${dscr.toFixed(2)}x)`);
+  if (cocReturn >= 8) strengths.push(`Solid CoC return (${fmtPct(cocReturn)})`);
+  if (ltv <= 75) strengths.push("Conservative leverage");
+  if (annualAppreciation >= 4) strengths.push(`Strong appreciation (${annualAppreciation}%/yr)`);
+
+  if (cashFlow < 0) warnings.push("Negative monthly cash flow");
+  if (capRate < 5) warnings.push(`Low cap rate (${fmtPct(capRate)})`);
+  if (dscr < 1.25 && dscr > 0) warnings.push(`Thin DSCR (${dscr.toFixed(2)}x — lenders want 1.25+)`);
+  if (ltv > 80) warnings.push(`High leverage (${fmtPct(ltv)} LTV)`);
+  if (breakEven > 85) warnings.push(`High break-even occupancy (${fmtPct(breakEven)})`);
+  if (grm > 15) warnings.push(`High GRM (${grm.toFixed(1)} — overpaying for rent income)`);
+
+  let score = 50;
+  score += Math.min(20, Math.max(-20, cashFlow / 50));
+  score += capRate >= 8 ? 15 : capRate >= 5 ? 5 : -10;
+  score += dscr >= 1.25 ? 10 : dscr >= 1.0 ? 0 : -15;
+  score += cocReturn >= 8 ? 10 : cocReturn >= 5 ? 3 : -5;
+  score = Math.min(100, Math.max(0, Math.round(score)));
+
+  const verdict: DealVerdict = score >= 70 ? "STRONG BUY" : score >= 50 ? "WATCH" : score >= 30 ? "ANALYZE" : "PASS";
+
+  return { cashFlow, capRate, roi, cocReturn, breakEven, paybackYears: isFinite(paybackYears) ? paybackYears : 99, grm, ltv, dscr, verdict, score, strengths, warnings };
+}
+
+// ── Strategy Projection ───────────────────────────────────────────────
+function projectStrategy(purchasePrice: number, equity: number, monthlyRent: number, monthlyExpenses: number, appreciation: number, years = 5) {
+  const results: Record<string, {label: string; color: string; icon: string; netWorth5yr: number; totalCashFlow: number; capitalFreed: number; verdict: string; metrics: {label:string;value:string}[]}> = {};
+
+  // Hold & Rent
+  const holdAppreciation = purchasePrice * (Math.pow(1+appreciation/100, years) - 1);
+  const holdEquityGain = holdAppreciation;
+  const holdCashFlow = (monthlyRent - monthlyExpenses) * 12 * years;
+  results.hold = { label:"Hold & Rent", color:"#34d399", icon:"🏠", netWorth5yr: equity + holdEquityGain + holdCashFlow, totalCashFlow: holdCashFlow, capitalFreed: 0, verdict: "Wealth builder", metrics:[{label:"Appreciation gain",value:fmt(holdAppreciation)},{label:"Total cash flow",value:fmt(holdCashFlow)},{label:"Equity growth",value:fmt(equity + holdEquityGain)}] };
+
+  // BRRRR (refinance, pull equity, buy another)
+  const refiLoanAmount = purchasePrice * 0.75;
+  const originalMortgage = purchasePrice - equity;
+  const capitalPulled = Math.max(0, refiLoanAmount - originalMortgage);
+  const newMonthlyPayment = refiLoanAmount * (0.07/12) * Math.pow(1+0.07/12,360) / (Math.pow(1+0.07/12,360)-1);
+  const brrrCashFlow = (monthlyRent - monthlyExpenses - newMonthlyPayment) * 12 * years;
+  const brrrNewPropertyEquity = capitalPulled * 0.25; // 25% equity on next deal
+  results.brrrr = { label:"BRRRR", color:"#a78bfa", icon:"🔄", netWorth5yr: equity + holdEquityGain + brrrCashFlow + brrrNewPropertyEquity, totalCashFlow: brrrCashFlow, capitalFreed: capitalPulled, verdict:"Fastest scale", metrics:[{label:"Capital recycled",value:fmt(capitalPulled)},{label:"New deal equity",value:fmt(brrrNewPropertyEquity)},{label:"Total net worth delta",value:fmt(equity + holdEquityGain + brrrCashFlow + brrrNewPropertyEquity)}] };
+
+  // Sell
+  const saleProceeds = purchasePrice * Math.pow(1+appreciation/100, 1) * 0.94; // 6% selling costs
+  const capitalGainsTax = Math.max(0, (saleProceeds - purchasePrice) * 0.20);
+  const sellNetProfit = saleProceeds - originalMortgage - capitalGainsTax;
+  results.sell = { label:"Sell Now", color:"#f59e0b", icon:"💰", netWorth5yr: sellNetProfit, totalCashFlow: 0, capitalFreed: sellNetProfit, verdict:"Immediate liquidity", metrics:[{label:"Net proceeds",value:fmt(sellNetProfit)},{label:"Capital gains tax",value:fmt(capitalGainsTax)},{label:"Freed capital",value:fmt(sellNetProfit)}] };
+
+  // STR conversion
+  const strMonthlyRent = monthlyRent * 2.2; // STR typically 2–2.5× LTR
+  const strExpenses = monthlyExpenses * 1.4; // Higher costs
+  const strCashFlow = (strMonthlyRent - strExpenses) * 12 * years;
+  results.str = { label:"Convert to STR", color:"#60a5fa", icon:"🏖", netWorth5yr: equity + holdEquityGain + strCashFlow, totalCashFlow: strCashFlow, capitalFreed: 0, verdict:"Max cash flow", metrics:[{label:"Projected STR rent",value:fmt(strMonthlyRent)+"/mo"},{label:"5yr cash flow",value:fmt(strCashFlow)},{label:"Total net worth",value:fmt(equity + holdEquityGain + strCashFlow)}] };
+
+  return results;
+}
+
+// ── Sub-components ────────────────────────────────────────────────────
+
+function DeadlineCounter({ deadline }: { deadline?: string }) {
+  if (!deadline) return null;
+  const days = daysUntil(deadline);
+  if (days === null) return null;
+  const urgent = days <= 7;
+  const overdue = days < 0;
+  const color = overdue ? "#f87171" : urgent ? "#f59e0b" : "#60a5fa";
+  const pct = Math.max(0, Math.min(100, (days / 30) * 100));
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+      <div style={{ position:"relative", width:"36px", height:"36px" }}>
+        <svg width="36" height="36" style={{ transform:"rotate(-90deg)" }}>
+          <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3"/>
+          <circle cx="18" cy="18" r="14" fill="none" stroke={color} strokeWidth="3" strokeDasharray={`${2*Math.PI*14}`} strokeDashoffset={`${2*Math.PI*14*(1-pct/100)}`} style={{transition:"stroke-dashoffset 0.8s"}}/>
+        </svg>
+        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <span style={{ fontSize:"8px", fontWeight:"900", color }}>{overdue ? "!" : days}</span>
+        </div>
+      </div>
+      <div>
+        <p style={{ fontSize:"10px", fontWeight:"800", color, lineHeight:1 }}>
+          {overdue ? `${Math.abs(days)}d OVERDUE` : days === 0 ? "TODAY" : `${days}d left`}
+        </p>
+        <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.25)", marginTop:"1px" }}>Decide by {new Date(deadline).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</p>
+      </div>
+    </div>
+  );
+}
+
+function DealScoreRing({ score, size = 56 }: { score: number; size?: number }) {
+  const color = score >= 70 ? "#34d399" : score >= 50 ? "#f59e0b" : "#f87171";
+  const r = (size/2) - 4;
+  const circ = 2 * Math.PI * r;
+  return (
+    <div style={{ position:"relative", width:size, height:size, flexShrink:0 }}>
+      <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5"/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="3.5"
+          strokeDasharray={`${circ}`}
+          strokeDashoffset={`${circ*(1-score/100)}`}
+          style={{transition:"stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)"}}
+          strokeLinecap="round"/>
+      </svg>
+      <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+        <span style={{ fontSize:size > 50 ? "15px" : "11px", fontWeight:"900", color, lineHeight:1 }}>{score}</span>
+        <span style={{ fontSize:"7px", color:"rgba(255,255,255,0.3)", marginTop:"1px", fontWeight:"700" }}>SCORE</span>
+      </div>
+    </div>
+  );
+}
+
+function VerdictBadge({ verdict }: { verdict: DealVerdict }) {
+  const m = VERDICT_META[verdict];
+  return (
+    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"5px 12px", borderRadius:"999px", background:m.bg, border:`1px solid ${m.color}44`, animation:m.pulse?"verdictPulse 2s ease-in-out infinite":"none" }}>
+      <span style={{ fontSize:"12px" }}>{m.icon}</span>
+      <span style={{ fontSize:"11px", fontWeight:"900", color:m.color, letterSpacing:"1.5px" }}>{verdict}</span>
+    </div>
+  );
+}
+
+// ── DEAL ANALYZER PANEL ───────────────────────────────────────────────
+function DealAnalyzerPanel({ onSaveToPipeline }: { onSaveToPipeline: (result: AnalyzerResult, inputs: any) => void }) {
+  const [inputs, setInputs] = useState({ purchasePrice:"", downPayment:"", interestRate:"7.0", loanTerm:"30", monthlyRent:"", monthlyExpenses:"", annualAppreciation:"3.5", closingCosts:"", rehabCost:"" });
+  const [result, setResult] = useState<AnalyzerResult | null>(null);
+  const [projections, setProjections] = useState<ReturnType<typeof projectStrategy> | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiInsight, setAiInsight] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [activeStrategy, setActiveStrategy] = useState<string>("hold");
+
+  function setInput(key: string, val: string) { setInputs(prev => ({...prev, [key]:val})); }
+  function parseInputs() {
+    return {
+      purchasePrice: parseFloat(inputs.purchasePrice.replace(/,/g,"")) || 0,
+      downPayment: parseFloat(inputs.downPayment.replace(/,/g,"")) || 0,
+      interestRate: parseFloat(inputs.interestRate) || 7,
+      loanTerm: parseFloat(inputs.loanTerm) || 30,
+      monthlyRent: parseFloat(inputs.monthlyRent.replace(/,/g,"")) || 0,
+      monthlyExpenses: parseFloat(inputs.monthlyExpenses.replace(/,/g,"")) || 0,
+      annualAppreciation: parseFloat(inputs.annualAppreciation) || 3.5,
+      closingCosts: parseFloat(inputs.closingCosts.replace(/,/g,"")) || 0,
+      rehabCost: parseFloat(inputs.rehabCost.replace(/,/g,"")) || 0,
+    };
+  }
+
+  function analyze() {
+    const parsed = parseInputs();
+    if (!parsed.purchasePrice || !parsed.monthlyRent) return;
+    setAnalyzing(true);
+    setTimeout(() => {
+      const res = runAnalyzer(parsed);
+      setResult(res);
+      const equity = parsed.purchasePrice - (parsed.purchasePrice - parsed.downPayment);
+      const projs = projectStrategy(parsed.purchasePrice, equity, parsed.monthlyRent, parsed.monthlyExpenses, parsed.annualAppreciation);
+      setProjections(projs);
+      setAnalyzing(false);
+    }, 600);
+  }
+
+  async function fetchAiInsight() {
+    if (!result) return;
+    setAiLoading(true); setAiInsight("");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:200,
+          messages:[{ role:"user", content:`Real estate deal analyst. Give ONE sharp 2-sentence verdict on this deal. Be specific, use the numbers. Score: ${result.score}/100. Cash flow: $${Math.round(result.cashFlow)}/mo. Cap rate: ${result.capRate.toFixed(1)}%. CoC: ${result.cocReturn.toFixed(1)}%. DSCR: ${result.dscr.toFixed(2)}. LTV: ${result.ltv.toFixed(0)}%. Strengths: ${result.strengths.join(", ")}. Warnings: ${result.warnings.join(", ")}.` }]
+        })
+      });
+      const d = await res.json();
+      setAiInsight(d.content?.find((b:any)=>b.type==="text")?.text || "");
+    } catch {}
+    setAiLoading(false);
+  }
+
+  const IS: React.CSSProperties = { width:"100%", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"10px", padding:"10px 14px", fontSize:"14px", fontWeight:"700", color:"#fff", outline:"none", fontFamily:"'DM Sans',sans-serif", boxSizing:"border-box" };
+
+  const strategyKeys = projections ? Object.keys(projections) : [];
+  const maxNW = projections ? Math.max(...strategyKeys.map(k => projections[k].netWorth5yr)) : 1;
+
+  return (
+    <div>
+      {/* Input grid */}
+      <div style={{ background:"linear-gradient(135deg,rgba(96,165,250,0.06),rgba(96,165,250,0.02))", border:"1px solid rgba(96,165,250,0.2)", borderRadius:"20px", padding:"24px", marginBottom:"20px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"20px" }}>
+          <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:"#60a5fa", boxShadow:"0 0 8px #60a5fa", animation:"blink 1.5s infinite" }}/>
+          <span style={{ fontSize:"10px", color:"rgba(96,165,250,0.7)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase" }}>Deal Analyzer — Instant ROI Verdict</span>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px", marginBottom:"12px" }}>
+          {[
+            {label:"Purchase Price ($)", key:"purchasePrice", placeholder:"350,000"},
+            {label:"Down Payment ($)", key:"downPayment", placeholder:"70,000"},
+            {label:"Monthly Rent ($)", key:"monthlyRent", placeholder:"2,400"},
+            {label:"Monthly Expenses ($)", key:"monthlyExpenses", placeholder:"400"},
+            {label:"Closing Costs ($)", key:"closingCosts", placeholder:"8,000"},
+            {label:"Rehab Budget ($)", key:"rehabCost", placeholder:"0"},
+          ].map(f => (
+            <div key={f.key}>
+              <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px", fontWeight:"700" }}>{f.label}</label>
+              <input type="text" inputMode="numeric" placeholder={f.placeholder} value={(inputs as any)[f.key]} onChange={e=>setInput(f.key,e.target.value)} style={IS} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px", marginBottom:"20px" }}>
+          <div>
+            <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px", fontWeight:"700" }}>Interest Rate (%)</label>
+            <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+              <input type="range" min="3" max="12" step="0.25" value={inputs.interestRate} onChange={e=>setInput("interestRate",e.target.value)} style={{ flex:1, accentColor:"#60a5fa" }}/>
+              <span style={{ fontSize:"14px", fontWeight:"900", color:"#60a5fa", minWidth:"40px" }}>{inputs.interestRate}%</span>
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px", fontWeight:"700" }}>Loan Term (yrs)</label>
+            <div style={{ display:"flex", gap:"6px" }}>
+              {[15,20,25,30].map(t=>(
+                <button key={t} onClick={()=>setInput("loanTerm",String(t))} style={{ flex:1, padding:"8px 4px", borderRadius:"8px", fontSize:"11px", fontWeight:"800", border:`1px solid ${inputs.loanTerm===String(t)?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`, background:inputs.loanTerm===String(t)?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.03)", color:inputs.loanTerm===String(t)?"#60a5fa":"rgba(255,255,255,0.4)", cursor:"pointer" }}>{t}yr</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px", fontWeight:"700" }}>Appreciation %/yr</label>
+            <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+              <input type="range" min="0" max="10" step="0.5" value={inputs.annualAppreciation} onChange={e=>setInput("annualAppreciation",e.target.value)} style={{ flex:1, accentColor:"#34d399" }}/>
+              <span style={{ fontSize:"14px", fontWeight:"900", color:"#34d399", minWidth:"40px" }}>{inputs.annualAppreciation}%</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={analyze} disabled={analyzing || !inputs.purchasePrice || !inputs.monthlyRent} style={{ width:"100%", padding:"14px", background:(!inputs.purchasePrice||!inputs.monthlyRent)?"rgba(96,165,250,0.2)":"#60a5fa", color:(!inputs.purchasePrice||!inputs.monthlyRent)?"rgba(255,255,255,0.3)":"#000", borderRadius:"12px", fontWeight:"900", fontSize:"15px", border:"none", cursor:(!inputs.purchasePrice||!inputs.monthlyRent)?"not-allowed":"pointer", letterSpacing:"0.5px", transition:"all 0.2s" }}>
+          {analyzing ? "⚡ Analyzing deal..." : "⚡ Run Analysis →"}
+        </button>
+      </div>
+
+      {/* Results */}
+      {result && (
+        <div style={{ animation:"fadeInUp 0.4s ease" }}>
+          {/* Verdict hero */}
+          <div style={{ background:`linear-gradient(135deg,${VERDICT_META[result.verdict].bg},rgba(0,0,0,0.3))`, border:`1px solid ${VERDICT_META[result.verdict].color}44`, borderRadius:"20px", padding:"28px 32px", marginBottom:"16px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:"16px" }}>
+            <div>
+              <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.4)", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"10px", fontWeight:"700" }}>Deal Verdict</p>
+              <VerdictBadge verdict={result.verdict}/>
+              <p style={{ fontSize:"13px", color:"rgba(255,255,255,0.5)", marginTop:"12px", maxWidth:"400px", lineHeight:"1.6" }}>
+                Score {result.score}/100 · {result.strengths.length} strengths · {result.warnings.length} warnings
+              </p>
+            </div>
+            <div style={{ display:"flex", gap:"16px", alignItems:"center" }}>
+              <DealScoreRing score={result.score} size={80}/>
+              <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                <div style={{ textAlign:"right" }}>
+                  <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", marginBottom:"2px", textTransform:"uppercase", letterSpacing:"1px" }}>Monthly Cash Flow</p>
+                  <p style={{ fontSize:"28px", fontWeight:"900", color:result.cashFlow>=0?"#34d399":"#f87171", letterSpacing:"-1px" }}>{result.cashFlow>=0?"+":""}{fmt(result.cashFlow)}<span style={{ fontSize:"13px" }}>/mo</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Metrics grid */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginBottom:"16px" }}>
+            {[
+              {label:"Cap Rate",    value:fmtPct(result.capRate),    color:result.capRate>=8?"#34d399":result.capRate>=5?"#f59e0b":"#f87171", target:"Target: 8%+"},
+              {label:"CoC Return",  value:fmtPct(result.cocReturn),  color:result.cocReturn>=8?"#34d399":result.cocReturn>=5?"#f59e0b":"#f87171", target:"Target: 8%+"},
+              {label:"DSCR",       value:result.dscr.toFixed(2)+"x", color:result.dscr>=1.25?"#34d399":result.dscr>=1.0?"#f59e0b":"#f87171", target:"Lenders: 1.25+"},
+              {label:"LTV",        value:fmtPct(result.ltv),         color:result.ltv<=75?"#34d399":result.ltv<=80?"#f59e0b":"#f87171", target:"Conservative: <75%"},
+              {label:"Break-Even", value:fmtPct(result.breakEven),   color:result.breakEven<=80?"#34d399":result.breakEven<=90?"#f59e0b":"#f87171", target:"Target: <80%"},
+              {label:"GRM",        value:result.grm.toFixed(1)+"x",  color:result.grm<=12?"#34d399":result.grm<=15?"#f59e0b":"#f87171", target:"Good: <12x"},
+              {label:"Payback",    value:result.paybackYears>=99?"Never":result.paybackYears.toFixed(1)+"yr", color:result.paybackYears<=10?"#34d399":result.paybackYears<=15?"#f59e0b":"#f87171", target:"Target: <10yr"},
+              {label:"Annual ROI", value:fmtPct(result.roi),         color:result.roi>=10?"#34d399":result.roi>=6?"#f59e0b":"#f87171", target:"Target: 10%+"},
+            ].map(m => (
+              <div key={m.label} style={{ background:"rgba(255,255,255,0.03)", border:`1px solid ${m.color}22`, borderRadius:"12px", padding:"14px" }}>
+                <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:"6px", fontWeight:"700" }}>{m.label}</p>
+                <p style={{ fontSize:"20px", fontWeight:"900", color:m.color, letterSpacing:"-0.5px" }}>{m.value}</p>
+                <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.2)", marginTop:"4px" }}>{m.target}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Strengths & Warnings */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"16px" }}>
+            <div style={{ background:"rgba(52,211,153,0.04)", border:"1px solid rgba(52,211,153,0.15)", borderRadius:"14px", padding:"16px" }}>
+              <p style={{ fontSize:"10px", fontWeight:"800", color:"#34d399", letterSpacing:"1px", textTransform:"uppercase", marginBottom:"10px" }}>✅ Strengths ({result.strengths.length})</p>
+              {result.strengths.length === 0 ? <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.2)" }}>None identified</p> :
+                result.strengths.map((s,i) => <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}><div style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#34d399", flexShrink:0 }}/><span style={{ fontSize:"12px", color:"rgba(255,255,255,0.65)" }}>{s}</span></div>)}
+            </div>
+            <div style={{ background:"rgba(248,113,113,0.04)", border:"1px solid rgba(248,113,113,0.15)", borderRadius:"14px", padding:"16px" }}>
+              <p style={{ fontSize:"10px", fontWeight:"800", color:"#f87171", letterSpacing:"1px", textTransform:"uppercase", marginBottom:"10px" }}>⚠ Warnings ({result.warnings.length})</p>
+              {result.warnings.length === 0 ? <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.2)" }}>None — clean deal</p> :
+                result.warnings.map((w,i) => <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}><div style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#f87171", flexShrink:0 }}/><span style={{ fontSize:"12px", color:"rgba(255,255,255,0.65)" }}>{w}</span></div>)}
+            </div>
+          </div>
+
+          {/* Strategy Comparison */}
+          {projections && (
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"20px", padding:"24px", marginBottom:"16px" }}>
+              <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.4)", letterSpacing:"1.5px", textTransform:"uppercase", fontWeight:"700", marginBottom:"16px" }}>⚡ Strategy Comparison — 5 Year Net Worth Delta</p>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginBottom:"16px" }}>
+                {strategyKeys.map(key => {
+                  const s = projections[key];
+                  const barPct = maxNW > 0 ? (s.netWorth5yr / maxNW) * 100 : 0;
+                  const isBest = s.netWorth5yr === maxNW;
+                  const isActive = activeStrategy === key;
+                  return (
+                    <div key={key} onClick={()=>setActiveStrategy(key)} style={{ background:isActive?`${s.color}12`:"rgba(255,255,255,0.02)", border:`1px solid ${isActive?s.color+"55":"rgba(255,255,255,0.07)"}`, borderRadius:"14px", padding:"14px", cursor:"pointer", transition:"all 0.2s", position:"relative" }}>
+                      {isBest && <div style={{ position:"absolute", top:"-8px", left:"50%", transform:"translateX(-50%)", fontSize:"9px", fontWeight:"900", color:s.color, background:`${s.color}20`, border:`1px solid ${s.color}44`, borderRadius:"999px", padding:"2px 8px", whiteSpace:"nowrap" }}>★ BEST</div>}
+                      <div style={{ fontSize:"18px", marginBottom:"6px" }}>{s.icon}</div>
+                      <p style={{ fontSize:"11px", fontWeight:"800", color:s.color, marginBottom:"8px" }}>{s.label}</p>
+                      <p style={{ fontSize:"18px", fontWeight:"900", color:isBest?s.color:"#fff", letterSpacing:"-0.5px" }}>{fmt(s.netWorth5yr)}</p>
+                      <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", marginBottom:"8px" }}>5yr net worth</p>
+                      <div style={{ height:"3px", background:"rgba(255,255,255,0.06)", borderRadius:"999px" }}>
+                        <div style={{ height:"100%", width:`${barPct}%`, background:s.color, borderRadius:"999px", transition:"width 0.8s" }}/>
+                      </div>
+                      <p style={{ fontSize:"9px", color:s.color, marginTop:"5px", fontWeight:"700" }}>{s.verdict}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Active strategy detail */}
+              {projections[activeStrategy] && (
+                <div style={{ background:`${projections[activeStrategy].color}08`, border:`1px solid ${projections[activeStrategy].color}22`, borderRadius:"12px", padding:"14px 18px", display:"flex", gap:"24px", flexWrap:"wrap" }}>
+                  {projections[activeStrategy].metrics.map((m:any) => (
+                    <div key={m.label}>
+                      <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:"3px" }}>{m.label}</p>
+                      <p style={{ fontSize:"15px", fontWeight:"800", color:projections[activeStrategy].color }}>{m.value}</p>
+                    </div>
+                  ))}
+                  {projections[activeStrategy].capitalFreed > 0 && (
+                    <div>
+                      <p style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:"3px" }}>Capital freed</p>
+                      <p style={{ fontSize:"15px", fontWeight:"800", color:"#f59e0b" }}>{fmt(projections[activeStrategy].capitalFreed)}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI Insight */}
+          <div style={{ background:"rgba(245,158,11,0.04)", border:"1px solid rgba(245,158,11,0.15)", borderRadius:"14px", padding:"16px 20px", marginBottom:"16px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+              <p style={{ fontSize:"10px", fontWeight:"800", color:"#f59e0b", letterSpacing:"1px", textTransform:"uppercase" }}>🤖 AI Deal Coach</p>
+              <button onClick={fetchAiInsight} disabled={aiLoading} style={{ fontSize:"11px", padding:"5px 12px", background:aiLoading?"rgba(245,158,11,0.1)":"#f59e0b", color:aiLoading?"#f59e0b":"#000", border:"none", borderRadius:"7px", cursor:aiLoading?"not-allowed":"pointer", fontWeight:"800" }}>{aiLoading?"Thinking...":"Get Insight"}</button>
+            </div>
+            {aiInsight ? <p style={{ fontSize:"13px", color:"rgba(255,255,255,0.7)", lineHeight:"1.6" }}>{aiInsight}</p> : <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.25)" }}>Click "Get Insight" for an AI-powered verdict on this specific deal.</p>}
+          </div>
+
+          {/* CTA: Save to pipeline */}
+          <button onClick={()=>onSaveToPipeline(result, parseInputs())} style={{ width:"100%", padding:"13px", background:"linear-gradient(90deg,#60a5fa,#a78bfa)", color:"#000", borderRadius:"12px", fontWeight:"900", fontSize:"14px", border:"none", cursor:"pointer", letterSpacing:"0.5px" }}>
+            + Save This Deal to Analysis Pipeline →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MARKET PULSE PANEL ────────────────────────────────────────────────
+function MarketPulsePanel({ geography }: { geography?: string }) {
+  const FRED_KEY = "a2b027856e3e343954232c295ac10ce9";
+  const [metrics, setMetrics] = useState<Record<string,any>>({});
+  const [loading, setLoading] = useState(true);
+  const [aiPulse, setAiPulse] = useState("");
+  const [pulseLoading, setPulseLoading] = useState(false);
+
+  const SERIES = [
+    {key:"mortgage30", id:"MORTGAGE30US", label:"30-Yr Rate", unit:"%"},
+    {key:"cpi",        id:"CPIAUCSL",     label:"CPI Inflation", unit:"pts"},
+    {key:"lumber",     id:"WPU081",       label:"Lumber Index", unit:"pts"},
+    {key:"natgas",     id:"MHHNGSP",      label:"Natural Gas", unit:"$/MMBtu"},
+    {key:"fedrate",    id:"FEDFUNDS",     label:"Fed Rate", unit:"%"},
+    {key:"vacancy",    id:"RRVRUSQ156N",  label:"Rental Vacancy", unit:"%"},
+  ];
+
+  const FALLBACKS: Record<string,any> = {
+    mortgage30:{value:"6.82",change:"+0.12%",up:true}, cpi:{value:"319.1",change:"+0.2%",up:true},
+    lumber:{value:"387",change:"-1.4%",up:false}, natgas:{value:"2.14",change:"-3.2%",up:false},
+    fedrate:{value:"5.33",change:"0.0%",up:false}, vacancy:{value:"6.6",change:"-0.2%",up:false}
+  };
+
+  useEffect(() => {
+    async function load() {
+      const results: Record<string,any> = {};
+      await Promise.all(SERIES.map(async s => {
+        try {
+          const res = await fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=${s.id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=2`);
+          const data = await res.json();
+          const obs = data.observations?.filter((o:any) => o.value !== ".");
+          if (obs?.length >= 1) {
+            const val = parseFloat(obs[0].value);
+            const prev = obs.length > 1 ? parseFloat(obs[1].value) : val;
+            const delta = val - prev;
+            results[s.key] = { value:val.toFixed(2), change:(delta>=0?"+":"")+((delta/prev)*100).toFixed(1)+"%", up:delta>=0 };
+          } else results[s.key] = FALLBACKS[s.key];
+        } catch { results[s.key] = FALLBACKS[s.key]; }
+      }));
+      setMetrics(results); setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function fetchPulse() {
+    setPulseLoading(true); setAiPulse("");
+    try {
+      const summary = Object.entries(metrics).map(([k,v]) => `${k}: ${v.value} (${v.change})`).join(", ");
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:150,
+          messages:[{ role:"user", content:`Real estate market analyst. Based on these LIVE macro indicators: ${summary}. Give ONE sharp 2-sentence take on what this means for a property investor RIGHT NOW. Be specific, data-driven, actionable.` }]
+        })
+      });
+      const d = await res.json();
+      setAiPulse(d.content?.find((b:any)=>b.type==="text")?.text || "");
+    } catch {}
+    setPulseLoading(false);
+  }
+
+  return (
+    <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"20px", padding:"20px", marginBottom:"16px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px", flexWrap:"wrap", gap:"8px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+          <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#34d399", boxShadow:"0 0 6px #34d399", animation:"blink 1.5s infinite" }}/>
+          <span style={{ fontSize:"10px", color:"rgba(52,211,153,0.7)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase" }}>Market Pulse · Live FRED Data</span>
+          {geography && <span style={{ fontSize:"10px", padding:"2px 8px", borderRadius:"999px", background:"rgba(96,165,250,0.1)", color:"#60a5fa", fontWeight:"700", border:"1px solid rgba(96,165,250,0.2)" }}>📍 {geography}</span>}
+        </div>
+        <button onClick={fetchPulse} disabled={pulseLoading || loading} style={{ fontSize:"11px", padding:"5px 12px", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.3)", borderRadius:"7px", color:"#34d399", cursor:"pointer", fontWeight:"800" }}>{pulseLoading?"Analyzing...":"🤖 AI Macro Read"}</button>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"10px", marginBottom:"14px" }}>
+        {SERIES.map(s => {
+          const m = metrics[s.key];
+          const isInvestorGood = (s.key==="mortgage30"||s.key==="fedrate") ? !m?.up : (s.key==="vacancy"||s.key==="lumber") ? !m?.up : true;
+          return (
+            <div key={s.key} style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.05)", borderRadius:"12px", padding:"12px 14px" }}>
+              <p style={{ fontSize:"8px", color:"rgba(255,255,255,0.25)", textTransform:"uppercase", letterSpacing:"1.5px", fontWeight:"700", marginBottom:"6px" }}>{s.label}</p>
+              <p style={{ fontSize:"20px", fontWeight:"900", color:"#f5a623", letterSpacing:"-0.5px" }}>
+                {loading?"—":m?.value ?? "—"}
+                <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)", marginLeft:"3px", fontWeight:"400" }}>{s.unit}</span>
+              </p>
+              {!loading && m && (
+                <p style={{ fontSize:"10px", fontWeight:"700", color:m.up?"#f87171":"#34d399", marginTop:"4px" }}>
+                  {m.up?"▲":"▼"} {m.change}
+                  <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.2)", fontWeight:"400", marginLeft:"4px" }}>{isInvestorGood?"✓ Good":"↓ Caution"}</span>
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {aiPulse && (
+        <div style={{ padding:"12px 14px", background:"rgba(52,211,153,0.04)", border:"1px solid rgba(52,211,153,0.15)", borderRadius:"10px" }}>
+          <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.65)", lineHeight:"1.6" }}>{aiPulse}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AI WEEKLY COACH ───────────────────────────────────────────────────
+function AIWeeklyCoach({ analyses }: { analyses: DealAnalysis[] }) {
+  const [coaching, setCoaching] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [lastRun, setLastRun] = useState<string | null>(null);
+
+  useEffect(() => {
+    try { setLastRun(localStorage.getItem("gs_coach_lastrun")); } catch {}
+  }, []);
+
+  async function runCoaching() {
+    setLoading(true); setCoaching("");
+    const summaries = analyses.slice(0,5).map(a => `"${a.name}" (${a.project_type}, ${a.completeness}% analyzed, deadline: ${a.deadline||"none"}, checklist: ${a.checklist.filter(c=>c.done).length}/${a.checklist.length} done)`).join("; ");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300,
+          messages:[{ role:"user", content:`You are a sharp real estate deal coach. The investor has ${analyses.length} deals under analysis: ${summaries}. Give them 3 specific, actionable coaching points this week. Format: **Priority 1** [action]. **Priority 2** [action]. **Priority 3** [action]. Be direct, use their specific deal data, no fluff.` }]
+        })
+      });
+      const d = await res.json();
+      const text = d.content?.find((b:any)=>b.type==="text")?.text || "";
+      setCoaching(text);
+      try { const now = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}); localStorage.setItem("gs_coach_lastrun",now); setLastRun(now); } catch {}
+    } catch { setCoaching("Unable to connect. Try again."); }
+    setLoading(false);
+  }
+
+  if (analyses.length === 0) return null;
+
+  const incompleteDeals = analyses.filter(a => a.completeness < 100);
+  const urgentDeals = analyses.filter(a => a.deadline && (daysUntil(a.deadline) ?? 99) <= 7);
+
+  return (
+    <div style={{ background:"linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03))", border:"1px solid rgba(245,158,11,0.25)", borderRadius:"20px", padding:"20px 24px", marginBottom:"16px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"14px", flexWrap:"wrap", gap:"10px" }}>
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}>
+            <span style={{ fontSize:"16px" }}>🎯</span>
+            <span style={{ fontSize:"11px", color:"rgba(245,158,11,0.8)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase" }}>AI Deal Coach — Weekly Priorities</span>
+          </div>
+          <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
+            {urgentDeals.length > 0 && <span style={{ fontSize:"10px", fontWeight:"700", color:"#f87171", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:"999px", padding:"2px 8px" }}>🔴 {urgentDeals.length} urgent deadline{urgentDeals.length>1?"s":""}</span>}
+            {incompleteDeals.length > 0 && <span style={{ fontSize:"10px", fontWeight:"700", color:"#f59e0b", background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:"999px", padding:"2px 8px" }}>⏳ {incompleteDeals.length} deal{incompleteDeals.length>1?"s":""} need work</span>}
+          </div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:"4px" }}>
+          <button onClick={runCoaching} disabled={loading} style={{ fontSize:"12px", padding:"8px 16px", background:loading?"rgba(245,158,11,0.1)":"#f59e0b", color:loading?"#f59e0b":"#000", border:"none", borderRadius:"9px", cursor:loading?"not-allowed":"pointer", fontWeight:"900" }}>{loading?"Coaching...":"Get This Week's Plan"}</button>
+          {lastRun && <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.2)" }}>Last: {lastRun}</span>}
+        </div>
+      </div>
+      {coaching ? (
+        <div style={{ fontSize:"13px", lineHeight:"1.7", color:"rgba(255,255,255,0.7)" }}>
+          {coaching.split("\n").map((line,i) => {
+            const m = line.match(/^\*\*(.*?)\*\*(.*)/);
+            if (m) return <p key={i} style={{ marginBottom:"10px" }}><span style={{ color:"#f59e0b", fontWeight:"800" }}>{m[1]}</span><span>{m[2]}</span></p>;
+            return line ? <p key={i} style={{ marginBottom:"8px" }}>{line}</p> : null;
+          })}
+        </div>
+      ) : (
+        <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
+          {analyses.slice(0,3).map(a => {
+            const days = a.deadline ? daysUntil(a.deadline) : null;
+            const color = days !== null && days <= 7 ? "#f87171" : days !== null && days <= 14 ? "#f59e0b" : "#60a5fa";
+            return (
+              <div key={a.id} style={{ padding:"10px 14px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"10px", flex:1, minWidth:"160px" }}>
+                <p style={{ fontSize:"11px", fontWeight:"700", marginBottom:"4px" }}>{a.name}</p>
+                <div style={{ height:"3px", background:"rgba(255,255,255,0.06)", borderRadius:"999px", marginBottom:"4px" }}>
+                  <div style={{ height:"100%", width:`${a.completeness}%`, background:a.completeness>=75?"#34d399":a.completeness>=40?"#f59e0b":"#f87171", borderRadius:"999px" }}/>
+                </div>
+                <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)" }}>{a.completeness}% analyzed{days!==null ? ` · ${days < 0?"OVERDUE":days+"d left"}` : ""}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DEAL ROOM (Community Votes) ───────────────────────────────────────
+function DealRoomPanel() {
+  // Sample shared deals — in production these come from Supabase public table
+  const SAMPLE_DEALS = [
+    { id:1, title:"4-plex in Indianapolis", type:"Small multifamily", cap:"8.2%", cashflow:"+$640/mo", verdict:"STRONG BUY" as DealVerdict, votes:{yes:47,no:8,watch:12}, submitted:"2d ago", geo:"Indianapolis, IN" },
+    { id:2, title:"STR condo — Scottsdale", type:"Short-term rental", cap:"6.1%", cashflow:"+$1,840/mo", verdict:"WATCH" as DealVerdict, votes:{yes:23,no:31,watch:18}, submitted:"5d ago", geo:"Scottsdale, AZ" },
+    { id:3, title:"Duplex house hack — Denver", type:"House hacking", cap:"5.8%", cashflow:"-$120/mo", verdict:"WATCH" as DealVerdict, votes:{yes:14,no:9,watch:41}, submitted:"1d ago", geo:"Denver, CO" },
+    { id:4, title:"8-unit apartment — Dallas", type:"Large multifamily", cap:"7.4%", cashflow:"+$2,100/mo", verdict:"STRONG BUY" as DealVerdict, votes:{yes:82,no:11,watch:19}, submitted:"3d ago", geo:"Dallas, TX" },
+  ];
+
+  const [voted, setVoted] = useState<Record<number,string>>({});
+
+  function vote(dealId: number, type: string) {
+    setVoted(prev => ({...prev, [dealId]:type}));
+  }
+
+  return (
+    <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"20px", padding:"20px 24px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px", flexWrap:"wrap", gap:"8px" }}>
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px" }}>
+            <span style={{ fontSize:"14px" }}>🏛</span>
+            <span style={{ fontSize:"10px", color:"rgba(167,139,250,0.7)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase" }}>Deal Room · Community Votes</span>
+          </div>
+          <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.3)" }}>Real deals, anonymized. What would you do?</p>
+        </div>
+        <button style={{ fontSize:"11px", padding:"7px 14px", background:"rgba(167,139,250,0.1)", border:"1px solid rgba(167,139,250,0.3)", borderRadius:"8px", color:"#a78bfa", cursor:"pointer", fontWeight:"800" }}>+ Share a Deal</button>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+        {SAMPLE_DEALS.map(deal => {
+          const totalVotes = deal.votes.yes + deal.votes.no + deal.votes.watch;
+          const yesPct = totalVotes > 0 ? (deal.votes.yes / totalVotes) * 100 : 0;
+          const noPct = totalVotes > 0 ? (deal.votes.no / totalVotes) * 100 : 0;
+          const myVote = voted[deal.id];
+          const vm = VERDICT_META[deal.verdict];
+
+          return (
+            <div key={deal.id} style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:"14px", padding:"14px 16px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px", flexWrap:"wrap", gap:"8px" }}>
+                <div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px" }}>
+                    <p style={{ fontSize:"13px", fontWeight:"800" }}>{deal.title}</p>
+                    <VerdictBadge verdict={deal.verdict}/>
+                  </div>
+                  <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)" }}>{deal.type} · {deal.geo} · {deal.submitted}</p>
+                </div>
+                <div style={{ display:"flex", gap:"12px" }}>
+                  <div style={{ textAlign:"right" }}><p style={{ fontSize:"9px", color:"rgba(255,255,255,0.25)", marginBottom:"2px" }}>Cap Rate</p><p style={{ fontSize:"13px", fontWeight:"800", color:"#f59e0b" }}>{deal.cap}</p></div>
+                  <div style={{ textAlign:"right" }}><p style={{ fontSize:"9px", color:"rgba(255,255,255,0.25)", marginBottom:"2px" }}>Cash Flow</p><p style={{ fontSize:"13px", fontWeight:"800", color:"#34d399" }}>{deal.cashflow}</p></div>
+                </div>
+              </div>
+
+              {/* Vote bar */}
+              <div style={{ height:"6px", background:"rgba(255,255,255,0.05)", borderRadius:"999px", overflow:"hidden", marginBottom:"8px", display:"flex" }}>
+                <div style={{ height:"100%", width:`${yesPct}%`, background:"#34d399", transition:"width 0.5s" }}/>
+                <div style={{ height:"100%", width:`${noPct}%`, background:"#f87171", transition:"width 0.5s" }}/>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div style={{ display:"flex", gap:"6px", fontSize:"10px", color:"rgba(255,255,255,0.3)", fontWeight:"600" }}>
+                  <span style={{ color:"#34d399" }}>✅ {deal.votes.yes}</span>
+                  <span>·</span>
+                  <span style={{ color:"#f87171" }}>❌ {deal.votes.no}</span>
+                  <span>·</span>
+                  <span style={{ color:"#f59e0b" }}>👁 {deal.votes.watch}</span>
+                  <span>·</span>
+                  <span>{totalVotes} votes</span>
+                </div>
+                {!myVote ? (
+                  <div style={{ display:"flex", gap:"5px" }}>
+                    {[{label:"I'd Buy",color:"#34d399",key:"yes"},{label:"Pass",color:"#f87171",key:"no"},{label:"Watch",color:"#f59e0b",key:"watch"}].map(v=>(
+                      <button key={v.key} onClick={()=>vote(deal.id,v.key)} style={{ fontSize:"10px", padding:"4px 10px", background:`${v.color}15`, border:`1px solid ${v.color}44`, borderRadius:"6px", color:v.color, cursor:"pointer", fontWeight:"800" }}>{v.label}</button>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)", fontWeight:"700" }}>✓ You voted: {myVote}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN DEAL LAB TAB ─────────────────────────────────────────────────
 function DealLabTab({ user }: { user: any }) {
-  const [subTab, setSubTab] = useState<"discover" | "analysis" | "pros">("discover");
-  const [filterTier, setFilterTier] = useState<"all" | "p" | "a" | "b">("all");
+  const [subTab, setSubTab] = useState<"analyzer"|"pipeline"|"discover"|"room"|"pros">("analyzer");
+  const [filterTier, setFilterTier] = useState<"all"|DealTier>("all");
   const [search, setSearch] = useState("");
   const [selectedCard, setSelectedCard] = useState<any>(null);
-  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [analyses, setAnalyses] = useState<DealAnalysis[]>([]);
   const [loadingAnalyses, setLoadingAnalyses] = useState(true);
   const [showAddAnalysis, setShowAddAnalysis] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", project_type: "", tier: "a", capital: "", geography: "", time_per_week: "", risk: "Med", notes: "", deadline: "" });
+  const [addForm, setAddForm] = useState({ name:"", project_type:"", tier:"a" as DealTier, capital:"", geography:"", risk:"Med", notes:"", deadline:"" });
   const [profilerCapital, setProfilerCapital] = useState("$50k–$150k");
   const [profilerTime, setProfilerTime] = useState("5–20h/week");
   const [profilerGeo, setProfilerGeo] = useState<string[]>(["United States"]);
-  const [imgCache, setImgCache] = useState<Record<string, string>>({});
-
-  const PEXELS_KEY = "563492ad6f91700001000001b8c1f2e2b1f44a1a9c3d1e2f3a4b5c6";
-  const PEXELS_QUERIES: Record<string, string> = {
-    "reit": "real estate investment building", "note": "mortgage paperwork signing", "crowd": "crowdfunding investment group",
-    "land": "aerial land parcel field", "turnkey": "modern furnished rental apartment", "syndlp": "large apartment complex aerial",
-    "dscr": "property manager keys rental", "str": "airbnb short term rental cozy interior", "brrrr": "house renovation before after",
-    "hack": "duplex house suburban", "midterm": "furnished apartment bedroom professional", "flip": "house flip renovation construction",
-    "small": "duplex triplex building exterior", "colive": "co-living shared house interior", "sto": "self storage facility units",
-    "rent2own": "house keys handover sale", "park": "parking lot urban city", "large": "apartment complex large building",
-    "boutique": "boutique hotel luxury small", "venue": "wedding venue outdoor elegant", "student": "student housing dormitory university",
-    "senior": "senior living community garden", "mixed": "mixed use building retail residential", "commercial": "strip mall commercial retail",
-    "ground": "new construction residential build", "datacenter": "data center server room", "rehab": "commercial building renovation",
-    "glamping": "glamping tent nature luxury",
-  };
-
-  const PROJECTS = [
-    { id:"reit", tier:"p", name:"REIT investment", roi:"8–12%", cap:"$1k min", time:"0h/wk", risk:"Low", fill:55, desc:"Buy shares in a publicly traded real estate investment trust. Fully hands-off, liquid like a stock, quarterly dividends. No tenants, no toilets, no calls at 2am.", riskDetail:"Low — publicly regulated, diversified exposure, can lose value in market downturns", chips:["Dividends","Liquid","Tax-advantaged"] },
-    { id:"note", tier:"p", name:"Mortgage note", roi:"8–13%", cap:"$50k min", time:"1h/wk", risk:"Low", fill:60, desc:"Buy an existing mortgage from a bank at a discount. You collect monthly interest payments. Secured by real property but you never own or manage it.", riskDetail:"Low — secured by property deed, but defaults and foreclosure process can be slow and costly", chips:["Monthly income","Secured","No tenants"] },
-    { id:"crowd", tier:"p", name:"Crowdfunding LP", roi:"7–14%", cap:"$5k min", time:"1h/wk", risk:"Low-Med", fill:52, desc:"Invest as a limited partner in large deals via platforms like Fundrise or CrowdStreet. Platform manages everything — you contribute capital and receive quarterly reports.", riskDetail:"Low-Med — platform risk, illiquidity, project-specific risks apply", chips:["Diversified","Platform-managed","Quarterly reports"] },
-    { id:"land", tier:"p", name:"Land banking", roi:"10–30%", cap:"$20k min", time:"2h/wk", risk:"Med", fill:58, desc:"Buy undeveloped land in the path of growth and hold for appreciation. No tenants, minimal maintenance. Long-term play requiring patience and good market timing.", riskDetail:"Med — illiquid, no income stream, zoning changes can hurt value", chips:["Long-term hold","No maintenance","Appreciation play"] },
-    { id:"turnkey", tier:"p", name:"Turnkey rental", roi:"8–11%", cap:"$80k min", time:"3h/wk", risk:"Low", fill:62, desc:"Buy a fully renovated, tenant-occupied property managed by a third-party PM. Cash flow from day one with minimal involvement. Best for remote or passive investors.", riskDetail:"Low — PM fees reduce returns, turnkey premiums can thin margins", chips:["Fully managed","Cash flow day 1","Remote-friendly"] },
-    { id:"syndlp", tier:"p", name:"Syndication LP", roi:"12–18%", cap:"$50k min", time:"2h/wk", risk:"Med", fill:65, desc:"Invest as a silent limited partner in large apartment or commercial deals. General partners run everything. You get distributions and tax benefits with a 5–7 year lockup.", riskDetail:"Med — capital is locked, depends entirely on GP competence and market conditions", chips:["Big deals access","Tax benefits","5–7yr lockup"] },
-    { id:"dscr", tier:"p", name:"DSCR rental + PM", roi:"9–13%", cap:"$70k min", time:"3h/wk", risk:"Low-Med", fill:59, desc:"Buy a long-term rental using a DSCR loan (qualified by rental income, not your salary) and hand operations to a property manager. Scalable model for building a portfolio.", riskDetail:"Low-Med — PM fees 8–10%, vacancy still hits your bottom line", chips:["Leverage","PM handles ops","Scalable"] },
-    { id:"str", tier:"a", name:"Short-term rental", roi:"20–35%", cap:"$80k min", time:"10h/wk", risk:"Med", fill:88, desc:"Airbnb/VRBO model — rent furnished units by the night or week. High nightly rates but requires active management, dynamic pricing, and constant guest communication.", riskDetail:"Med — regulation risk is high (cities banning STR), seasonality, high turnover costs", chips:["High yield","Dynamic pricing","Regulation risk"] },
-    { id:"brrrr", tier:"a", name:"BRRRR strategy", roi:"25–40%", cap:"$60k min", time:"15h/wk", risk:"Med", fill:82, desc:"Buy distressed, Rehab, Rent, Refinance, Repeat. Recycle your capital by pulling it back out via refinance to fund the next deal. Powerful wealth builder for experienced investors.", riskDetail:"Med — rehab cost overruns, appraisal risk at refinance, contractor dependency", chips:["Capital recycling","Forced appreciation","Requires contractors"] },
-    { id:"hack", tier:"a", name:"House hacking", roi:"15–25%", cap:"$50k min", time:"6h/wk", risk:"Low", fill:79, desc:"Live in one unit of a multi-family property while renting the others. Offset or eliminate your housing cost. Best entry point for first-time investors using FHA financing.", riskDetail:"Low — you must live on site, proximity to tenants can create friction", chips:["Low entry","FHA eligible","Live-in required"] },
-    { id:"midterm", tier:"a", name:"Mid-term rental", roi:"18–28%", cap:"$75k min", time:"8h/wk", risk:"Low-Med", fill:84, desc:"Furnished 1–6 month rentals targeting travel nurses, contractors, and relocating professionals. Higher than long-term rent, less regulation than STR, lower turnover costs.", riskDetail:"Low-Med — furnished unit costs more upfront, vacancy between stays possible", chips:["Stable demand","Less regulation","Furnished premium"] },
-    { id:"flip", tier:"a", name:"Fix & flip", roi:"30–50%", cap:"$100k min", time:"20h/wk", risk:"High", fill:71, desc:"Buy distressed properties at a discount, renovate fast, sell at market value. Project-based income, not recurring. Requires contractor management and fast execution.", riskDetail:"High — holding costs, construction overruns, market timing critical, no income during reno", chips:["Short cycle","High profit","Execution risk"] },
-    { id:"small", tier:"a", name:"Small multifamily (2–4)", roi:"12–20%", cap:"$100k min", time:"8h/wk", risk:"Low-Med", fill:80, desc:"Own a duplex, triplex, or quad. Multiple income streams with residential financing (up to 4 units). Easier to manage than large multifamily, scalable, and bankable.", riskDetail:"Low-Med — one vacancy hurts proportionally more than in large buildings", chips:["Residential loans","Scalable","Multiple income streams"] },
-    { id:"colive", tier:"a", name:"Co-living house", roi:"20–35%", cap:"$80k min", time:"10h/wk", risk:"Med", fill:76, desc:"Rent individual bedrooms in a single-family home to young professionals. Charge 20–30% below studio apartments per room but generate 2–3× the rent of a single tenant.", riskDetail:"Med — high tenant turnover, requires house rules management, zoning varies by city", chips:["High yield/sqft","Young professionals","Tenant turnover risk"] },
-    { id:"sto", tier:"a", name:"Storage unit facility", roi:"15–25%", cap:"$200k min", time:"8h/wk", risk:"Low-Med", fill:77, desc:"Self-storage is one of the most recession-resistant asset classes. Low maintenance, no toilets, no tenants living on site. Highly automatable with gate access technology.", riskDetail:"Low-Med — competition from large REITs, location is everything", chips:["Recession-proof","Low tenant issues","Scalable"] },
-    { id:"rent2own", tier:"a", name:"Rent-to-own", roi:"18–30%", cap:"$70k min", time:"6h/wk", risk:"Low-Med", fill:72, desc:"Lease to a tenant with an option to purchase at a set price. Collect above-market rent plus an option fee. Tenant typically maintains the property, reducing your costs.", riskDetail:"Low-Med — if prices rise fast, tenant may back out; if they fall, you're locked", chips:["Premium rents","Low vacancy","Potential exit"] },
-    { id:"park", tier:"a", name:"Parking lot / car park", roi:"15–25%", cap:"$150k min", time:"5h/wk", risk:"Low", fill:68, desc:"Surface lots or structured parking near stadiums, transit, hospitals, or city centers. Near-passive once automated with payment systems and dynamic event pricing.", riskDetail:"Low — location dependent, autonomous vehicle adoption a long-term structural risk", chips:["Automated income","Low maintenance","Urban play"] },
-    { id:"large", tier:"b", name:"Large multifamily (5+)", roi:"15–25%", cap:"$500k min", time:"20h/wk", risk:"Med", fill:72, desc:"Apartment buildings financed commercially. Economies of scale reduce per-unit costs. Requires asset management expertise, strong team, and commercial lending relationships.", riskDetail:"Med — larger capital at risk, requires experienced team, commercial financing terms stricter", chips:["Commercial financing","Economies of scale","Team required"] },
-    { id:"boutique", tier:"b", name:"Boutique hotel", roi:"25–45%", cap:"$500k min", time:"30h/wk", risk:"High", fill:65, desc:"6–30 room property with a premium brand identity. Unique experience drives RevPAR above chain hotels. Strong in tourist destinations with year-round demand.", riskDetail:"High — hospitality is operationally complex, COVID-type events crush revenues overnight", chips:["Brand value","High RevPAR","Operational complexity"] },
-    { id:"venue", tier:"b", name:"Wedding / event venue", roi:"40–90%", cap:"$300k min", time:"35h/wk", risk:"Med-High", fill:80, desc:"Exclusively booked weekends generate extremely high per-event revenue. Scenic locations are key. Business model built 18–24 months in advance through bookings.", riskDetail:"Med-High — seasonal, weather-dependent, requires event staff and permits", chips:["Weekend model","High per-event revenue","Seasonal"] },
-    { id:"student", tier:"b", name:"Student housing", roi:"20–35%", cap:"$200k min", time:"20h/wk", risk:"Med", fill:74, desc:"High-density housing near universities with consistent annual demand. Lease by the room rather than the unit. Annual lease cycle means turnover every August.", riskDetail:"Med — high turnover, university enrollment changes, student damage to property", chips:["Consistent demand","Annual leases","High density"] },
-    { id:"senior", tier:"b", name:"Senior housing", roi:"18–28%", cap:"$500k min", time:"25h/wk", risk:"Med", fill:62, desc:"Independent or assisted living facilities with strong demographic tailwinds. Aging population creates structural demand. Highly regulated but stable occupancy once established.", riskDetail:"Med — heavy regulation, staffing challenges, licensing requirements before opening", chips:["Aging population","Stable occupancy","Regulatory complexity"] },
-    { id:"mixed", tier:"b", name:"Mixed-use development", roi:"20–40%", cap:"$1M+ min", time:"40h/wk", risk:"High", fill:58, desc:"Retail below, residential above. Complex to develop but creates lasting asset value with multiple income streams. Often eligible for favorable zoning treatment in urban infill.", riskDetail:"High — long development cycle, retail leasing risk, complex permitting", chips:["Multiple income streams","Appreciation","Long development cycle"] },
-    { id:"commercial", tier:"b", name:"Commercial strip / retail", roi:"8–15%", cap:"$500k min", time:"15h/wk", risk:"Med", fill:60, desc:"Strip malls and NNN leases with national tenants. Tenants cover most expenses (taxes, insurance, maintenance). Long lease terms with annual rent bumps.", riskDetail:"Med — e-commerce pressure on retail, anchor tenant risk", chips:["NNN leases","Stable tenants","Cap rate driven"] },
-    { id:"ground", tier:"b", name:"Ground-up residential build", roi:"30–60%", cap:"$300k min", time:"40h/wk", risk:"Very High", fill:55, desc:"Build a new home or small development from raw land. Maximum profit margin, maximum complexity. Requires full construction management and deep contractor network.", riskDetail:"Very High — cost overruns, permit delays, market timing, no income during construction", chips:["Max profit margin","Full control","Timeline risk"] },
-    { id:"datacenter", tier:"b", name:"Data center (emerging)", roi:"15–30%", cap:"$2M+ min", time:"30h/wk", risk:"High", fill:45, desc:"AI-driven demand is pushing data center cap rates to record lows. Institutional asset class becoming accessible via JV partnerships. Power infrastructure is the critical constraint.", riskDetail:"High — power-intensive, very high entry cost, long pre-development period", chips:["AI demand wave","Long-term leases","Power-intensive"] },
-    { id:"rehab", tier:"b", name:"Commercial rehab & resell", roi:"25–50%", cap:"$300k min", time:"30h/wk", risk:"High", fill:63, desc:"Buy distressed commercial assets, reposition through renovation or conversion, sell stabilized to institutional buyers. Office-to-residential conversion is a major 2025 trend.", riskDetail:"High — repositioning risk, tenant leasing during reno, commercial market volatility", chips:["Value-add","Office conversion trend","Repositioning skill required"] },
-    { id:"glamping", tier:"b", name:"Glamping / eco-resort", roi:"35–80%", cap:"$150k min", time:"25h/wk", risk:"Med-High", fill:70, desc:"Safari tents, cabins, and domes on scenic land. Low permit burden versus traditional buildings, very high nightly rates. Experience economy is growing fast.", riskDetail:"Med-High — weather dependent, remote land challenges, Instagram-driven demand can shift", chips:["High nightly rates","Low build cost","Experience economy"] },
-  ];
-
-  const GEOS = ["United States", "Canada", "France", "Morocco", "Spain", "UAE", "United Kingdom", "Germany", "Open to any"];
-  const RISK_COLOR: Record<string, string> = {
-    "Low": "#34d399", "Low-Med": "#34d399", "Med": "#f59e0b",
-    "Med-High": "#f87171", "High": "#f87171", "Very High": "#f87171"
-  };
 
   useEffect(() => { if (user) loadAnalyses(); }, [user]);
 
   async function loadAnalyses() {
-    const { data } = await supabase.from("deal_lab").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    setAnalyses(data || []); setLoadingAnalyses(false);
+    const { data } = await supabase.from("deal_lab").select("*").eq("user_id", user.id).order("created_at",{ascending:false});
+    const parsed = (data || []).map((a:any) => ({
+      ...a,
+      checklist: typeof a.checklist==="string" ? JSON.parse(a.checklist) : (a.checklist||[]),
+    }));
+    setAnalyses(parsed); setLoadingAnalyses(false);
   }
 
-  async function addAnalysis() {
-    if (!addForm.name || !addForm.project_type) return;
-    const row = { user_id: user.id, name: addForm.name, project_type: addForm.project_type, tier: addForm.tier, capital: addForm.capital, geography: addForm.geography, time_per_week: addForm.time_per_week, risk: addForm.risk, notes: addForm.notes, deadline: addForm.deadline, completeness: 10, status: "active", checklist: JSON.stringify([ { label: "Exit strategy defined", done: false }, { label: "Zoning confirmed", done: false }, { label: "Comparable rents researched", done: false }, { label: "Financing source confirmed", done: false }, { label: "Property manager identified", done: false }, { label: "Market analysis complete", done: false }, { label: "Legal review done", done: false }, { label: "Decision deadline set", done: false } ]) };
+  async function addAnalysis(prefill?: {name:string;project_type:string;tier:DealTier}) {
+    const f = prefill || addForm;
+    if (!f.name || !f.project_type) return;
+    const defaultChecklist = [
+      {label:"Exit strategy defined",done:false},
+      {label:"Zoning confirmed",done:false},
+      {label:"Comparable rents researched",done:false},
+      {label:"Financing source confirmed",done:false},
+      {label:"Property manager identified",done:false},
+      {label:"Market analysis complete",done:false},
+      {label:"Legal review done",done:false},
+      {label:"Decision deadline set",done:false},
+    ];
+    const row = { user_id:user.id, name:f.name, project_type:f.project_type, tier:f.tier, capital:addForm.capital, geography:addForm.geography, risk:addForm.risk, notes:addForm.notes, deadline:addForm.deadline, completeness:0, status:"active", checklist:JSON.stringify(defaultChecklist), deal_score:0 };
     const { data, error } = await supabase.from("deal_lab").insert(row).select().single();
-    if (!error && data) { setAnalyses([data, ...analyses]); setShowAddAnalysis(false); setAddForm({ name: "", project_type: "", tier: "a", capital: "", geography: "", time_per_week: "", risk: "Med", notes: "", deadline: "" }); }
+    if (!error && data) {
+      const parsed = { ...data, checklist: typeof data.checklist==="string" ? JSON.parse(data.checklist) : (data.checklist||[]) };
+      setAnalyses(prev => [parsed, ...prev]);
+      setShowAddAnalysis(false);
+      setAddForm({name:"",project_type:"",tier:"a",capital:"",geography:"",risk:"Med",notes:"",deadline:""});
+      setSubTab("pipeline");
+    }
   }
 
-  async function toggleCheckItem(analysis: any, idx: number) {
-    const checklist = typeof analysis.checklist === "string" ? JSON.parse(analysis.checklist) : analysis.checklist;
-    const updated = checklist.map((c: any, i: number) => i === idx ? { ...c, done: !c.done } : c);
-    const done = updated.filter((c: any) => c.done).length;
-    const completeness = Math.round((done / updated.length) * 100);
-    await supabase.from("deal_lab").update({ checklist: JSON.stringify(updated), completeness }).eq("id", analysis.id);
-    setAnalyses(analyses.map(a => a.id === analysis.id ? { ...a, checklist: updated, completeness } : a));
+  async function saveDealFromAnalyzer(result: AnalyzerResult, inputs: any) {
+    const checklist = [
+      {label:"Exit strategy defined", done:true},
+      {label:"Cash flow verified positive", done:result.cashFlow>0},
+      {label:"Cap rate above 6%", done:result.capRate>=6},
+      {label:"DSCR above 1.25", done:result.dscr>=1.25},
+      {label:"Comparable rents researched", done:false},
+      {label:"Financing source confirmed", done:false},
+      {label:"Property manager identified", done:false},
+      {label:"Legal review done", done:false},
+    ];
+    const donePct = Math.round((checklist.filter(c=>c.done).length/checklist.length)*100);
+    const row = { user_id:user.id, name:`Analyzed Deal (${result.verdict})`, project_type:"From Analyzer", tier:"a" as DealTier, capital:`$${Math.round(inputs.downPayment+inputs.closingCosts+inputs.rehabCost).toLocaleString()}`, geography:"", risk:result.score>=70?"Low":result.score>=50?"Med":"High", notes:`Score: ${result.score}/100 · Cap Rate: ${result.capRate.toFixed(1)}% · CoC: ${result.cocReturn.toFixed(1)}%`, deadline:"", completeness:donePct, status:"active", checklist:JSON.stringify(checklist), deal_score:result.score, analyzer_data:JSON.stringify({...inputs, result}) };
+    const { data, error } = await supabase.from("deal_lab").insert(row).select().single();
+    if (!error && data) {
+      const parsed = { ...data, checklist: typeof data.checklist==="string" ? JSON.parse(data.checklist) : (data.checklist||[]) };
+      setAnalyses(prev => [parsed, ...prev]);
+      setSubTab("pipeline");
+    }
+  }
+
+  async function toggleCheck(analysis: DealAnalysis, idx: number) {
+    const updated = analysis.checklist.map((c,i) => i===idx ? {...c,done:!c.done} : c);
+    const done = updated.filter(c=>c.done).length;
+    const completeness = Math.round((done/updated.length)*100);
+    const score = calcDealScore(updated, analysis.deadline, completeness);
+    await supabase.from("deal_lab").update({checklist:JSON.stringify(updated),completeness,deal_score:score}).eq("id",analysis.id);
+    setAnalyses(prev => prev.map(a => a.id===analysis.id ? {...a,checklist:updated,completeness,deal_score:score} : a));
   }
 
   async function deleteAnalysis(id: number) {
-    await supabase.from("deal_lab").delete().eq("id", id);
-    setAnalyses(analyses.filter(a => a.id !== id));
-  }
-
-  async function fetchImage(id: string, query: string) {
-    if (imgCache[id]) return;
-    try {
-      const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`, { headers: { Authorization: PEXELS_KEY } });
-      const data = await res.json();
-      const url = data.photos?.[0]?.src?.medium;
-      if (url) setImgCache(prev => ({ ...prev, [id]: url }));
-    } catch {}
+    await supabase.from("deal_lab").delete().eq("id",id);
+    setAnalyses(prev => prev.filter(a=>a.id!==id));
   }
 
   const filtered = PROJECTS.filter(p => {
-    const tierMatch = filterTier === "all" || p.tier === filterTier;
-    const searchMatch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.desc.toLowerCase().includes(search.toLowerCase()) || p.chips.some(c => c.toLowerCase().includes(search.toLowerCase()));
+    const tierMatch = filterTier==="all" || p.tier===filterTier;
+    const searchMatch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.desc.toLowerCase().includes(search.toLowerCase()) || p.chips.some(c=>c.toLowerCase().includes(search.toLowerCase()));
     return tierMatch && searchMatch;
   });
 
-  const IS: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  const IS: React.CSSProperties = { width:"100%", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"10px", padding:"10px 14px", fontSize:"13px", color:"#fff", outline:"none", fontFamily:"'DM Sans',sans-serif", boxSizing:"border-box" };
 
-  const TIER_META = {
-    p: { label: "Passive", desc: "0–5h/week · 8–15% ROI", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)" },
-    a: { label: "Active", desc: "5–20h/week · 20–40% ROI", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
-    b: { label: "Business", desc: "20h+/week · 40–90%+ ROI", color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" },
-  };
+  const urgentCount = analyses.filter(a => a.deadline && (daysUntil(a.deadline)??99)<=7).length;
+  const incompleteCount = analyses.filter(a => a.completeness < 100).length;
 
   return (
     <div>
+      <style>{`
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes verdictPulse { 0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,0.3)} 50%{box-shadow:0 0 0 8px rgba(52,211,153,0)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes scoreFill { from{stroke-dashoffset:88} }
+      `}</style>
+
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"24px", flexWrap:"wrap", gap:"12px" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#60a5fa", boxShadow: "0 0 6px #60a5fa", animation: "blink 1.5s infinite" }} />
-            <span style={{ fontSize: "10px", color: "rgba(96,165,250,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>Deal Lab · Discover · Evaluate · Launch</span>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}>
+            <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#60a5fa", boxShadow:"0 0 6px #60a5fa", animation:"blink 1.5s infinite" }}/>
+            <span style={{ fontSize:"10px", color:"rgba(96,165,250,0.7)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase" }}>Deal Lab · Analyze · Decide · Win</span>
           </div>
-          <h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.8px", background: "linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Deal Lab</h2>
-          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "4px" }}>28 project types · Under Analysis pipeline · Verified professionals</p>
+          <h2 style={{ fontSize:"26px", fontWeight:"900", letterSpacing:"-1px", background:"linear-gradient(135deg,#fff 60%,rgba(255,255,255,0.4))", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Deal Lab</h2>
+          <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.25)", marginTop:"4px" }}>Instant ROI analysis · Strategy comparison · AI coaching · {analyses.length} deals tracked</p>
+        </div>
+        <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap" }}>
+          {urgentCount > 0 && <div style={{ padding:"6px 12px", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:"999px", fontSize:"11px", fontWeight:"800", color:"#f87171", animation:"verdictPulse 2s infinite" }}>🔴 {urgentCount} urgent</div>}
+          <button onClick={()=>{setShowAddAnalysis(true);}} style={{ padding:"9px 18px", background:"#60a5fa", color:"#000", borderRadius:"10px", fontWeight:"900", fontSize:"13px", border:"none", cursor:"pointer" }}>+ Add Deal</button>
         </div>
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: "flex", gap: "2px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "4px", marginBottom: "24px" }}>
-        {([["discover", "Discover"], ["analysis", `Under Analysis ${analyses.length > 0 ? `(${analyses.length})` : ""}`], ["pros", "Professionals"]] as const).map(([key, label]) => (
-          <button key={key} onClick={() => setSubTab(key as any)} style={{ flex: 1, padding: "10px", borderRadius: "9px", fontSize: "12px", fontWeight: "700", border: `1px solid ${subTab === key ? "rgba(96,165,250,0.35)" : "transparent"}`, cursor: "pointer", background: subTab === key ? "rgba(96,165,250,0.12)" : "transparent", color: subTab === key ? "#60a5fa" : "rgba(255,255,255,0.4)", transition: "all 0.15s" }}>{label}</button>
+      <div style={{ display:"flex", gap:"2px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:"14px", padding:"4px", marginBottom:"24px", overflowX:"auto" }}>
+        {([
+          {key:"analyzer", label:"⚡ Analyzer",       badge:null},
+          {key:"pipeline", label:"🔍 Pipeline",        badge:incompleteCount > 0 ? incompleteCount : null},
+          {key:"discover", label:"🗺 Discover",         badge:null},
+          {key:"room",     label:"🏛 Deal Room",        badge:null},
+          {key:"pros",     label:"🛡 Professionals",    badge:null},
+        ] as const).map(({key,label,badge}) => (
+          <button key={key} onClick={()=>setSubTab(key)} style={{ flex:1, padding:"10px 12px", borderRadius:"10px", fontSize:"12px", fontWeight:"700", border:`1px solid ${subTab===key?"rgba(96,165,250,0.4)":"transparent"}`, cursor:"pointer", background:subTab===key?"rgba(96,165,250,0.15)":"transparent", color:subTab===key?"#60a5fa":"rgba(255,255,255,0.4)", transition:"all 0.15s", position:"relative", whiteSpace:"nowrap" }}>
+            {label}
+            {badge && <span style={{ position:"absolute", top:"-4px", right:"-2px", background:"#f87171", color:"#fff", borderRadius:"999px", fontSize:"8px", fontWeight:"900", minWidth:"14px", height:"14px", display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>{badge}</span>}
+          </button>
         ))}
       </div>
 
-      {/* ── DISCOVER ────────────────────────────────────────── */}
+      {/* ── ANALYZER ─────────────────────────────────────────── */}
+      {subTab === "analyzer" && (
+        <div>
+          <AIWeeklyCoach analyses={analyses}/>
+          <MarketPulsePanel geography={analyses[0]?.geography}/>
+          <DealAnalyzerPanel onSaveToPipeline={saveDealFromAnalyzer}/>
+        </div>
+      )}
+
+      {/* ── PIPELINE ─────────────────────────────────────────── */}
+      {subTab === "pipeline" && (
+        <div>
+          <AIWeeklyCoach analyses={analyses}/>
+
+          {loadingAnalyses ? <p style={{ color:"rgba(255,255,255,0.3)", fontSize:"13px" }}>Loading...</p> : analyses.length === 0 ? (
+            <div style={{ padding:"60px", textAlign:"center", border:"1px dashed rgba(96,165,250,0.15)", borderRadius:"20px" }}>
+              <p style={{ fontSize:"40px", marginBottom:"12px" }}>🔍</p>
+              <p style={{ fontSize:"14px", fontWeight:"700", color:"rgba(255,255,255,0.4)", marginBottom:"6px" }}>No deals in pipeline</p>
+              <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.2)", marginBottom:"20px" }}>Use the Analyzer to evaluate a deal, or click "+ Add Deal" to track one manually.</p>
+              <button onClick={()=>setSubTab("analyzer")} style={{ padding:"10px 20px", background:"#60a5fa", color:"#000", borderRadius:"10px", fontWeight:"800", fontSize:"13px", border:"none", cursor:"pointer" }}>⚡ Run Analyzer →</button>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+              {analyses.map(a => {
+                const checklist = a.checklist || [];
+                const score = a.deal_score || calcDealScore(checklist, a.deadline, a.completeness);
+                const barColor = a.completeness>=75?"#34d399":a.completeness>=40?"#f59e0b":"rgba(255,255,255,0.3)";
+                const tm = TIER_META[a.tier] || TIER_META.a;
+                const days = a.deadline ? daysUntil(a.deadline) : null;
+                const isUrgent = days !== null && days <= 7;
+
+                return (
+                  <div key={a.id} style={{ background:"rgba(255,255,255,0.02)", border:`1px solid ${isUrgent?"rgba(248,113,113,0.3)":barColor+"22"}`, borderRadius:"18px", overflow:"hidden", animation:"fadeInUp 0.3s ease" }}>
+                    {/* Header */}
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 20px", flexWrap:"wrap", gap:"10px" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                        <DealScoreRing score={score} size={52}/>
+                        <div>
+                          <p style={{ fontSize:"15px", fontWeight:"800" }}>{a.name}</p>
+                          <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"4px", flexWrap:"wrap" }}>
+                            <span style={{ fontSize:"10px", fontWeight:"700", padding:"1px 7px", borderRadius:"20px", background:tm.bg, color:tm.color, border:`1px solid ${tm.border}` }}>{tm.label}</span>
+                            <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)" }}>{a.project_type}</span>
+                            {a.capital && <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)" }}>· {a.capital}</span>}
+                            {a.geography && <span style={{ fontSize:"10px", color:"rgba(96,165,250,0.7)", fontWeight:"600" }}>📍 {a.geography}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
+                        <DeadlineCounter deadline={a.deadline}/>
+                        <span style={{ fontSize:"13px", fontWeight:"800", color:barColor }}>{a.completeness}%</span>
+                        <button onClick={()=>deleteAnalysis(a.id)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.2)", cursor:"pointer", fontSize:"18px" }}>×</button>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ height:"3px", background:"rgba(255,255,255,0.05)", margin:"0 20px 14px" }}>
+                      <div style={{ height:"100%", width:`${a.completeness}%`, background:barColor, borderRadius:"999px", transition:"width 0.5s", boxShadow:`0 0 6px ${barColor}66` }}/>
+                    </div>
+
+                    {/* Checklist — compact */}
+                    <div style={{ padding:"0 20px 16px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                      {checklist.map((item,idx) => (
+                        <div key={idx} onClick={()=>toggleCheck(a,idx)} style={{ display:"flex", alignItems:"center", gap:"8px", padding:"7px 10px", borderRadius:"8px", background:item.done?"rgba(52,211,153,0.05)":"rgba(255,255,255,0.02)", border:`1px solid ${item.done?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.05)"}`, cursor:"pointer", transition:"all 0.15s" }}>
+                          <div style={{ width:"14px", height:"14px", borderRadius:"4px", border:`1.5px solid ${item.done?"#34d399":"rgba(255,255,255,0.2)"}`, background:item.done?"#34d399":"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:"9px", color:"#000" }}>{item.done?"✓":""}</div>
+                          <span style={{ fontSize:"11px", color:item.done?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.7)", textDecoration:item.done?"line-through":"none" }}>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Market pulse micro */}
+                    {a.completeness === 100 && (
+                      <div style={{ margin:"0 20px 16px", padding:"10px 14px", background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)", borderRadius:"10px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:"12px", color:"#34d399", fontWeight:"700" }}>✓ Analysis complete — ready to decide</span>
+                        <button style={{ fontSize:"11px", padding:"5px 12px", background:"#34d399", color:"#000", borderRadius:"6px", fontWeight:"900", border:"none", cursor:"pointer" }}>Move to Action →</button>
+                      </div>
+                    )}
+                    {a.notes && <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.3)", margin:"0 20px 14px", padding:"8px 10px", background:"rgba(255,255,255,0.02)", borderRadius:"8px", fontStyle:"italic" }}>{a.notes}</p>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DISCOVER ─────────────────────────────────────────── */}
       {subTab === "discover" && (
         <div>
           {/* Profiler */}
-          <div style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "16px", padding: "20px 24px", marginBottom: "20px" }}>
-            <p style={{ fontSize: "10px", color: "rgba(96,165,250,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase", marginBottom: "14px" }}>Your investor profile — filter recommendations</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "14px" }}>
+          <div style={{ background:"rgba(96,165,250,0.04)", border:"1px solid rgba(96,165,250,0.15)", borderRadius:"16px", padding:"20px 24px", marginBottom:"20px" }}>
+            <p style={{ fontSize:"10px", color:"rgba(96,165,250,0.7)", letterSpacing:"2px", fontWeight:"800", textTransform:"uppercase", marginBottom:"14px" }}>Your Investor Profile</p>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
               <div>
-                <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "6px" }}>Available capital</label>
-                <select value={profilerCapital} onChange={e => setProfilerCapital(e.target.value)} style={IS}>
-                  {["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1M", "$1M+"].map(v => <option key={v}>{v}</option>)}
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px" }}>Available capital</label>
+                <select value={profilerCapital} onChange={e=>setProfilerCapital(e.target.value)} style={IS}>
+                  {["Under $50k","$50k–$150k","$150k–$500k","$500k–$1M","$1M+"].map(v=><option key={v}>{v}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "6px" }}>Time per week</label>
-                <select value={profilerTime} onChange={e => setProfilerTime(e.target.value)} style={IS}>
-                  {["0–5h/week (passive)", "5–20h/week (active)", "20h+/week (business)"].map(v => <option key={v}>{v}</option>)}
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", display:"block", marginBottom:"6px" }}>Time per week</label>
+                <select value={profilerTime} onChange={e=>setProfilerTime(e.target.value)} style={IS}>
+                  {["0–5h/week (passive)","5–20h/week (active)","20h+/week (business)"].map(v=><option key={v}>{v}</option>)}
                 </select>
               </div>
             </div>
-            <label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>Where can you operate?</label>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {GEOS.map(g => (
-                <button key={g} onClick={() => setProfilerGeo(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g])} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "999px", fontWeight: "600", border: `1px solid ${profilerGeo.includes(g) ? "rgba(96,165,250,0.5)" : "rgba(255,255,255,0.08)"}`, background: profilerGeo.includes(g) ? "rgba(96,165,250,0.15)" : "rgba(255,255,255,0.03)", color: profilerGeo.includes(g) ? "#60a5fa" : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{g}</button>
+            <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+              {GEOS.map(g=>(
+                <button key={g} onClick={()=>setProfilerGeo(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev,g])} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"999px", fontWeight:"600", border:`1px solid ${profilerGeo.includes(g)?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`, background:profilerGeo.includes(g)?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.03)", color:profilerGeo.includes(g)?"#60a5fa":"rgba(255,255,255,0.4)", cursor:"pointer", transition:"all 0.12s" }}>{g}</button>
               ))}
             </div>
           </div>
 
-          {/* Search + tier filters */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
-            <input placeholder="Search project types..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 2, minWidth: "180px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "9px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit" }} />
-            {(["all", "p", "a", "b"] as const).map(t => {
-              const meta = t === "all" ? null : TIER_META[t];
+          {/* Filters */}
+          <div style={{ display:"flex", gap:"8px", marginBottom:"16px", flexWrap:"wrap" }}>
+            <input placeholder="Search project types..." value={search} onChange={e=>setSearch(e.target.value)} style={{ flex:2, minWidth:"160px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"10px", padding:"9px 14px", fontSize:"13px", color:"#fff", outline:"none", fontFamily:"'DM Sans',sans-serif" }}/>
+            {(["all","p","a","b"] as const).map(t => {
+              const meta = t==="all" ? null : TIER_META[t];
               return (
-                <button key={t} onClick={() => setFilterTier(t)} style={{ padding: "9px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: "700", border: `1px solid ${filterTier === t ? (meta?.color || "rgba(255,255,255,0.4)") + "55" : "rgba(255,255,255,0.08)"}`, background: filterTier === t ? (meta?.bg || "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.03)", color: filterTier === t ? (meta?.color || "#fff") : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{t === "all" ? `All (${PROJECTS.length})` : `${meta!.label} (${PROJECTS.filter(p => p.tier === t).length})`}</button>
+                <button key={t} onClick={()=>setFilterTier(t)} style={{ padding:"9px 16px", borderRadius:"10px", fontSize:"12px", fontWeight:"700", border:`1px solid ${filterTier===t?(meta?.color||"rgba(255,255,255,0.4)")+"55":"rgba(255,255,255,0.08)"}`, background:filterTier===t?(meta?.bg||"rgba(255,255,255,0.06)"):"rgba(255,255,255,0.03)", color:filterTier===t?(meta?.color||"#fff"):"rgba(255,255,255,0.4)", cursor:"pointer" }}>
+                  {t==="all"?`All (${PROJECTS.length})`:`${meta!.label} (${PROJECTS.filter(p=>p.tier===t).length})`}
+                </button>
               );
             })}
           </div>
 
-          {/* Cards grid */}
-          {(["p", "a", "b"] as const).map(tier => {
-            const items = filtered.filter(p => p.tier === tier);
-            if (items.length === 0) return null;
+          {/* Cards by tier */}
+          {(["p","a","b"] as const).map(tier => {
+            const items = filtered.filter(p=>p.tier===tier);
+            if (!items.length) return null;
             const meta = TIER_META[tier];
             return (
-              <div key={tier} style={{ marginBottom: "28px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: meta.color }} />
-                  <span style={{ fontSize: "12px", fontWeight: "700", color: meta.color }}>{meta.label}</span>
-                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>{meta.desc}</span>
-                  <span style={{ fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "999px", background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, marginLeft: "auto" }}>{items.length} types</span>
+              <div key={tier} style={{ marginBottom:"28px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>
+                  <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:meta.color }}/>
+                  <span style={{ fontSize:"12px", fontWeight:"700", color:meta.color }}>{meta.label}</span>
+                  <span style={{ fontSize:"11px", color:"rgba(255,255,255,0.3)" }}>{meta.desc}</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:"10px" }}>
                   {items.map(p => {
-                    const imgUrl = imgCache[p.id];
-                    if (!imgUrl) fetchImage(p.id, PEXELS_QUERIES[p.id] || p.name + " real estate");
                     const riskColor = RISK_COLOR[p.risk] || "#f59e0b";
+                    const isSelected = selectedCard?.id === p.id;
                     return (
-                      <div key={p.id} onClick={() => setSelectedCard(selectedCard?.id === p.id ? null : p)} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${selectedCard?.id === p.id ? meta.color + "55" : "rgba(255,255,255,0.07)"}`, borderRadius: "16px", overflow: "hidden", cursor: "pointer", transition: "all 0.15s" }}>
-                        {/* Image */}
-                        <div style={{ height: "110px", background: imgUrl ? `url(${imgUrl}) center/cover` : `linear-gradient(135deg, ${meta.color}18, ${meta.color}08)`, position: "relative" }}>
-                          {!imgUrl && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", opacity: 0.3 }}>🏗</div>}
-                          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.7))" }} />
-                          <div style={{ position: "absolute", top: "8px", left: "8px", display: "flex", gap: "5px" }}>
-                            <span style={{ fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "20px", background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, backdropFilter: "blur(8px)" }}>{meta.label.toUpperCase()}</span>
+                      <div key={p.id} onClick={()=>setSelectedCard(isSelected?null:p)} style={{ background:"rgba(255,255,255,0.02)", border:`1px solid ${isSelected?meta.color+"55":"rgba(255,255,255,0.07)"}`, borderRadius:"16px", overflow:"hidden", cursor:"pointer", transition:"all 0.15s" }}>
+                        {/* Gradient header */}
+                        <div style={{ height:"90px", background:`linear-gradient(135deg,${meta.color}18,${meta.color}06)`, position:"relative", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <div style={{ position:"absolute", top:"8px", left:"8px" }}><span style={{ fontSize:"9px", fontWeight:"800", padding:"2px 7px", borderRadius:"20px", background:meta.bg, color:meta.color, border:`1px solid ${meta.border}` }}>{meta.label.toUpperCase()}</span></div>
+                          <div style={{ position:"absolute", top:"8px", right:"8px" }}><span style={{ fontSize:"9px", fontWeight:"700", color:riskColor, background:`${riskColor}22`, border:`1px solid ${riskColor}44`, padding:"2px 7px", borderRadius:"20px" }}>{p.risk}</span></div>
+                          <span style={{ fontSize:"13px", fontWeight:"900", color:meta.color }}>{p.roi}</span>
+                        </div>
+                        <div style={{ padding:"12px 14px" }}>
+                          <p style={{ fontSize:"13px", fontWeight:"800", marginBottom:"4px" }}>{p.name}</p>
+                          <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.45)", lineHeight:"1.5", marginBottom:"10px" }}>{p.desc.slice(0,72)}…</p>
+                          <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", marginBottom:"8px" }}>
+                            <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.4)", background:"rgba(255,255,255,0.05)", padding:"2px 7px", borderRadius:"6px" }}>{p.cap}</span>
+                            <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.4)", background:"rgba(255,255,255,0.05)", padding:"2px 7px", borderRadius:"6px" }}>{p.time}</span>
                           </div>
-                          <div style={{ position: "absolute", top: "8px", right: "8px" }}>
-                            <span style={{ fontSize: "9px", fontWeight: "700", color: riskColor, background: `${riskColor}22`, border: `1px solid ${riskColor}44`, padding: "2px 7px", borderRadius: "20px", backdropFilter: "blur(8px)" }}>{p.risk} risk</span>
-                          </div>
-                          <div style={{ position: "absolute", bottom: "8px", right: "8px" }}>
-                            <span style={{ fontSize: "12px", fontWeight: "900", color: meta.color, textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>{p.roi}</span>
+                          <div style={{ height:"3px", background:"rgba(255,255,255,0.06)", borderRadius:"999px" }}>
+                            <div style={{ height:"100%", width:`${p.fill}%`, background:meta.color, borderRadius:"999px" }}/>
                           </div>
                         </div>
-                        {/* Card body */}
-                        <div style={{ padding: "12px 14px" }}>
-                          <p style={{ fontSize: "13px", fontWeight: "800", marginBottom: "4px" }}>{p.name}</p>
-                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5", marginBottom: "10px" }}>{p.desc.slice(0, 80)}…</p>
-                          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "10px" }}>
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "6px" }}>{p.cap}</span>
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", padding: "2px 7px", borderRadius: "6px" }}>{p.time}</span>
-                          </div>
-                          {/* Match bar */}
-                          <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }}>
-                            <div style={{ height: "100%", width: `${p.fill}%`, background: meta.color, borderRadius: "999px" }} />
-                          </div>
-                        </div>
-                        {/* Expanded detail */}
-                        {selectedCard?.id === p.id && (
-                          <div style={{ borderTop: `1px solid ${meta.color}22`, padding: "14px", background: `${meta.color}06` }}>
-                            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", lineHeight: "1.6", marginBottom: "10px" }}>{p.desc}</p>
-                            <div style={{ background: `${riskColor}10`, border: `1px solid ${riskColor}30`, borderRadius: "8px", padding: "8px 12px", marginBottom: "10px" }}>
-                              <p style={{ fontSize: "9px", color: riskColor, fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "3px" }}>Risk profile</p>
-                              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{p.riskDetail}</p>
+                        {isSelected && (
+                          <div style={{ borderTop:`1px solid ${meta.color}22`, padding:"14px", background:`${meta.color}06` }}>
+                            <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.6)", lineHeight:"1.6", marginBottom:"10px" }}>{p.desc}</p>
+                            <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", marginBottom:"10px", padding:"8px 12px", background:`${riskColor}10`, borderRadius:"8px", border:`1px solid ${riskColor}30` }}><span style={{ color:riskColor, fontWeight:"700" }}>Risk: </span>{p.riskDetail}</div>
+                            <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", marginBottom:"12px" }}>
+                              {p.chips.map(c=><span key={c} style={{ fontSize:"10px", padding:"3px 9px", borderRadius:"999px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.5)" }}>{c}</span>)}
                             </div>
-                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
-                              {p.chips.map(c => <span key={c} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>{c}</span>)}
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); setAddForm(f => ({ ...f, name: p.name + " — Deal", project_type: p.name, tier: p.tier })); setShowAddAnalysis(true); setSubTab("analysis"); }} style={{ width: "100%", padding: "9px", background: meta.color, color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer" }}>+ Add to Under Analysis →</button>
+                            <button onClick={e=>{e.stopPropagation();setAddForm(f=>({...f,name:p.name+" — Deal",project_type:p.name,tier:p.tier}));setShowAddAnalysis(true);}} style={{ width:"100%", padding:"9px", background:meta.color, color:"#000", borderRadius:"8px", fontWeight:"900", fontSize:"12px", border:"none", cursor:"pointer" }}>+ Add to Pipeline →</button>
                           </div>
                         )}
                       </div>
@@ -3906,179 +4956,67 @@ function DealLabTab({ user }: { user: any }) {
               </div>
             );
           })}
-          {filtered.length === 0 && <div style={{ padding: "48px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: "13px" }}>No project types match your search.</div>}
         </div>
       )}
 
-      {/* ── UNDER ANALYSIS ──────────────────────────────────── */}
-      {subTab === "analysis" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-            <div>
-              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", marginBottom: "4px" }}>Deals you're evaluating — nothing gets lost</p>
-              {analyses.length === 0 && !loadingAnalyses && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>Add your first deal from the Discover tab or below.</p>}
-            </div>
-            <button onClick={() => setShowAddAnalysis(true)} style={{ padding: "10px 20px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ Add Deal</button>
-          </div>
+      {/* ── DEAL ROOM ────────────────────────────────────────── */}
+      {subTab === "room" && <DealRoomPanel/>}
 
-          {loadingAnalyses ? <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Loading...</p> : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
-              {analyses.map(a => {
-                const checklist = typeof a.checklist === "string" ? JSON.parse(a.checklist) : (a.checklist || []);
-                const doneCount = checklist.filter((c: any) => c.done).length;
-                const pct = a.completeness || Math.round((doneCount / Math.max(checklist.length, 1)) * 100);
-                const barColor = pct >= 75 ? "#34d399" : pct >= 40 ? "#f59e0b" : "rgba(255,255,255,0.3)";
-                const dotColor = pct >= 75 ? "#34d399" : pct >= 40 ? "#f59e0b" : "rgba(255,255,255,0.4)";
-                const tierMeta = TIER_META[a.tier as "p" | "a" | "b"] || TIER_META.a;
-                return (
-                  <div key={a.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${dotColor}22`, borderRadius: "16px", overflow: "hidden" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", flexWrap: "wrap", gap: "10px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: dotColor, boxShadow: `0 0 6px ${dotColor}`, flexShrink: 0 }} />
-                        <div>
-                          <p style={{ fontSize: "14px", fontWeight: "800" }}>{a.name}</p>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "10px", fontWeight: "700", padding: "1px 7px", borderRadius: "20px", background: tierMeta.bg, color: tierMeta.color, border: `1px solid ${tierMeta.border}` }}>{tierMeta.label}</span>
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{a.project_type}</span>
-                            {a.capital && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>· {a.capital}</span>}
-                            {a.geography && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>· {a.geography}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        {a.deadline && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>Decide by {a.deadline}</span>}
-                        <span style={{ fontSize: "12px", fontWeight: "800", padding: "4px 12px", borderRadius: "20px", background: pct >= 75 ? "rgba(52,211,153,0.12)" : pct >= 40 ? "rgba(245,158,11,0.1)" : "rgba(255,255,255,0.05)", color: barColor, border: `1px solid ${barColor}44` }}>{pct}% complete</span>
-                        <button onClick={() => deleteAnalysis(a.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "18px" }}>×</button>
-                      </div>
-                    </div>
-                    {/* Progress bar */}
-                    <div style={{ height: "3px", background: "rgba(255,255,255,0.05)", margin: "0 20px 14px" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "999px", transition: "width 0.5s" }} />
-                    </div>
-                    {/* Checklist */}
-                    <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: "5px" }}>
-                      {checklist.map((item: any, idx: number) => (
-                        <div key={idx} onClick={() => toggleCheckItem(a, idx)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 10px", borderRadius: "8px", background: item.done ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)"}`, cursor: "pointer" }}>
-                          <div style={{ width: "16px", height: "16px", borderRadius: "4px", border: `1.5px solid ${item.done ? "#34d399" : "rgba(255,255,255,0.2)"}`, background: item.done ? "#34d399" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "10px", color: "#000" }}>{item.done ? "✓" : ""}</div>
-                          <span style={{ fontSize: "12px", color: item.done ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)", textDecoration: item.done ? "line-through" : "none" }}>{item.label}</span>
-                        </div>
-                      ))}
-                      {pct === 100 && (
-                        <div style={{ marginTop: "10px", padding: "10px 14px", background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "12px", color: "#34d399", fontWeight: "700" }}>✓ Analysis complete — ready to launch</span>
-                          <button style={{ fontSize: "11px", padding: "5px 12px", background: "#34d399", color: "#000", borderRadius: "6px", fontWeight: "800", border: "none", cursor: "pointer" }}>Convert to Project →</button>
-                        </div>
-                      )}
-                      {a.notes && <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "8px", padding: "8px 10px", background: "rgba(255,255,255,0.02)", borderRadius: "8px", fontStyle: "italic" }}>{a.notes}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-              {analyses.length === 0 && (
-                <div onClick={() => setShowAddAnalysis(true)} style={{ border: "1px dashed rgba(96,165,250,0.25)", borderRadius: "16px", padding: "36px", textAlign: "center", cursor: "pointer", color: "rgba(96,165,250,0.5)", fontSize: "13px", fontWeight: "600" }}>
-                  + Add your first deal to analyse
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Add modal */}
-          {showAddAnalysis && (
-            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 60, padding: "80px 20px 20px" }}>
-              <div style={{ background: "#0f0f0f", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "24px", padding: "36px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-                  <h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Deal to Analysis</h2>
-                  <button onClick={() => setShowAddAnalysis(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Deal Name *</label><input type="text" placeholder="e.g. STR duplex — Austin TX" value={addForm.name} onChange={e => setAddForm(f => ({...f, name: e.target.value}))} style={IS} /></div>
-                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Project Type *</label>
-                    <select value={addForm.project_type} onChange={e => setAddForm(f => ({...f, project_type: e.target.value}))} style={IS}>
-                      <option value="">Select type...</option>
-                      {PROJECTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Tier</label>
-                    <select value={addForm.tier} onChange={e => setAddForm(f => ({...f, tier: e.target.value}))} style={IS}>
-                      <option value="p">Passive</option><option value="a">Active</option><option value="b">Business</option>
-                    </select>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Capital est.</label><input type="text" placeholder="e.g. $120k" value={addForm.capital} onChange={e => setAddForm(f => ({...f, capital: e.target.value}))} style={IS} /></div>
-                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Geography</label><input type="text" placeholder="e.g. Austin TX" value={addForm.geography} onChange={e => setAddForm(f => ({...f, geography: e.target.value}))} style={IS} /></div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Decision deadline</label><input type="date" value={addForm.deadline} onChange={e => setAddForm(f => ({...f, deadline: e.target.value}))} style={IS} /></div>
-                    <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Risk tolerance</label>
-                      <select value={addForm.risk} onChange={e => setAddForm(f => ({...f, risk: e.target.value}))} style={IS}>
-                        {["Low","Med","Med-High","High","Very High"].map(r => <option key={r}>{r}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div><label style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Notes</label><textarea placeholder="What you know so far, questions to answer..." value={addForm.notes} onChange={e => setAddForm(f => ({...f, notes: e.target.value}))} style={{ ...IS, height: "70px", resize: "vertical" }} /></div>
-                </div>
-                <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
-                  <button onClick={() => setShowAddAnalysis(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer" }}>Cancel</button>
-                  <button onClick={addAnalysis} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Save Deal →</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── PROFESSIONALS ───────────────────────────────────── */}
+      {/* ── PROFESSIONALS ────────────────────────────────────── */}
       {subTab === "pros" && (
         <div>
-          <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "12px 18px", marginBottom: "20px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
-            <span style={{ fontSize: "18px", flexShrink: 0 }}>🛡</span>
+          <div style={{ background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:"12px", padding:"12px 18px", marginBottom:"20px", display:"flex", gap:"12px", alignItems:"flex-start" }}>
+            <span style={{ fontSize:"18px", flexShrink:0 }}>🛡</span>
             <div>
-              <p style={{ fontSize: "12px", fontWeight: "700", color: "#f59e0b", marginBottom: "3px" }}>Zero-tolerance fraud policy</p>
-              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", lineHeight: "1.6" }}>Every professional listed here has been manually verified. Propvest never allows unvetted third parties to offer services. Only accredited, licensed professionals with verifiable credentials appear in this directory.</p>
+              <p style={{ fontSize:"12px", fontWeight:"700", color:"#f59e0b", marginBottom:"3px" }}>Zero-tolerance fraud policy</p>
+              <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", lineHeight:"1.6" }}>Every professional listed here has been manually verified. Only accredited, licensed professionals with verifiable credentials appear in this directory. No unvetted third parties, ever.</p>
             </div>
           </div>
 
-          {/* Category sections */}
           {[
-            { label: "Legal & Compliance", color: "#a78bfa", pros: [
-              { name: "Real Estate Attorney", role: "Contract review, zoning, title", badge: "Bar certified", note: "Essential before any acquisition. Review every contract.", geo: "US · Nationwide", verified: true },
-              { name: "Tax Advisor (RE)", role: "Depreciation, 1031 exchange, cost seg", badge: "CPA licensed", note: "Saves more than they cost on your first deal.", geo: "US · Nationwide", verified: true },
+            {label:"Legal & Compliance", color:"#a78bfa", pros:[
+              {name:"Real Estate Attorney", role:"Contract review, zoning, title", badge:"Bar certified", note:"Essential before any acquisition. Review every contract.", geo:"US · Nationwide"},
+              {name:"Tax Advisor (RE)", role:"Depreciation, 1031 exchange, cost seg", badge:"CPA licensed", note:"Saves more than they cost on your first deal.", geo:"US · Nationwide"},
+              {name:"Corporate Structuring", role:"LLC, holding companies, asset protection", badge:"Attorney + CPA", note:"Structure before you buy, not after. Retroactive restructuring costs more.", geo:"US · Nationwide"},
             ]},
-            { label: "Financing", color: "#60a5fa", pros: [
-              { name: "DSCR Mortgage Broker", role: "Investment loans, no income verification", badge: "NMLS licensed", note: "Qualification based on rental income, not your salary.", geo: "US · Nationwide", verified: true },
-              { name: "Hard Money Lender", role: "Fast short-term financing for flips", badge: "State licensed", note: "Close in 7–14 days. Critical for competitive markets.", geo: "US · Multi-state", verified: true },
+            {label:"Financing & Capital", color:"#60a5fa", pros:[
+              {name:"DSCR Mortgage Broker", role:"Investment loans, no income verification", badge:"NMLS licensed", note:"Qualification based on rental income, not your salary.", geo:"US · Nationwide"},
+              {name:"Hard Money Lender", role:"Fast short-term financing for flips", badge:"State licensed", note:"Close in 7–14 days. Critical for competitive markets.", geo:"US · Multi-state"},
+              {name:"Private Equity Intro", role:"JV partnerships, syndication capital", badge:"SEC accredited", note:"Access deals above your budget via strategic partnerships.", geo:"US · Nationwide"},
             ]},
-            { label: "Construction & Renovation", color: "#f59e0b", pros: [
-              { name: "General Contractor", role: "Full renovation management", badge: "Licensed & insured", note: "Ask for 3 references on projects matching your scope.", geo: "Local market", verified: true },
-              { name: "Property Inspector", role: "Pre-purchase & pre-listing inspections", badge: "InterNACHI certified", note: "Never skip this. Uncovers hidden costs before you buy.", geo: "Local market", verified: true },
+            {label:"Construction & Renovation", color:"#f59e0b", pros:[
+              {name:"General Contractor", role:"Full renovation management", badge:"Licensed & insured", note:"Ask for 3 references on projects matching your scope.", geo:"Local market"},
+              {name:"Property Inspector", role:"Pre-purchase & pre-listing inspections", badge:"InterNACHI certified", note:"Never skip this. Uncovers hidden costs before you buy.", geo:"Local market"},
+              {name:"Cost Segregation Specialist", role:"Tax depreciation optimization", badge:"CPA certified", note:"Typically generates $50K+ in first-year deductions on a $500K property.", geo:"US · Nationwide"},
             ]},
-            { label: "Property Management", color: "#34d399", pros: [
-              { name: "STR Concierge Manager", role: "Airbnb co-hosting, guest management", badge: "Platform certified", note: "Takes 15–25% but enables truly passive STR income.", geo: "Local market", verified: true },
-              { name: "Long-Term PM Company", role: "Leasing, rent collection, maintenance", badge: "NARPM member", note: "8–10% of rent. Evaluate by vacancy rate and response time.", geo: "Local market", verified: true },
+            {label:"Property Management", color:"#34d399", pros:[
+              {name:"STR Concierge Manager", role:"Airbnb co-hosting, guest management", badge:"Platform certified", note:"Takes 15–25% but enables truly passive STR income.", geo:"Local market"},
+              {name:"Long-Term PM Company", role:"Leasing, rent collection, maintenance", badge:"NARPM member", note:"8–10% of rent. Evaluate by vacancy rate and response time.", geo:"Local market"},
+              {name:"Virtual PM Service", role:"Remote portfolio management", badge:"Tech-enabled", note:"Ideal for out-of-state investors. Full dashboard access.", geo:"US · Nationwide"},
             ]},
           ].map(section => (
-            <div key={section.label} style={{ marginBottom: "24px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: section.color }} />
-                <span style={{ fontSize: "12px", fontWeight: "700", color: section.color, letterSpacing: "0.5px" }}>{section.label}</span>
+            <div key={section.label} style={{ marginBottom:"24px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px" }}>
+                <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:section.color }}/>
+                <span style={{ fontSize:"12px", fontWeight:"700", color:section.color }}>{section.label}</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px" }}>
-                {section.pros.map(pro => (
-                  <div key={pro.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${section.color}22`, borderRadius: "14px", padding: "16px 18px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"10px" }}>
+                {section.pros.map(pro=>(
+                  <div key={pro.name} style={{ background:"rgba(255,255,255,0.02)", border:`1px solid ${section.color}22`, borderRadius:"14px", padding:"16px 18px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
                       <div>
-                        <p style={{ fontSize: "13px", fontWeight: "800" }}>{pro.name}</p>
-                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{pro.role}</p>
+                        <p style={{ fontSize:"13px", fontWeight:"800" }}>{pro.name}</p>
+                        <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", marginTop:"2px" }}>{pro.role}</p>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                        {pro.verified && <span style={{ fontSize: "9px", fontWeight: "800", color: "#34d399", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)", borderRadius: "20px", padding: "2px 8px" }}>✓ Verified</span>}
-                        <span style={{ fontSize: "9px", color: section.color, background: `${section.color}12`, border: `1px solid ${section.color}30`, borderRadius: "20px", padding: "2px 8px", fontWeight: "700" }}>{pro.badge}</span>
+                      <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:"4px" }}>
+                        <span style={{ fontSize:"9px", fontWeight:"800", color:"#34d399", background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.25)", borderRadius:"20px", padding:"2px 8px" }}>✓ Verified</span>
+                        <span style={{ fontSize:"9px", color:section.color, background:`${section.color}12`, border:`1px solid ${section.color}30`, borderRadius:"20px", padding:"2px 8px", fontWeight:"700" }}>{pro.badge}</span>
                       </div>
                     </div>
-                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", lineHeight: "1.5", marginBottom: "10px", fontStyle: "italic" }}>{pro.note}</p>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", fontWeight: "600" }}>{pro.geo}</span>
-                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.04)", padding: "3px 10px", borderRadius: "6px" }}>Coming soon</span>
+                    <p style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", lineHeight:"1.5", marginBottom:"10px", fontStyle:"italic" }}>{pro.note}</p>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.2)", fontWeight:"600" }}>{pro.geo}</span>
+                      <span style={{ fontSize:"10px", color:"rgba(255,255,255,0.25)", background:"rgba(255,255,255,0.04)", padding:"3px 10px", borderRadius:"6px" }}>Coming soon</span>
                     </div>
                   </div>
                 ))}
@@ -4086,13 +5024,78 @@ function DealLabTab({ user }: { user: any }) {
             </div>
           ))}
 
-          <div style={{ textAlign: "center", padding: "24px", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "14px" }}>
-            <p style={{ fontSize: "14px", fontWeight: "700", color: "rgba(255,255,255,0.4)", marginBottom: "6px" }}>Are you a professional?</p>
-            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)", marginBottom: "12px" }}>We manually review every application. Accredited professionals only.</p>
-            <button style={{ fontSize: "12px", padding: "9px 20px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }}>Apply to be listed →</button>
+          <div style={{ textAlign:"center", padding:"24px", border:"1px dashed rgba(255,255,255,0.08)", borderRadius:"14px" }}>
+            <p style={{ fontSize:"14px", fontWeight:"700", color:"rgba(255,255,255,0.4)", marginBottom:"6px" }}>Are you a verified professional?</p>
+            <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.2)", marginBottom:"12px" }}>Manual review only. Accredited, licensed professionals exclusively.</p>
+            <button style={{ fontSize:"12px", padding:"9px 20px", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"8px", color:"rgba(255,255,255,0.5)", cursor:"pointer", fontWeight:"600" }}>Apply to be listed →</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Deal Modal */}
+      {showAddAnalysis && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", backdropFilter:"blur(10px)", display:"flex", alignItems:"flex-start", justifyContent:"center", zIndex:60, padding:"80px 20px 20px" }}>
+          <div style={{ background:"#0f0f0f", border:"1px solid rgba(96,165,250,0.25)", borderRadius:"24px", padding:"36px", width:"100%", maxWidth:"500px", maxHeight:"90vh", overflowY:"auto" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px" }}>
+              <h2 style={{ fontSize:"17px", fontWeight:"900", color:"#60a5fa" }}>Add Deal to Pipeline</h2>
+              <button onClick={()=>setShowAddAnalysis(false)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.4)", cursor:"pointer", fontSize:"22px" }}>×</button>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+              <div>
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Deal Name *</label>
+                <input type="text" placeholder="e.g. STR duplex — Austin TX" value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))} style={IS}/>
+              </div>
+              <div>
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Project Type *</label>
+                <select value={addForm.project_type} onChange={e=>setAddForm(f=>({...f,project_type:e.target.value}))} style={IS}>
+                  <option value="">Select type...</option>
+                  {PROJECTS.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Tier</label>
+                <div style={{ display:"flex", gap:"6px" }}>
+                  {(["p","a","b"] as const).map(t=>(
+                    <button key={t} onClick={()=>setAddForm(f=>({...f,tier:t}))} style={{ flex:1, padding:"9px", borderRadius:"9px", fontSize:"11px", fontWeight:"800", border:`1px solid ${addForm.tier===t?TIER_META[t].color+"55":"rgba(255,255,255,0.08)"}`, background:addForm.tier===t?TIER_META[t].bg:"rgba(255,255,255,0.03)", color:addForm.tier===t?TIER_META[t].color:"rgba(255,255,255,0.4)", cursor:"pointer" }}>{TIER_META[t].label}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                <div>
+                  <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Capital est.</label>
+                  <input type="text" placeholder="e.g. $120k" value={addForm.capital} onChange={e=>setAddForm(f=>({...f,capital:e.target.value}))} style={IS}/>
+                </div>
+                <div>
+                  <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Geography</label>
+                  <input type="text" placeholder="e.g. Austin TX" value={addForm.geography} onChange={e=>setAddForm(f=>({...f,geography:e.target.value}))} style={IS}/>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                <div>
+                  <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Decision Deadline</label>
+                  <input type="date" value={addForm.deadline} onChange={e=>setAddForm(f=>({...f,deadline:e.target.value}))} style={IS}/>
+                </div>
+                <div>
+                  <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Risk Tolerance</label>
+                  <select value={addForm.risk} onChange={e=>setAddForm(f=>({...f,risk:e.target.value}))} style={IS}>
+                    {["Low","Med","Med-High","High","Very High"].map(r=><option key={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", letterSpacing:"1px", textTransform:"uppercase", display:"block", marginBottom:"6px", fontWeight:"700" }}>Notes</label>
+                <textarea placeholder="What you know so far, questions to answer..." value={addForm.notes} onChange={e=>setAddForm(f=>({...f,notes:e.target.value}))} style={{ ...IS, height:"70px", resize:"vertical" as const }}/>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:"10px", marginTop:"24px" }}>
+              <button onClick={()=>setShowAddAnalysis(false)} style={{ flex:1, padding:"12px", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"10px", fontSize:"13px", color:"rgba(255,255,255,0.4)", background:"none", cursor:"pointer" }}>Cancel</button>
+              <button onClick={()=>addAnalysis()} disabled={!addForm.name||!addForm.project_type} style={{ flex:1, padding:"12px", background:(!addForm.name||!addForm.project_type)?"rgba(96,165,250,0.3)":"#60a5fa", color:(!addForm.name||!addForm.project_type)?"rgba(255,255,255,0.3)":"#000", borderRadius:"10px", fontSize:"13px", fontWeight:"900", border:"none", cursor:(!addForm.name||!addForm.project_type)?"not-allowed":"pointer" }}>Add to Pipeline →</button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+export default Dashboard;
