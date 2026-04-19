@@ -164,10 +164,27 @@ function FlagPill({ address }: { address: string }) {
 function TacticalMap({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void; }) {
   const mapRef = useRef<HTMLDivElement>(null); const leafletRef = useRef<any>(null); const markersRef = useRef<any[]>([]); const initDone = useRef(false);
   if (typeof window !== "undefined" && !initDone.current) { initDone.current = true; setTimeout(() => { if (!document.getElementById("leaflet-css")) { const link = document.createElement("link"); link.id = "leaflet-css"; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link); } if (!(window as any).L) { const script = document.createElement("script"); script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = () => setupMap(); document.head.appendChild(script); } else setupMap(); }, 100); }
-  function setupMap() { const L = (window as any).L; if (!mapRef.current || leafletRef.current) return; const center: [number, number] = [20, 10]; const zoom = properties.length > 0 ? 4 : 2; const map = L.map(mapRef.current, { center, zoom, zoomControl: false, attributionControl: false }); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map); const s = document.createElement("style"); s.textContent = `.leaflet-layer{filter:invert(1) hue-rotate(195deg) brightness(0.82) contrast(1.1) saturate(0.45)}.leaflet-container{background:#050a0f!important}.leaflet-control-zoom{display:none}.leaflet-popup-content-wrapper{background:rgba(5,10,15,0.96)!important;border:1px solid rgba(245,158,11,0.4)!important;border-radius:12px!important;color:#fff!important;font-family:'DM Sans',sans-serif!important}.leaflet-popup-tip{background:rgba(5,10,15,0.96)!important}.leaflet-popup-close-button{color:rgba(255,255,255,0.4)!important}`; document.head.appendChild(s); leafletRef.current = { map, L }; renderMarkers(map, L, properties, selected, onSelect); }
+  function setupMap() { const L = (window as any).L; if (!mapRef.current || leafletRef.current) return; const center: [number, number] = [20, 10]; const zoom = properties.length > 0 ? 4 : 2; const map = L.map(mapRef.current, { center, zoom, zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
+
+mapRef.current.addEventListener("click", () => {
+  map.dragging.enable();
+  map.scrollWheelZoom.enable();
+  map.doubleClickZoom.enable();
+  const indicator = document.getElementById("gs-map-unlock");
+  if (indicator) indicator.style.opacity = "1";
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    map.dragging.disable();
+    map.scrollWheelZoom.disable();
+    const indicator = document.getElementById("gs-map-unlock");
+    if (indicator) indicator.style.opacity = "0";
+  }
+}); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map); const s = document.createElement("style"); s.textContent = `.leaflet-layer{filter:invert(1) hue-rotate(195deg) brightness(0.82) contrast(1.1) saturate(0.45)}.leaflet-container{background:#050a0f!important}.leaflet-control-zoom{display:none}.leaflet-popup-content-wrapper{background:rgba(5,10,15,0.96)!important;border:1px solid rgba(245,158,11,0.4)!important;border-radius:12px!important;color:#fff!important;font-family:'DM Sans',sans-serif!important}.leaflet-popup-tip{background:rgba(5,10,15,0.96)!important}.leaflet-popup-close-button{color:rgba(255,255,255,0.4)!important}`; document.head.appendChild(s); leafletRef.current = { map, L }; renderMarkers(map, L, properties, selected, onSelect); }
   const prevPropsRef = useRef<string>(""); const cur = JSON.stringify({ properties, selected }); if (cur !== prevPropsRef.current && leafletRef.current) { prevPropsRef.current = cur; const { map, L } = leafletRef.current; renderMarkers(map, L, properties, selected, onSelect); }
   function renderMarkers(map: any, L: any, props: Property[], sel: number | null, onSel: (id: number) => void) { markersRef.current.forEach((m) => m.remove()); markersRef.current = []; props.forEach((p) => { const isSelected = sel === p.id; const cf = propCashFlow(p); const oc = occupancyColor(p); const borderColor = isSelected ? "#f59e0b" : oc.color; const bgColor = isSelected ? "rgba(245,158,11,0.92)" : "rgba(5,10,15,0.92)"; const valueColor = isSelected ? "#000" : "#f59e0b"; const cfColor = isSelected ? "#000" : (cf >= 0 ? "#34d399" : "#f87171"); const iconHtml = `<div style="position:relative;text-align:center;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:1px solid ${borderColor};border-radius:50%;opacity:0.35;animation:tPulse 2s ease-out infinite;"></div><div style="background:${bgColor};border:2px solid ${borderColor};border-radius:10px;padding:7px 12px;min-width:110px;box-shadow:0 0 14px ${borderColor}44;position:relative;"><div style="font-size:9px;color:${isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)'};letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:2px;">${p.name.length > 14 ? p.name.slice(0, 13) + "…" : p.name}</div><div style="font-size:12px;font-weight:800;color:${valueColor};">${fmt(p.value)}</div><div style="font-size:10px;font-weight:700;color:${cfColor};margin-top:2px;">${cf >= 0 ? "+" : ""}${fmtFull(cf)}/mo</div><div style="font-size:9px;color:${isSelected ? 'rgba(0,0,0,0.4)' : oc.color};margin-top:2px;font-weight:600;">${occupancyLabel(p).toUpperCase()}</div></div><div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid ${borderColor};margin:0 auto;"></div></div>`; const icon = L.divIcon({ html: iconHtml, className: "", iconSize: [130, 72], iconAnchor: [65, 79], popupAnchor: [0, -82] }); const equity = p.value - p.mortgage; const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) : "—"; const popup = `<div style="padding:6px 8px;min-width:190px;"><div style="font-size:13px;font-weight:800;margin-bottom:10px;">${p.name}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Value</div><div style="font-size:13px;font-weight:700;color:#f59e0b;">${fmtFull(p.value)}</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Equity</div><div style="font-size:13px;font-weight:700;">${fmtFull(equity)}</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Cash Flow</div><div style="font-size:13px;font-weight:700;color:${cf >= 0 ? '#34d399' : '#f87171'};">${cf >= 0 ? "+" : ""}${fmtFull(cf)}/mo</div></div><div><div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;">ROI</div><div style="font-size:13px;font-weight:700;">${roi}%</div></div></div>${p.address ? `<div style="margin-top:8px;font-size:10px;color:rgba(255,255,255,0.2);">${p.address}</div>` : ""}</div>`; const marker = L.marker([p.lat, p.lng], { icon }); marker.bindPopup(popup); marker.on("click", () => onSel(p.id)); marker.addTo(map); markersRef.current.push(marker); }); if (props.length > 1) { try { map.fitBounds(L.latLngBounds(props.map((p) => [p.lat, p.lng])), { padding: [60, 60] }); } catch {} } }
-  return (<div style={{ position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid rgba(245,158,11,0.15)" }}><div style={{ position: "absolute", inset: 0, zIndex: 400, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(245,158,11,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} /><div style={{ position: "absolute", top: "14px", left: "18px", zIndex: 402, pointerEvents: "none", display: "flex", alignItems: "center", gap: "8px" }}><div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s ease-in-out infinite" }} /><span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>GOLDSTREAM · TACTICAL VIEW</span></div><div style={{ position: "absolute", top: "14px", right: "18px", zIndex: 402, pointerEvents: "none", fontSize: "10px", color: "rgba(245,158,11,0.5)", letterSpacing: "1px", fontWeight: "600" }}>{String(Math.max(0, properties.length)).padStart(2, "0")} ASSETS TRACKED</div><div ref={mapRef} className="gs-map" style={{ height: "380px", width: "100%" }} /></div>);
+  return (<div style={{ position: "relative", borderRadius: "20px", overflow: "hidden", border: "1px solid rgba(245,158,11,0.15)" }}><div id="gs-map-unlock" style={{ position:"absolute", top:"14px", left:"50%", transform:"translateX(-50%)", zIndex:402, background:"rgba(52,211,153,0.15)", border:"1px solid rgba(52,211,153,0.4)", borderRadius:"999px", padding:"4px 14px", fontSize:"10px", fontWeight:"700", color:"#34d399", opacity:0, transition:"opacity 0.3s", pointerEvents:"none" }}>🔓 Exploring · Esc to lock</div><div style={{ position: "absolute", inset: 0, zIndex: 400, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(245,158,11,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} /><div style={{ position: "absolute", top: "14px", left: "18px", zIndex: 402, pointerEvents: "none", display: "flex", alignItems: "center", gap: "8px" }}><div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s ease-in-out infinite" }} /><span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" }}>GOLDSTREAM · TACTICAL VIEW</span></div><div style={{ position: "absolute", top: "14px", right: "18px", zIndex: 402, pointerEvents: "none", fontSize: "10px", color: "rgba(245,158,11,0.5)", letterSpacing: "1px", fontWeight: "600" }}>{String(Math.max(0, properties.length)).padStart(2, "0")} ASSETS TRACKED</div><div ref={mapRef} className="gs-map" style={{ height: "380px", width: "100%" }} /></div>);
 }
 
 function MilestoneToast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -810,6 +827,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
   const [filterGroup, setFilterGroup] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showArchive, setShowArchive] = useState(false);
+  const [viewMode, setViewMode] = useState<"table"|"cards">("table");
 
   const activeProps = properties.filter((p: Property) => p.occupancyStatus !== "sold");
   const soldProps = properties.filter((p: Property) => p.occupancyStatus === "sold");
@@ -891,7 +909,16 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
       {/* Header + controls */}
       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "20px 20px 0 0", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-          <h2 style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Properties</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+  <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+    <h2 style={{ fontSize: "10px", fontWeight: "800", color: "rgba(245,158,11,0.6)", letterSpacing: "3px", textTransform: "uppercase" }}>Portfolio</h2>
+    <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", lineHeight: 1 }}>Assets</p>
+  </div>
+  <div style={{ display: "flex", gap: "3px", background: "rgba(255,255,255,0.05)", borderRadius: "10px", padding: "3px", border: "1px solid rgba(255,255,255,0.07)" }}>
+    <button onClick={() => setViewMode("table")} title="Table view" style={{ padding: "7px 14px", borderRadius: "7px", border: "none", cursor: "pointer", background: viewMode === "table" ? "rgba(245,158,11,0.18)" : "transparent", color: viewMode === "table" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontSize: "15px", fontWeight: "700", transition: "all 0.15s", boxShadow: viewMode === "table" ? "0 0 12px rgba(245,158,11,0.15)" : "none" }}>☰</button>
+    <button onClick={() => setViewMode("cards")} title="Card view" style={{ padding: "7px 14px", borderRadius: "7px", border: "none", cursor: "pointer", background: viewMode === "cards" ? "rgba(245,158,11,0.18)" : "transparent", color: viewMode === "cards" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontSize: "15px", fontWeight: "700", transition: "all 0.15s", boxShadow: viewMode === "cards" ? "0 0 12px rgba(245,158,11,0.15)" : "none" }}>⊞</button>
+  </div>
+</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button onClick={() => onCompare()} style={{ fontSize: "12px", padding: "8px 16px", background: "transparent", color: "#f59e0b", borderRadius: "8px", fontWeight: "700", border: "1px solid rgba(245,158,11,0.4)", cursor: "pointer" }}>⚖ Compare</button>
             <button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button>
@@ -914,8 +941,104 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
         </div>
       </div>
 
-      {/* Table */}
-      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: displayProps.length === 0 ? "0 0 20px 20px" : "0", overflow: "hidden" }}>
+      {/* Card Grid View */}
+      {viewMode === "cards" && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 20px 20px", padding: "24px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: "20px" }}>
+          {displayProps.length === 0 ? (
+            <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "13px", textAlign: "center", padding: "48px", gridColumn: "1/-1" }}>No properties match your filters.</p>
+          ) : displayProps.map((p: Property) => {
+            const equity = p.value - p.mortgage;
+            const cf = propCashFlow(p);
+            const roi = equity > 0 ? ((cf * 12 / equity) * 100).toFixed(1) : "—";
+            const ltv = p.value > 0 ? ((p.mortgage / p.value) * 100).toFixed(0) : "—";
+            const oc = occupancyColor(p);
+            const score = propertyHealthScore(p);
+            const scoreColor = score >= 70 ? "#34d399" : score >= 45 ? "#f59e0b" : "#f87171";
+            const isSelected = selected === p.id;
+            const grossYield = p.value > 0 ? ((p.rent * 12 / p.value) * 100).toFixed(1) : "—";
+            return (
+              <div key={p.id} onClick={() => onSelect(isSelected ? null : p.id)}
+                style={{ background: isSelected ? "rgba(245,158,11,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${isSelected ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: "20px", overflow: "hidden", cursor: "pointer", transition: "all 0.25s", boxShadow: isSelected ? "0 0 0 1px rgba(245,158,11,0.2), 0 20px 40px rgba(0,0,0,0.4)" : "0 4px 20px rgba(0,0,0,0.2)", position: "relative" }}>
+                {/* Satellite image — tall */}
+                <div style={{ height: "200px", position: "relative", overflow: "hidden" }}>
+                  <SatelliteThumb lat={p.lat} lng={p.lng} address={p.address} />
+                  {/* Top gradient overlay */}
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, transparent 40%, rgba(0,0,0,0.7) 100%)" }} />
+                  {/* Score ring top-right */}
+                  <div style={{ position: "absolute", top: "12px", right: "12px", width: "44px", height: "44px", borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: `2px solid ${scoreColor}`, backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "900", color: scoreColor, lineHeight: 1 }}>{score}</span>
+                    <span style={{ fontSize: "6px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "0.3px" }}>SCORE</span>
+                  </div>
+                  {/* Flag top-left */}
+                  <div style={{ position: "absolute", top: "12px", left: "12px" }}><FlagPill address={p.address} /></div>
+                  {/* Status pill bottom-left */}
+                  <div style={{ position: "absolute", bottom: "12px", left: "12px", fontSize: "10px", padding: "4px 10px", borderRadius: "999px", background: oc.bg, color: oc.color, border: `1px solid ${oc.border}`, fontWeight: "800", backdropFilter: "blur(8px)" }}>{occupancyLabel(p)}</div>
+                  {/* Value bottom-right */}
+                  <div style={{ position: "absolute", bottom: "12px", right: "12px", textAlign: "right" }}>
+                    <p style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", lineHeight: 1, textShadow: "0 2px 8px rgba(0,0,0,0.8)" }}>{fmt(p.value)}</p>
+                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.5)", fontWeight: "600" }}>MARKET VALUE</p>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: "18px 20px" }}>
+                  {/* Name + type */}
+                  <div style={{ marginBottom: "14px" }}>
+                    <p style={{ fontSize: "17px", fontWeight: "900", letterSpacing: "-0.3px", marginBottom: "3px" }}>{p.name}</p>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: "500" }}>{p.type}{p.groupTag ? <span style={{ marginLeft: "8px", fontSize: "9px", padding: "1px 7px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa", fontWeight: "700" }}>{p.groupTag}</span> : null}</p>
+                    {p.address ? <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "3px" }}>📍 {p.address}</p> : null}
+                  </div>
+
+                  {/* Primary metrics — 2 big */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                    <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "12px", padding: "12px 14px" }}>
+                      <p style={{ fontSize: "9px", color: "rgba(245,158,11,0.6)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "800", marginBottom: "5px" }}>Equity</p>
+                      <p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-0.5px" }}>{fmt(equity)}</p>
+                    </div>
+                    <div style={{ background: cf >= 0 ? "rgba(52,211,153,0.07)" : "rgba(248,113,113,0.07)", border: `1px solid ${cf >= 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)"}`, borderRadius: "12px", padding: "12px 14px" }}>
+                      <p style={{ fontSize: "9px", color: cf >= 0 ? "rgba(52,211,153,0.6)" : "rgba(248,113,113,0.6)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "800", marginBottom: "5px" }}>Cash Flow</p>
+                      <p style={{ fontSize: "20px", fontWeight: "900", color: cf >= 0 ? "#34d399" : "#f87171", letterSpacing: "-0.5px" }}>{cf >= 0 ? "+" : ""}{fmtFull(cf)}<span style={{ fontSize: "11px", fontWeight: "600" }}>/mo</span></p>
+                    </div>
+                  </div>
+
+                  {/* Secondary metrics — 4 small */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "6px", marginBottom: "14px" }}>
+                    {[
+                      { label: "ROI", value: roi !== "—" ? roi + "%" : "—", color: "rgba(255,255,255,0.7)" },
+                      { label: "Yield", value: grossYield !== "—" ? grossYield + "%" : "—", color: "rgba(255,255,255,0.7)" },
+                      { label: "LTV", value: ltv !== "—" ? ltv + "%" : "—", color: "rgba(255,255,255,0.7)" },
+                      { label: "Appr.", value: p.appreciation + "%", color: "rgba(255,255,255,0.7)" },
+                    ].map(m => (
+                      <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: "8px", padding: "8px 6px", textAlign: "center" }}>
+                        <p style={{ fontSize: "8px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px", fontWeight: "700" }}>{m.label}</p>
+                        <p style={{ fontSize: "12px", fontWeight: "800", color: m.color }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Rent + Expenses row */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: "10px", marginBottom: "14px" }}>
+                    <div style={{ display: "flex", gap: "16px" }}>
+                      <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>RENT</p><p style={{ fontSize: "13px", fontWeight: "700", color: "#34d399" }}>{isEffectivelyOccupied(p) ? fmtFull(p.rent) : "—"}/mo</p></div>
+                      <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>EXPENSES</p><p style={{ fontSize: "13px", fontWeight: "700", color: "#f87171" }}>{fmtFull(p.expenses)}/mo</p></div>
+                      <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>MORTGAGE</p><p style={{ fontSize: "13px", fontWeight: "700", color: "rgba(255,255,255,0.5)" }}>{fmt(p.mortgage)}</p></div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: "8px" }} onClick={e => e.stopPropagation()}>
+                    <button onClick={e => onEdit(p, e)} style={{ flex: 1, padding: "10px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "10px", color: "#f59e0b", cursor: "pointer", fontWeight: "800", fontSize: "12px", letterSpacing: "0.3px" }}>✎ Edit</button>
+                    <button onClick={() => onSelect(p.id)} style={{ flex: 1, padding: "10px", background: isSelected ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${isSelected ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.08)"}`, borderRadius: "10px", color: isSelected ? "#f59e0b" : "rgba(255,255,255,0.4)", cursor: "pointer", fontWeight: "800", fontSize: "12px" }}>{isSelected ? "▲ Close" : "▼ Details"}</button>
+                    <button onClick={() => onDelete(p.id)} style={{ padding: "10px 14px", background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "10px", color: "#f87171", cursor: "pointer", fontSize: "16px", fontWeight: "700" }}>×</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {/* Table View */}
+      {viewMode === "table" && <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: displayProps.length === 0 ? "0 0 20px 20px" : "0", overflow: "hidden" }}>
         <div className="gs-table-wrap">
           <table className="gs-table" style={{ width: "100%", fontSize: "13px", borderCollapse: "collapse" }}>
             <thead>
@@ -940,6 +1063,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
         </div>
       </div>
 
+      }
       {/* Sold Archive */}
       {soldProps.length > 0 && (
         <div style={{ background: "rgba(255,215,0,0.02)", border: "1px solid rgba(255,215,0,0.15)", borderTop: "none", borderRadius: "0 0 20px 20px", overflow: "hidden" }}>
@@ -994,10 +1118,72 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
   );
 }
 
+function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+  const [coords, setCoords] = useState<{lat: number; lng: number} | null>(
+    lat && lng && Math.abs(lat) > 0.01 ? { lat, lng } : null
+  );
+
+  useEffect(() => {
+    if (!coords && address) {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } })
+        .then(r => r.json())
+        .then(d => { if (d?.[0]) setCoords({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }); });
+    }
+  }, [address]);
+
+  if (!coords) {
+    return (
+      <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#0a0f14,#111a24)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", fontWeight: "600" }}>📍 No location</span>
+      </div>
+    );
+  }
+
+  const z = 19;
+  const tileSize = 256;
+  const scale = Math.pow(2, z);
+  const worldX = (coords.lng + 180) / 360 * scale;
+  const worldY = (1 - Math.log(Math.tan(coords.lat * Math.PI / 180) + 1 / Math.cos(coords.lat * Math.PI / 180)) / Math.PI) / 2 * scale;
+  const tileX = Math.floor(worldX);
+  const tileY = Math.floor(worldY);
+  const fracX = worldX - tileX;
+  const fracY = worldY - tileY;
+
+  const tiles = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tx = tileX + dx;
+      const ty = tileY + dy;
+      const offsetX = (dx - fracX) * tileSize;
+      const offsetY = (dy - fracY) * tileSize;
+      tiles.push({ tx, ty, offsetX, offsetY });
+    }
+  }
+
+  return (
+    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}>
+      {tiles.map(({ tx, ty, offsetX, offsetY }) => (
+        <img
+          key={`${tx}-${ty}`}
+          src={`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`}
+          style={{ position: "absolute", width: `${tileSize}px`, height: `${tileSize}px`, left: `calc(50% + ${offsetX}px)`, top: `calc(50% + ${offsetY}px)`, imageRendering: "crisp-edges" }}
+          alt=""
+        />
+      ))}
+    </div>
+  );
+}
+
 function SatelliteMockup({ address, hasPool, lat, lng }: { address: string; hasPool?: boolean; lat?: number; lng?: number }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const initDone = useRef(false);
+
+  useEffect(() => {
+    if (mapInstance.current && lat && lng) {
+      mapInstance.current.setView([lat, lng], 17);
+    }
+  }, [lat, lng]);
 
   useEffect(() => {
     if (initDone.current || !mapRef.current) return;
@@ -1015,9 +1201,18 @@ function SatelliteMockup({ address, hasPool, lat, lng }: { address: string; hasP
         const L = (window as any).L;
         if (!mapRef.current || mapInstance.current) return;
         const center: [number, number] = lat && lng ? [lat, lng] : [29.7604, -95.3698];
-        const map = L.map(mapRef.current, { center, zoom: 17, zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
+const needsGeocode = (!lat || !lng) && address;
+        const map = L.map(mapRef.current, { center, zoom: 19, zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false });
         L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 }).addTo(map);
+const satStyle = document.createElement("style");
+satStyle.textContent = `#gs-sat-map .leaflet-layer { filter: contrast(1.08) saturate(1.2) brightness(1.0) !important; }`;
+document.head.appendChild(satStyle);
         mapInstance.current = map;
+        if (needsGeocode) {
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } })
+    .then(r => r.json())
+    .then(d => { if (d?.[0]) { map.setView([parseFloat(d[0].lat), parseFloat(d[0].lon)], 19); } });
+}
         if (hasPool) {
           const poolIcon = L.divIcon({ html: `<div style="background:#0ea5e9;width:28px;height:18px;border-radius:4px;box-shadow:0 0 12px rgba(14,165,233,0.8);border:2px solid #fff;"></div>`, className: "", iconSize: [28, 18], iconAnchor: [14, 9] });
           L.marker(center, { icon: poolIcon }).addTo(map);
@@ -1035,7 +1230,7 @@ function SatelliteMockup({ address, hasPool, lat, lng }: { address: string; hasP
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", background: "#0a0a0a" }}>
-      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+      <div ref={mapRef} id="gs-sat-map" style={{ width: "100%", height: "100%" }} />
       {!hasPool && <div style={{ position: "absolute", top: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "rgba(255,255,255,0.8)", background: "rgba(10,12,16,0.8)", padding: "2px 7px", borderRadius: "4px", zIndex: 1000 }}>Live Satellite</div>}
       {hasPool && <div style={{ position: "absolute", top: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "#a78bfa", background: "rgba(124,58,237,0.25)", border: "1px solid #4c1d95", padding: "2px 7px", borderRadius: "4px", zIndex: 1000 }}>AI Mockup ✦</div>}
     </div>
@@ -5099,3 +5294,4 @@ function DealLabTab({ user }: { user: any }) {
 }
 
 export default Dashboard;
+
