@@ -1558,7 +1558,172 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     </div>
   );
 }
+function DecisionEngine({ property: p }: { property: Property }) {
+  const [active, setActive] = useState<"hold"|"brrrr"|"sell"|"str">("hold");
+  const equity = p.value - p.mortgage;
+  const cf = propCashFlow(p);
+  const appRate = (p.appreciation || 3.5) / 100;
 
+  // HOLD & RENT
+  const holdApp5 = p.value * (Math.pow(1 + appRate, 5) - 1);
+  const holdCF5 = cf * 12 * 5;
+  const holdNetWorth5 = equity + holdApp5 + holdCF5;
+
+  // BRRRR — refinance at 75% LTV, pull cash, redeploy
+  const refiLoan = p.value * 0.75;
+  const capitalPulled = Math.max(0, refiLoan - p.mortgage);
+  const newMortPayment = refiLoan > 0 ? refiLoan * (0.07/12) * Math.pow(1+0.07/12,360) / (Math.pow(1+0.07/12,360)-1) : 0;
+  const brrrrMonthlyCF = p.rent - p.expenses - newMortPayment;
+  const brrrrCF5 = brrrrMonthlyCF * 12 * 5;
+  const brrrrNewEquity = capitalPulled * 0.25;
+  const brrrrNetWorth5 = equity + holdApp5 + brrrrCF5 + brrrrNewEquity;
+
+  // SELL NOW
+  const salePrice = p.value * Math.pow(1 + appRate, 0.5);
+  const sellingCosts = salePrice * 0.06;
+  const capitalGains = Math.max(0, (salePrice - p.value) * 0.20);
+  const sellNet = salePrice - p.mortgage - sellingCosts - capitalGains;
+
+  // STR CONVERSION
+  const strRent = p.rent * 2.2;
+  const strExp = p.expenses * 1.4;
+  const strCF = strRent - strExp;
+  const strCF5 = strCF * 12 * 5;
+  const strNetWorth5 = equity + holdApp5 + strCF5;
+
+  const strategies = [
+    {
+      key: "hold" as const,
+      icon: "🏠", label: "Hold & Rent", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",
+      headline: fmt(holdNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Stable wealth builder",
+      metrics: [
+        { label: "Monthly CF", value: (cf>=0?"+":"")+fmtFull(cf)+"/mo", good: cf>=0 },
+        { label: "5Y Appreciation", value: "+"+fmt(holdApp5), good: true },
+        { label: "5Y Cash Flow", value: (holdCF5>=0?"+":"")+fmt(holdCF5), good: holdCF5>=0 },
+        { label: "Capital Freed", value: "$0", good: false },
+      ],
+      pros: ["Passive income", "Builds equity", "Tax deductions"],
+      cons: ["Capital locked", "Tenant risk"],
+    },
+    {
+      key: "brrrr" as const,
+      icon: "🔄", label: "BRRRR", color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.2)",
+      headline: fmt(brrrrNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Fastest portfolio scale",
+      metrics: [
+        { label: "Capital Recycled", value: fmt(capitalPulled), good: capitalPulled>0 },
+        { label: "New Monthly CF", value: (brrrrMonthlyCF>=0?"+":"")+fmtFull(brrrrMonthlyCF)+"/mo", good: brrrrMonthlyCF>=0 },
+        { label: "New Deal Equity", value: "+"+fmt(brrrrNewEquity), good: true },
+        { label: "5Y Net Worth", value: fmt(brrrrNetWorth5), good: true },
+      ],
+      pros: ["Recycle capital", "Scale faster", "Keep the asset"],
+      cons: ["Higher mortgage", "Execution risk"],
+    },
+    {
+      key: "sell" as const,
+      icon: "💰", label: "Sell Now", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)",
+      headline: fmt(sellNet), headlineSub: "net proceeds",
+      verdict: "Immediate liquidity",
+      metrics: [
+        { label: "Est. Sale Price", value: fmt(salePrice), good: true },
+        { label: "Selling Costs", value: "-"+fmt(sellingCosts), good: false },
+        { label: "Capital Gains Tax", value: "-"+fmt(capitalGains), good: false },
+        { label: "Net in Hand", value: fmt(sellNet), good: true },
+      ],
+      pros: ["Immediate cash", "Zero landlord risk", "Redeploy freely"],
+      cons: ["Lose appreciation", "Tax event", "Transaction costs"],
+    },
+    {
+      key: "str" as const,
+      icon: "🏖", label: "Convert to STR", color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.2)",
+      headline: fmt(strNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Maximum cash flow",
+      metrics: [
+        { label: "Est. STR Rent", value: fmt(strRent)+"/mo", good: true },
+        { label: "STR Expenses", value: "-"+fmt(strExp)+"/mo", good: false },
+        { label: "Monthly CF", value: (strCF>=0?"+":"")+fmtFull(strCF)+"/mo", good: strCF>=0 },
+        { label: "5Y Cash Flow", value: "+"+fmt(strCF5), good: true },
+      ],
+      pros: ["2x+ rental income", "Flexibility", "Market rate nightly"],
+      cons: ["Active management", "Regulation risk", "Seasonality"],
+    },
+  ];
+
+  const best = strategies.reduce((a,b) => {
+    const aVal = a.key==="sell"?sellNet:a.key==="hold"?holdNetWorth5:a.key==="brrrr"?brrrrNetWorth5:strNetWorth5;
+    const bVal = b.key==="sell"?sellNet:b.key==="hold"?holdNetWorth5:b.key==="brrrr"?brrrrNetWorth5:strNetWorth5;
+    return aVal > bVal ? a : b;
+  }).key;
+
+  const activeS = strategies.find(s => s.key === active)!;
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "20px", marginTop: "16px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 6px #f59e0b" }} />
+        <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.8)", letterSpacing: "2px", fontWeight: "800", textTransform: "uppercase" }}>Decision Engine · What Should You Do?</span>
+      </div>
+
+      {/* Strategy tabs */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+        {strategies.map(s => {
+          const isActive = active === s.key;
+          const isBest = best === s.key;
+          return (
+            <div key={s.key} onClick={() => setActive(s.key)}
+              style={{ background: isActive ? s.bg : "rgba(255,255,255,0.02)", border: `1px solid ${isActive ? s.border : "rgba(255,255,255,0.06)"}`, borderRadius: "14px", padding: "14px 12px", cursor: "pointer", transition: "all 0.2s", position: "relative", textAlign: "center" }}>
+              {isBest && <div style={{ position: "absolute", top: "-8px", left: "50%", transform: "translateX(-50%)", fontSize: "8px", fontWeight: "900", color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: "999px", padding: "2px 8px", whiteSpace: "nowrap" }}>★ BEST</div>}
+              <div style={{ fontSize: "20px", marginBottom: "6px" }}>{s.icon}</div>
+              <p style={{ fontSize: "10px", fontWeight: "800", color: isActive ? s.color : "rgba(255,255,255,0.5)", marginBottom: "6px" }}>{s.label}</p>
+              <p style={{ fontSize: "16px", fontWeight: "900", color: isActive ? s.color : "rgba(255,255,255,0.7)", letterSpacing: "-0.5px" }}>{s.headline}</p>
+              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{s.headlineSub}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Active strategy detail */}
+      <div style={{ background: activeS.bg, border: `1px solid ${activeS.border}`, borderRadius: "14px", padding: "18px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: activeS.color }}>{activeS.icon} {activeS.label}</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{activeS.verdict}</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontSize: "28px", fontWeight: "900", color: activeS.color, letterSpacing: "-1px" }}>{activeS.headline}</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{activeS.headlineSub}</p>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "14px" }}>
+          {activeS.metrics.map(m => (
+            <div key={m.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: "10px", padding: "10px 12px" }}>
+              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "4px" }}>{m.label}</p>
+              <p style={{ fontSize: "15px", fontWeight: "800", color: m.good ? "#34d399" : "#f87171" }}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Pros & Cons */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div>
+            <p style={{ fontSize: "9px", color: "#34d399", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>✓ Pros</p>
+            {activeS.pros.map(pro => <p key={pro} style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", marginBottom: "3px" }}>· {pro}</p>)}
+          </div>
+          <div>
+            <p style={{ fontSize: "9px", color: "#f87171", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>✗ Cons</p>
+            {activeS.cons.map(con => <p key={con} style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", marginBottom: "3px" }}>· {con}</p>)}
+          </div>
+        </div>
+      </div>
+
+      <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", textAlign: "center", marginTop: "10px" }}>Projections based on current market value, appreciation rate & rental income. Not financial advice.</p>
+    </div>
+  );
+}
 function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; address: string }) {
   const [coords, setCoords] = useState<{lat: number; lng: number} | null>(
     lat && lng && Math.abs(lat) > 0.01 ? { lat, lng } : null
@@ -1887,6 +2052,9 @@ function PropertyDetail({ property: p, onEdit, onClose }: any) {
         <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: "600" }}>🔥 Improvement opportunity detected</span>
         <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", fontWeight: "900", color: "#22c55e" }}>+{fmtFull(improvementVal)} potential</span>
       </div>
+
+      {/* Decision Engine */}
+      <DecisionEngine property={p} />
 
       {/* LTV Gauge + 5yr Projection + Paydown */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
