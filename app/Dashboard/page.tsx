@@ -1068,13 +1068,13 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     const GOLD: [number,number,number] = [201, 168, 76]; const WHITE: [number,number,number] = [255,255,255]; const DARK: [number,number,number] = [20,20,20];
     const MED: [number,number,number] = [30,30,30]; const GREY: [number,number,number] = [107,107,107]; const GREEN: [number,number,number] = [46,204,113]; const RED: [number,number,number] = [231,76,60]; const BLUE: [number,number,number] = [74,144,217];
     const now = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
-    const totalValue = properties.reduce((s,p)=>s+p.value,0);
-    const totalMortgage = properties.reduce((s,p)=>s+p.mortgage,0);
+    const totalValue = properties.reduce((s:number,p:Property)=>s+p.value,0);
+    const totalMortgage = properties.reduce((s:number,p:Property)=>s+p.mortgage,0);
     const totalEquity = totalValue - totalMortgage;
-    const totalRent = properties.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s,p)=>s+p.rent,0);
-    const totalExp = properties.reduce((s,p)=>s+p.expenses,0);
+    const totalRent = properties.filter((p:Property)=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s:number,p:Property)=>s+p.rent,0);
+    const totalExp = properties.reduce((s:number,p:Property)=>s+p.expenses,0);
     const monthlyCF = totalRent - totalExp;
-    const avgApp = properties.length > 0 ? properties.reduce((s,p)=>s+p.appreciation,0)/properties.length : 0;
+    const avgApp = properties.length > 0 ? properties.reduce((s:number,p:Property)=>s+p.appreciation,0)/properties.length : 0;
     const fmtM = (n: number) => n>=1e6?"$"+(n/1e6).toFixed(2)+"M":n>=1000?"$"+Math.round(n).toLocaleString("en-US"):"$"+n.toFixed(0);
     const fmtP = (n: number) => n.toFixed(1)+"%";
     const cfStr = (n: number) => (n>=0?"+$":"-$")+Math.abs(Math.round(n)).toLocaleString("en-US");
@@ -1151,7 +1151,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     thdrs.forEach((h,i)=>{ doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(5.5); doc.text(h,txs[i]+1.5,116); });
 
     let rowY = 118;
-    properties.forEach((p,i) => {
+    properties.forEach((p:Property,i:number) => {
       if(rowY > 260) return;
       const eq = p.value - p.mortgage;
       const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str" ? p.rent-p.expenses : -p.expenses;
@@ -1213,7 +1213,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     ahdrs.forEach((h,i)=>{ doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(5.5); doc.text(h,axs[i]+1.5,37); });
 
     let aRowY = 39;
-    properties.forEach((p,i)=>{
+    properties.forEach((p:Property,i:number)=>{
       const eq = p.value-p.mortgage;
       const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
       const gross = p.value>0?(p.rent*12/p.value*100):0;
@@ -1246,7 +1246,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     // Allocation bars
     doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("PORTFOLIO ALLOCATION BY VALUE",10,aRowY+10);
     const barColors2 = [GOLD,BLUE,GREEN,[232,121,249],[249,115,22]] as number[][];
-    properties.forEach((p,i)=>{
+    properties.forEach((p:Property,i:number)=>{
       const by = aRowY+16+i*8;
       const pct2 = totalValue>0?p.value/totalValue:0;
       const bw2 = 100;
@@ -1283,11 +1283,11 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
 <button onClick={() => {
   const _props = properties;
   const now = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
-  const totalValue = _props.reduce((s,p)=>s+p.value,0);
-  const totalMortgage = _props.reduce((s,p)=>s+p.mortgage,0);
+  const totalValue = _props.reduce((s:number,p:Property)=>s+p.value,0);
+  const totalMortgage = _props.reduce((s:number,p:Property)=>s+p.mortgage,0);
   const totalEquity = totalValue - totalMortgage;
-  const totalExp = _props.reduce((s,p)=>s+p.expenses,0);
-  const totalRent = _props.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s,p)=>s+p.rent,0);
+  const totalExp = _props.reduce((s:number,p:Property)=>s+p.expenses,0);
+  const totalRent = _props.filter((p:Property)=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s:number,p:Property)=>s+p.rent,0);
   const monthlyCF = totalRent - totalExp;
   const loadXL = (src: string) => new Promise<void>(res => {
     if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
@@ -1305,7 +1305,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
       ["Active Properties", _props.length],[],
       ["ASSET HOLDINGS"],
       ["Name","Type","Address","Value ($)","Mortgage ($)","Equity ($)","Rent/mo ($)","Expenses/mo ($)","Cash Flow/mo ($)","Gross Yield %","LTV %","Cash Yield %","Appreciation %","Status","Group"],
-      ..._props.map(p => {
+      ..._props.map((p:Property) => {
         const eq = p.value-p.mortgage;
         const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
         const grossY = p.value>0?(p.rent*12/p.value*100):0;
@@ -1321,7 +1321,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     const analyticsRows = [
       ["GOLDSTREAM — ASSET ANALYTICS & RISK MATRIX"],[`Generated: ${now}`],[],
       ["Asset","Gross Yield %","LTV %","Cash Yield %","Appreciation %/yr","5Y Projected Value ($)","DSCR","Health Score","Monthly NOI ($)","Break-Even Occ %"],
-      ..._props.map(p => {
+      ..._props.map((p:Property) => {
         const eq = p.value-p.mortgage;
         const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
         const gross = p.value>0?(p.rent*12/p.value*100):0;
