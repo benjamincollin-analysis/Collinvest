@@ -1565,7 +1565,7 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
   );
   const [zoom, setZoom] = useState(19);
   const [tilesLoaded, setTilesLoaded] = useState(0);
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const totalTiles = 9;
 
   useEffect(() => {
@@ -1608,13 +1608,29 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
     }
   }
 
-  const zoomLevels = [{ label: "Street", z: 19 }, { label: "Block", z: 16 }, { label: "Hood", z: 14 }];
+  const zoomLevels = [{ label: "Satellite", z: 19 }, { label: "Block", z: 16 }, { label: "Map View", z: 0 }];
+
+ if (zoom === 0 && coords) {
+    return (
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}>
+        <iframe
+          src={`https://www.google.com/maps?q=${coords.lat},${coords.lng}&layer=c&cbll=${coords.lat},${coords.lng}&output=svembed`}
+          style={{ width: "100%", height: "100%", border: "none" }}
+        />
+        <div style={{ position: "absolute", top: "8px", right: "8px", fontSize: "9px", fontWeight: "700", color: "#fff", background: "rgba(66,133,244,0.85)", padding: "2px 8px", borderRadius: "4px", zIndex: 10, pointerEvents: "none" }}>🗺 Map View</div>
+        <div style={{ position: "absolute", bottom: "8px", left: "50%", transform: "translateX(-50%)", zIndex: 40, display: "flex", gap: "4px" }}>
+          {zoomLevels.map(({ label, z }) => (
+            <button key={z} onClick={(e) => { e.stopPropagation(); setZoom(z); }}
+              style={{ padding: "2px 7px", fontSize: "9px", fontWeight: "700", borderRadius: "4px", border: "none", cursor: "pointer", background: zoom === z ? "#4285F4" : "rgba(0,0,0,0.65)", color: "#fff", transition: "all 0.15s" }}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
-    >
+    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}>
       <style>{`@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }`}</style>
       {tilesLoaded < totalTiles && (
         <div style={{ position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none", background: "linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
@@ -1634,15 +1650,13 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
       <div style={{ position: "absolute", top: "50%", left: "50%", zIndex: 30, pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
         <div style={{ width: "12px", height: "12px", borderRadius: "50% 50% 50% 0", background: "#f59e0b", border: "2px solid #fff", transform: "rotate(-45deg)", boxShadow: "0 0 6px rgba(245,158,11,0.8)" }} />
       </div>
-      {showControls && (
-        <div style={{ position: "absolute", bottom: "8px", left: "50%", transform: "translateX(-50%)", zIndex: 40, display: "flex", gap: "4px" }}>
+<div style={{ position: "absolute", bottom: "8px", left: "50%", transform: "translateX(-50%)", zIndex: 40, display: "flex", gap: "4px" }}>
           {zoomLevels.map(({ label, z }) => (
             <button key={z} onClick={(e) => { e.stopPropagation(); setZoom(z); }}
               style={{ padding: "2px 7px", fontSize: "9px", fontWeight: "700", borderRadius: "4px", border: "none", cursor: "pointer", background: zoom === z ? "#f59e0b" : "rgba(0,0,0,0.65)", color: zoom === z ? "#000" : "rgba(255,255,255,0.7)", transition: "all 0.15s" }}
             >{label}</button>
           ))}
         </div>
-      )}
     </div>
   );
 }
