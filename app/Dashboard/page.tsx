@@ -1720,6 +1720,70 @@ function DecisionEngine({ property: p }: { property: Property }) {
         </div>
       </div>
 
+      {/* Education Panel */}
+      <div style={{ marginTop: "16px", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "24px" }}>
+        {active === "hold" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#34d399", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is Hold & Rent?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>You keep the property and rent it to long-term tenants (6–12 month leases). You collect monthly rent, pay your mortgage and expenses, and keep the difference as cash flow. Over time the property appreciates and your mortgage balance decreases — building wealth automatically.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🛠 Best tools to find tenants:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Zillow Rental Manager","Apartments.com","Facebook Marketplace","Craigslist","Kijiji (Canada)","SeLoger (France)","Leboncoin (France)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)", color: "#34d399", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "brrrr" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#a78bfa", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is BRRRR?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>BRRRR stands for <strong style={{color:"#fff"}}>Buy, Rehab, Rent, Refinance, Repeat</strong>. You refinance your existing property at 75% of its current value — pulling out the difference as cash. That cash funds your next deal without selling. Example: property worth $400K, mortgage $200K → refinance at $300K → pocket $100K to buy another property while keeping this one rented.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🏦 BRRRR-friendly lenders:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Visio Lending","Lima One Capital","Kiavi (US)","RCN Capital","National Bank (Canada)","Crédit Foncier (France)","Hypotheekshop (EU)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "sell" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#f59e0b", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What does Sell Now mean?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>You list the property on the market, pay your agent (typically 3–6% commission), close within 30–90 days, and receive the net proceeds after paying off the mortgage and costs. Capital gains tax applies on profit (20% long-term in the US). The cash is then free to be redeployed into a better deal, a 1031 exchange, or another asset class.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🏡 Best platforms to sell:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Zillow (US)","Realtor.com (US)","MLS via agent (US)","Centris (Canada)","SeLoger (France)","Rightmove (UK)","Idealista (Spain)","Bayut (UAE)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "str" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#60a5fa", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is STR (Short-Term Rental)?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>STR means renting your property nightly or weekly instead of long-term. Think Airbnb or VRBO. A property that earns $2,000/mo long-term can earn $3,500–$5,000/mo as an STR in a good market. The tradeoff: higher income but more active management (guest check-ins, cleaning, dynamic pricing). Some cities restrict or ban STRs — always check local regulations first.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>📱 Best STR platforms by region:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+              {["Airbnb (Global)","VRBO (US/Canada)","Booking.com (Europe)","Gîtes de France (France)","Plum Guide (UK/EU)","Houfy (US)","Vacasa (US)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+            <div style={{ padding: "10px 12px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "8px" }}>
+              <p style={{ fontSize: "10px", fontWeight: "800", color: "#f87171", marginBottom: "3px" }}>⚠ Check regulations first</p>
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", lineHeight: "1.5" }}>Cities like Paris, Barcelona, NYC, and Vancouver have strict STR limits. Always verify your municipality's rules before converting.</p>
+            </div>
+          </div>
+        )}
+        {/* Universal advice */}
+        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <p style={{ fontSize: "13px", fontWeight: "900", color: "#f59e0b", marginBottom: "10px" }}>💡 Goldstream Recommendation</p>
+          {active === "hold" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if your cash flow is positive and you have no immediate capital needs. Let appreciation and mortgage paydown work for you. Review annually.</p>}
+          {active === "brrrr" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if you want to scale your portfolio without selling. Requires good credit and a lender comfortable with investment properties. Confirm the new monthly payment still generates positive cash flow before proceeding.</p>}
+          {active === "sell" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if the market is at peak, your cash flow is negative, or you have a better deal ready to deploy capital into. Consider a 1031 exchange in the US to defer capital gains tax.</p>}
+          {active === "str" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if your property is in a tourist area, city center, or near a university. Run AirDNA or Mashvisor analysis first to verify STR demand in your specific market before investing in furnishings.</p>}
+        </div>
+      </div>
+
       <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", textAlign: "center", marginTop: "10px" }}>Projections based on current market value, appreciation rate & rental income. Not financial advice.</p>
     </div>
   );
