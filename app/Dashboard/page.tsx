@@ -266,8 +266,75 @@ const [showCompare, setShowCompare] = useState(false);
 
   function openAdd() { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }
   function openEdit(p: Property, e: React.MouseEvent) { e.stopPropagation(); setEditingId(p.id); setForm({ name: p.name, type: p.type, value: String(p.value), mortgage: String(p.mortgage), rent: String(p.rent), expenses: String(p.expenses), occupancyStatus: p.occupancyStatus, plannedDate: p.plannedDate, appreciation: String(p.appreciation), address: p.address, lat: String(p.lat), lng: String(p.lng), occupancyPct: String(p.occupancyPct ?? 100), soldPrice: String(p.soldPrice ?? ""), soldDate: p.soldDate ?? "", parentId: p.parentId ? String(p.parentId) : "", groupTag: p.groupTag ?? "" }); setShowForm(true); }
-  async function geocodeAddress(address: string) { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } }); const data = await res.json(); if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }; } catch {} return null; }
-  async function handleGeocodeClick() { if (!form.address) return; setGeocoding(true); const coords = await geocodeAddress(form.address); if (coords) setForm({ ...form, lat: String(coords.lat), lng: String(coords.lng) }); setGeocoding(false); }
+  const [addressSuggestions, setAddressSuggestions] = useState<{label:string;lat:number;lng:number;confidence:string}[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const geocodeDebounce = useRef<any>(null);
+
+  async function geocodeAddress(address: string): Promise<{lat:number;lng:number;confidence:string}|null> {
+    // Tier 1: Photon — street-level precision, free, no key
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(address)}&limit=5`, { headers: { "Accept-Language": "en" } });
+      const data = await res.json();
+      const features = data?.features;
+      if (features?.length > 0) {
+        const best = features[0];
+        const [lng, lat] = best.geometry.coordinates;
+        const type = best.properties?.type;
+        if (type === "house" || type === "street") {
+          return { lat, lng, confidence: "high" };
+        }
+        // Return top result anyway if decent
+        if (lat && lng) return { lat, lng, confidence: "medium" };
+      }
+    } catch {}
+    // Tier 2: Nominatim fallback
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } });
+      const data = await res.json();
+      if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), confidence: "medium" };
+    } catch {}
+    return null;
+  }
+
+  async function fetchAddressSuggestions(address: string) {
+    if (address.length < 4) { setAddressSuggestions([]); setShowSuggestions(false); return; }
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(address)}&limit=5`, { headers: { "Accept-Language": "en" } });
+      const data = await res.json();
+      const features = data?.features || [];
+      const suggestions = features.map((f: any) => {
+        const p = f.properties;
+        const label = [p.name, p.street, p.housenumber, p.city, p.state, p.country].filter(Boolean).join(", ");
+        const [lng, lat] = f.geometry.coordinates;
+        const confidence = (p.type === "house" || p.type === "street") ? "high" : "medium";
+        return { label, lat, lng, confidence };
+      }).filter((s: any) => s.label && s.lat);
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } catch {
+      setAddressSuggestions([]); setShowSuggestions(false);
+    }
+  }
+
+  function handleAddressChange(value: string) {
+    setForm({ ...form, address: value, lat: "", lng: "" });
+    clearTimeout(geocodeDebounce.current);
+    geocodeDebounce.current = setTimeout(() => fetchAddressSuggestions(value), 350);
+  }
+
+  function selectSuggestion(s: {label:string;lat:number;lng:number;confidence:string}) {
+    setForm({ ...form, address: s.label, lat: String(s.lat), lng: String(s.lng) });
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+  }
+
+  async function handleGeocodeClick() {
+    if (!form.address) return;
+    setGeocoding(true);
+    const coords = await geocodeAddress(form.address);
+    if (coords) setForm({ ...form, lat: String(coords.lat), lng: String(coords.lng) });
+    setGeocoding(false);
+  }
   async function handleSave() { const errors: Record<string, boolean> = {}; if (!form.name) errors.name = true; if (!form.value) errors.value = true; if (Object.keys(errors).length > 0) { setFormErrors(errors); return; } setFormErrors({}); setSaving(true); let lat = parseFloat(form.lat) || 29.7604; let lng = parseFloat(form.lng) || -95.3698; if (form.address && (!form.lat || !form.lng)) { const coords = await geocodeAddress(form.address); if (coords) { lat = coords.lat; lng = coords.lng; } } const data: Omit<Property, "id"> = { name: form.name, type: form.type, value: parseFloat(form.value) || 0, mortgage: parseFloat(form.mortgage) || 0, rent: parseFloat(form.rent) || 0, expenses: parseFloat(form.expenses) || 0, occupancyStatus: form.occupancyStatus, plannedDate: form.plannedDate, appreciation: parseFloat(form.appreciation) || 0, address: form.address, lat, lng, occupancyPct: parseFloat(form.occupancyPct) || 100, soldPrice: parseFloat(form.soldPrice) || 0, soldDate: form.soldDate || "", parentId: form.parentId ? parseInt(form.parentId) : null, groupTag: form.groupTag || "" }; if (editingId !== null) { const { error } = await supabase.from("properties").update(toDb(data)).eq("id", editingId); if (!error) setProperties(properties.map((p) => p.id === editingId ? { ...p, ...data } : p)); } else { const newId = Date.now(); const { error } = await supabase.from("properties").insert({ id: newId, ...toDb(data), user_id: user?.id }); if (!error) setProperties([...properties, { id: newId, ...data }]); } setSaving(false); setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }
   function handleDelete(id: number) { setConfirmDelete(id); }
   async function confirmDeleteNow() { if (confirmDelete === null) return; const { error } = await supabase.from("properties").delete().eq("id", confirmDelete); if (!error) { setProperties(properties.filter((p) => p.id !== confirmDelete)); if (selected === confirmDelete) setSelected(null); } setConfirmDelete(null); }
@@ -469,7 +536,50 @@ const [showCompare, setShowCompare] = useState(false);
 )}
 {confirmDelete !== null && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div style={{ background: "#0f0f0f", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "20px", padding: "36px", width: "100%", maxWidth: "380px", textAlign: "center" }}><div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "22px" }}>⚠</div><h3 style={{ fontSize: "17px", fontWeight: "800", marginBottom: "8px" }}>Delete Property?</h3><p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginBottom: "28px", lineHeight: "1.5" }}>Permanently remove <span style={{ color: "#fff", fontWeight: "600" }}>{properties.find(p => p.id === confirmDelete)?.name}</span> from your portfolio.</p><div style={{ display: "flex", gap: "10px" }}><button onClick={() => setConfirmDelete(null)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={confirmDeleteNow} style={{ flex: 1, padding: "12px", background: "#ef4444", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Yes, Delete</button></div></div></div>)}
       {showAddScenarioProp && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "20px" }}><div className="gs-modal" style={{ border: "1px solid rgba(96,165,250,0.25)" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "17px", fontWeight: "800", color: "#60a5fa" }}>Add Hypothetical Property</h2><button onClick={() => setShowAddScenarioProp(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Name"><input type="text" value={scenPropForm.name} onChange={e => setScenPropForm(f => ({ ...f, name: e.target.value }))} style={IS} /></Field><div className="gs-modal-grid"><Field label="Market Value ($)"><NumberInput value={String(scenPropForm.value || "")} onChange={v => setScenPropForm(f => ({ ...f, value: parseFloat(v) || 0 }))} placeholder="300,000" style={IS} /></Field><Field label="Mortgage ($)"><NumberInput value={String(scenPropForm.mortgage || "")} onChange={v => setScenPropForm(f => ({ ...f, mortgage: parseFloat(v) || 0 }))} placeholder="240,000" style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><NumberInput value={String(scenPropForm.rent || "")} onChange={v => setScenPropForm(f => ({ ...f, rent: parseFloat(v) || 0 }))} placeholder="2,000" style={IS} /></Field><Field label="Monthly Expenses ($)"><NumberInput value={String(scenPropForm.expenses || "")} onChange={v => setScenPropForm(f => ({ ...f, expenses: parseFloat(v) || 0 }))} placeholder="400" style={IS} /></Field></div><Field label="Appreciation %/yr"><input type="number" placeholder="3.5" value={scenPropForm.appreciation} onChange={e => setScenPropForm(f => ({ ...f, appreciation: parseFloat(e.target.value) || 3.5 }))} style={IS} /></Field></div><div style={{ display: "flex", gap: "10px", marginTop: "24px" }}><button onClick={() => setShowAddScenarioProp(false)} style={{ flex: 1, padding: "12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.4)", background: "none", cursor: "pointer", fontWeight: "600" }}>Cancel</button><button onClick={addScenarioProp} style={{ flex: 1, padding: "12px", background: "#60a5fa", color: "#000", borderRadius: "10px", fontSize: "13px", fontWeight: "800", border: "none", cursor: "pointer" }}>Add to Scenario</button></div></div></div>)}
-      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)"><div style={{ display: "flex", gap: "8px" }}><input type="text" placeholder="e.g. 1234 Main St, Houston TX" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={{ ...IS, flex: 1 }} /><button onClick={handleGeocodeClick} disabled={geocoding} style={{ padding: "10px 12px", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", color: "#f59e0b", fontSize: "11px", fontWeight: "700", cursor: "pointer", whiteSpace: "nowrap" }}>{geocoding ? "..." : "Locate"}</button></div>{form.lat && form.lng && <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px" }}>✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</p>}</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><NumberInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="200,000" style={IS} /></Field><Field label="Mortgage Balance ($)"><NumberInput value={form.mortgage} onChange={v => setForm({ ...form, mortgage: v })} placeholder="160,000" style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><NumberInput value={form.rent} onChange={v => setForm({ ...form, rent: v })} placeholder="1,200" style={IS} /></Field><Field label="Monthly Expenses ($)"><NumberInput value={form.expenses} onChange={v => setForm({ ...form, expenses: v })} placeholder="300" style={IS} /></Field></div><div className="gs-modal-grid">
+      {showForm && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}><div className="gs-modal"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}><h2 style={{ fontSize: "18px", fontWeight: "800" }}>{editingId !== null ? "Edit Property" : "Add Property"}</h2><button onClick={() => { setShowForm(false); setEditingId(null); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: "22px" }}>×</button></div><div style={{ display: "flex", flexDirection: "column", gap: "14px" }}><Field label="Property Name"><input type="text" placeholder="e.g. 14 Maple Street" value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); setFormErrors(f => ({ ...f, name: false })); }} style={{ ...IS, border: formErrors.name ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.12)", boxShadow: formErrors.name ? "0 0 0 2px rgba(248,113,113,0.2)" : "none" }} /></Field><Field label="Property Type"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={IS}>{["Single Family", "Duplex", "Triplex", "Condo", "Multi-Family", "Commercial"].map(t => <option key={t}>{t}</option>)}</select></Field><Field label="Address (for map)">
+  <div style={{ position: "relative" }}>
+    <div style={{ display: "flex", gap: "8px" }}>
+      <input
+        type="text"
+        placeholder="e.g. 1234 Main St, Houston TX"
+        value={form.address}
+        onChange={e => handleAddressChange(e.target.value)}
+        onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+        style={{ ...IS, flex: 1 }}
+        autoComplete="off"
+      />
+      {geocoding && <div style={{ padding: "10px 12px", color: "rgba(245,158,11,0.5)", fontSize: "11px", fontWeight: "700", alignSelf: "center" }}>...</div>}
+    </div>
+    {showSuggestions && addressSuggestions.length > 0 && (
+      <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, background: "#0f0f0f", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", marginTop: "4px", overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+        {addressSuggestions.map((s, i) => (
+          <div
+            key={i}
+            onMouseDown={() => selectSuggestion(s)}
+            style={{ padding: "10px 14px", cursor: "pointer", borderBottom: i < addressSuggestions.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", display: "flex", alignItems: "center", gap: "10px" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(245,158,11,0.06)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          >
+            <span style={{ fontSize: "10px" }}>📍</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: "12px", color: "#fff", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</p>
+            </div>
+            <span style={{ fontSize: "9px", fontWeight: "700", padding: "1px 6px", borderRadius: "4px", background: s.confidence === "high" ? "rgba(52,211,153,0.12)" : "rgba(245,158,11,0.1)", color: s.confidence === "high" ? "#34d399" : "#f59e0b", flexShrink: 0 }}>
+              {s.confidence === "high" ? "✓ Precise" : "~ Block"}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+    {form.lat && form.lng && (
+      <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.6)", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+        ✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}
+        <span style={{ fontSize: "9px", color: "rgba(52,211,153,0.4)" }}>· coordinates locked</span>
+      </p>
+    )}
+  </div>
+</Field><div className="gs-modal-grid"><Field label="Market Value ($)"><NumberInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="200,000" style={IS} /></Field><Field label="Mortgage Balance ($)"><NumberInput value={form.mortgage} onChange={v => setForm({ ...form, mortgage: v })} placeholder="160,000" style={IS} /></Field></div><div className="gs-modal-grid"><Field label="Monthly Rent ($)"><NumberInput value={form.rent} onChange={v => setForm({ ...form, rent: v })} placeholder="1,200" style={IS} /></Field><Field label="Monthly Expenses ($)"><NumberInput value={form.expenses} onChange={v => setForm({ ...form, expenses: v })} placeholder="300" style={IS} /></Field></div><div className="gs-modal-grid">
   <Field label="Occupancy Status">
     <select value={form.occupancyStatus} onChange={e => setForm({ ...form, occupancyStatus: e.target.value as OccupancyStatus })} style={IS}>
       <option value="occupied">✓ Occupied</option>
@@ -827,7 +937,7 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
   const [filterGroup, setFilterGroup] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showArchive, setShowArchive] = useState(false);
-  const [viewMode, setViewMode] = useState<"table"|"cards">("table");
+  const [viewMode, setViewMode] = useState<"table"|"cards">("cards");
 
   const activeProps = properties.filter((p: Property) => p.occupancyStatus !== "sold");
   const soldProps = properties.filter((p: Property) => p.occupancyStatus === "sold");
@@ -869,8 +979,10 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     const cf = propCashFlow(p);
     const roi = equity > 0 ? ((cf * 12) / equity) * 100 : 0;
     const oc = occupancyColor(p);
+    const ltv = p.value > 0 ? (p.mortgage / p.value) * 100 : 0;
+    const borderColor = cf > 0 ? "#34d399" : p.occupancyStatus === "vacant" ? "#f59e0b" : "#f87171";
     return (
-      <tr onClick={() => onSelect(selected === p.id ? null : p.id)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selected === p.id ? "rgba(245,158,11,0.04)" : "transparent", transition: "background 0.15s" }}>
+      <tr onClick={() => onSelect(selected === p.id ? null : p.id)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", background: selected === p.id ? "rgba(245,158,11,0.04)" : "transparent", transition: "background 0.15s", borderLeft: `3px solid ${borderColor}` }}>
         <td style={{ padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <p style={{ fontWeight: "600" }}>{p.name}</p>
@@ -883,6 +995,14 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>
             {p.type}{p.groupTag ? <span style={{ marginLeft: "6px", fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>{p.groupTag}</span> : null}
           </p>
+          {p.mortgage > 0 && (
+            <div style={{ marginTop: "5px", width: "100%", maxWidth: "160px" }}>
+              <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.min(100, ltv)}%`, background: ltv <= 70 ? "#34d399" : ltv <= 85 ? "#f59e0b" : "#f87171", borderRadius: "999px" }} />
+              </div>
+              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>LTV {ltv.toFixed(0)}% · {fmt(p.mortgage)} owed</p>
+            </div>
+          )}
         </td>
         <td style={{ textAlign: "right", padding: "14px 16px" }}>{fmtFull(p.value)}</td>
         <td style={{ textAlign: "right", padding: "14px 16px", color: "#f59e0b", fontWeight: "600" }}>{fmtFull(equity)}</td>
@@ -915,12 +1035,314 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
     <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", lineHeight: 1 }}>Assets</p>
   </div>
   <div style={{ display: "flex", gap: "3px", background: "rgba(255,255,255,0.05)", borderRadius: "10px", padding: "3px", border: "1px solid rgba(255,255,255,0.07)" }}>
-    <button onClick={() => setViewMode("table")} title="Table view" style={{ padding: "7px 14px", borderRadius: "7px", border: "none", cursor: "pointer", background: viewMode === "table" ? "rgba(245,158,11,0.18)" : "transparent", color: viewMode === "table" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontSize: "15px", fontWeight: "700", transition: "all 0.15s", boxShadow: viewMode === "table" ? "0 0 12px rgba(245,158,11,0.15)" : "none" }}>☰</button>
     <button onClick={() => setViewMode("cards")} title="Card view" style={{ padding: "7px 14px", borderRadius: "7px", border: "none", cursor: "pointer", background: viewMode === "cards" ? "rgba(245,158,11,0.18)" : "transparent", color: viewMode === "cards" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontSize: "15px", fontWeight: "700", transition: "all 0.15s", boxShadow: viewMode === "cards" ? "0 0 12px rgba(245,158,11,0.15)" : "none" }}>⊞</button>
+    <button onClick={() => setViewMode("table")} title="Table view" style={{ padding: "7px 14px", borderRadius: "7px", border: "none", cursor: "pointer", background: viewMode === "table" ? "rgba(245,158,11,0.18)" : "transparent", color: viewMode === "table" ? "#f59e0b" : "rgba(255,255,255,0.3)", fontSize: "15px", fontWeight: "700", transition: "all 0.15s", boxShadow: viewMode === "table" ? "0 0 12px rgba(245,158,11,0.15)" : "none" }}>☰</button>
   </div>
 </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button onClick={() => onCompare()} style={{ fontSize: "12px", padding: "8px 16px", background: "transparent", color: "#f59e0b", borderRadius: "8px", fontWeight: "700", border: "1px solid rgba(245,158,11,0.4)", cursor: "pointer" }}>⚖ Compare</button>
+<button onClick={() => {
+  // Load jsPDF
+  const _firstName = "Investor";
+  const _props = properties;
+  const _goalP = 2_000_000;
+  const _goalCF = 2000;
+  const loadScript = (src: string) => new Promise<void>(res => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement("script"); s.src = src; s.onload = () => res(); document.head.appendChild(s);
+  });
+
+  const runReport = () => {
+    const { jsPDF } = (window as any).jspdf;
+    const settings = { firstName: _firstName };
+    const properties = _props;
+    const GOAL_PORTFOLIO = _goalP;
+    const GOAL_CASHFLOW = _goalCF;
+    const _settings = settings;
+    const _properties = properties;
+    const _displayName = _settings.firstName || "Investor";
+    const _GOAL_PORTFOLIO = GOAL_PORTFOLIO;
+    const _GOAL_CASHFLOW = GOAL_CASHFLOW;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W = 210; const H = 297;
+    const GOLD: [number,number,number] = [201, 168, 76]; const WHITE: [number,number,number] = [255,255,255]; const DARK: [number,number,number] = [20,20,20];
+    const MED: [number,number,number] = [30,30,30]; const GREY: [number,number,number] = [107,107,107]; const GREEN: [number,number,number] = [46,204,113]; const RED: [number,number,number] = [231,76,60]; const BLUE: [number,number,number] = [74,144,217];
+    const now = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+    const totalValue = properties.reduce((s,p)=>s+p.value,0);
+    const totalMortgage = properties.reduce((s,p)=>s+p.mortgage,0);
+    const totalEquity = totalValue - totalMortgage;
+    const totalRent = properties.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s,p)=>s+p.rent,0);
+    const totalExp = properties.reduce((s,p)=>s+p.expenses,0);
+    const monthlyCF = totalRent - totalExp;
+    const avgApp = properties.length > 0 ? properties.reduce((s,p)=>s+p.appreciation,0)/properties.length : 0;
+    const fmtM = (n: number) => n>=1e6?"$"+(n/1e6).toFixed(2)+"M":n>=1000?"$"+Math.round(n).toLocaleString("en-US"):"$"+n.toFixed(0);
+    const fmtP = (n: number) => n.toFixed(1)+"%";
+    const cfStr = (n: number) => (n>=0?"+$":"-$")+Math.abs(Math.round(n)).toLocaleString("en-US");
+
+    // ── PAGE 1 ──
+    // Background
+    doc.setFillColor(...DARK); doc.rect(0,0,W,H,"F");
+    // Grid lines
+    doc.setDrawColor(17,17,17); doc.setLineWidth(0.15);
+    for(let x=0;x<W;x+=10) doc.line(x,0,x,H);
+    for(let y=0;y<H;y+=10) doc.line(0,y,W,y);
+
+    // Header bar
+    doc.setFillColor(...MED); doc.rect(0,0,W,18,"F");
+    doc.setFillColor(...GOLD); doc.rect(10,5,8,8,"F");
+    doc.setFillColor(...DARK); doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(...DARK); doc.text("GS",11.8,10.5);
+    doc.setTextColor(...WHITE); doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.text("GOLDSTREAM",21,10);
+    doc.setTextColor(...GOLD); doc.setFontSize(6); doc.setFont("helvetica","normal"); doc.text("WEALTH INTELLIGENCE PLATFORM",21,14.5);
+    doc.setTextColor(...GREY); doc.setFontSize(6); doc.text(`CONFIDENTIAL  ·  ${now}`,W-10,9,"right");
+    doc.setTextColor(...WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.text("PORTFOLIO INTELLIGENCE REPORT",W-10,14,"right");
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.8); doc.line(0,18,W,18);
+
+    // Hero
+    doc.setFillColor(...MED); doc.rect(0,20,W,28,"F");
+    doc.setFillColor(...GOLD); doc.rect(0,20,2.5,28,"F");
+    doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(6); doc.text("PREPARED FOR",12,26);
+    doc.setTextColor(...WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.text((_displayName).toUpperCase(),12,34);
+    doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.text("PORTFOLIO INTELLIGENCE REPORT",12,40);
+    doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(6); doc.text(`${_properties.length} Active Assets  ·  ${now}  ·  CONFIDENTIAL`,12,45.5);
+
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.6); doc.line(10,50,W-10,50);
+
+    // KPI cards
+    const kpis = [
+      {label:"TOTAL AUM",val:fmtM(totalValue),sub:fmtP((totalValue/_GOAL_PORTFOLIO)*100)+" of vision",col:GOLD},
+      {label:"NET EQUITY",val:fmtM(totalEquity),sub:"Owned outright",col:WHITE},
+      {label:"MONTHLY CF",val:cfStr(monthlyCF),sub:fmtP((monthlyCF/_GOAL_CASHFLOW)*100)+" to target",col:monthlyCF>=0?GREEN:RED},
+      {label:"AVG APPRECIATION",val:fmtP(avgApp)+"/yr",sub:"Portfolio average",col:BLUE},
+    ];
+    const cardW = 44; const cardGap = 2; const cardX0 = 10; const cardY = 53;
+    kpis.forEach((k,i) => {
+      const x = cardX0 + i*(cardW+cardGap);
+      doc.setFillColor(...MED); doc.roundedRect(x,cardY,cardW,24,1.5,1.5,"F");
+      doc.setFillColor(...GOLD); doc.rect(x,cardY,cardW,0.8,"F");
+      doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(5.5); doc.text(k.label,x+3,cardY+5);
+      doc.setTextColor(...(k.col as [number,number,number])); doc.setFont("helvetica","bold"); doc.setFontSize(k.val.length>9?10:13); doc.text(k.val,x+3,cardY+14);
+      doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(5.5); doc.text(k.sub,x+3,cardY+20);
+    });
+
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.5); doc.line(10,79,W-10,79);
+
+    // Goal bars
+    doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("GOAL PROGRESS TRACKER",10,85);
+    const barW = W-30; const barY1 = 88; const barY2 = 95;
+    // Portfolio bar
+    doc.setFillColor(40,40,40); doc.rect(10,barY1,barW,3.5,"F");
+    doc.setFillColor(...GOLD); doc.rect(10,barY1,barW*Math.min(1,totalValue/_GOAL_PORTFOLIO),3.5,"F");
+    doc.setTextColor(...WHITE); doc.setFontSize(5.5); doc.setFont("helvetica","bold"); doc.text(`Portfolio: ${fmtM(totalValue)} of ${fmtM(_GOAL_PORTFOLIO)}`,10,barY1+6);
+    doc.setTextColor(...GOLD); doc.text(fmtP((totalValue/_GOAL_PORTFOLIO)*100),W-10,barY1+6,"right");
+    // CF bar
+    doc.setFillColor(40,40,40); doc.rect(10,barY2,barW,3.5,"F");
+    doc.setFillColor(...GREEN); doc.rect(10,barY2,barW*Math.min(1,Math.max(0,monthlyCF/_GOAL_CASHFLOW)),3.5,"F");
+    doc.setTextColor(...WHITE); doc.text(`Cash Flow: ${cfStr(monthlyCF)} of $${_GOAL_CASHFLOW.toLocaleString()}/mo`,10,barY2+6);
+    doc.setTextColor(...GREEN); doc.text(fmtP((monthlyCF/_GOAL_CASHFLOW)*100),W-10,barY2+6,"right");
+
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.5); doc.line(10,104,W-10,104);
+
+    // Asset table
+    doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("ASSET HOLDINGS SUMMARY",10,110);
+    const thdrs = ["ASSET NAME","TYPE","VALUE","EQUITY","CF/MO","ROI","STATUS"];
+    const txs = [10,52,78,100,122,143,160]; const tws = [42,26,22,22,21,17,30];
+    // Header row
+    doc.setFillColor(...MED); doc.rect(10,112,W-20,6,"F");
+    thdrs.forEach((h,i)=>{ doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(5.5); doc.text(h,txs[i]+1.5,116); });
+
+    let rowY = 118;
+    properties.forEach((p,i) => {
+      if(rowY > 260) return;
+      const eq = p.value - p.mortgage;
+      const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str" ? p.rent-p.expenses : -p.expenses;
+      const roi = eq>0?(cf2*12/eq*100):0;
+      const statusColors: Record<string,number[]> = {occupied:GREEN,vacant:RED,str:BLUE,planned:BLUE,sold:GOLD};
+      const sc = statusColors[p.occupancyStatus]||GREY;
+      const bg = i%2===0?[18,18,18]:[14,14,14];
+      doc.setFillColor(...(bg as [number,number,number])); doc.rect(10,rowY,W-20,7,"F");
+      doc.setFillColor(...(sc as [number,number,number])); doc.rect(10,rowY,1,7,"F");
+      const rowData = [
+        {t:p.name.slice(0,20),c:WHITE,b:true},{t:p.type.slice(0,12),c:GREY,b:false},
+        {t:fmtM(p.value),c:WHITE,b:true},{t:fmtM(eq),c:GOLD,b:true},
+        {t:cfStr(cf2),c:cf2>=0?GREEN:RED,b:true},{t:fmtP(roi),c:WHITE,b:false},
+        {t:p.occupancyStatus.toUpperCase().slice(0,8),c:sc,b:true},
+      ];
+      rowData.forEach((d,j)=>{ doc.setTextColor(...(d.c as [number,number,number])); doc.setFont("helvetica",d.b?"bold":"normal"); doc.setFontSize(6.5); doc.text(d.t,txs[j]+1.5,rowY+4.5); });
+      doc.setDrawColor(25,25,25); doc.setLineWidth(0.2); doc.line(10,rowY+7,W-10,rowY+7);
+      rowY+=7;
+    });
+    // Totals
+    doc.setFillColor(...MED); doc.rect(10,rowY,W-20,7,"F");
+    doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(6.5);
+    doc.text("TOTAL PORTFOLIO",11.5,rowY+4.5);
+    doc.text(fmtM(totalValue),txs[2]+1.5,rowY+4.5);
+    doc.text(fmtM(totalEquity),txs[3]+1.5,rowY+4.5);
+    doc.setTextColor(...(monthlyCF>=0?GREEN:RED)); doc.text(cfStr(monthlyCF),txs[4]+1.5,rowY+4.5);
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.5); doc.line(10,rowY+7,W-10,rowY+7);
+
+    // Footer
+    doc.setFillColor(...MED); doc.rect(0,H-12,W,12,"F");
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.4); doc.line(0,H-12,W,H-12);
+    doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(5.5); doc.text(`GOLDSTREAM WEALTH INTELLIGENCE  ·  CONFIDENTIAL AND PROPRIETARY`,10,H-5);
+    doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("Page 1",W-10,H-5,"right");
+
+    // ── PAGE 2 ──
+    doc.addPage();
+    doc.setFillColor(...DARK); doc.rect(0,0,W,H,"F");
+    for(let x=0;x<W;x+=10){ doc.setDrawColor(17,17,17); doc.setLineWidth(0.15); doc.line(x,0,x,H); }
+    for(let y=0;y<H;y+=10) doc.line(0,y,W,y);
+    // Header
+    doc.setFillColor(...MED); doc.rect(0,0,W,18,"F");
+    doc.setFillColor(...GOLD); doc.rect(10,5,8,8,"F");
+    doc.setFillColor(...DARK); doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(...DARK); doc.text("GS",11.8,10.5);
+    doc.setTextColor(...WHITE); doc.setFontSize(11); doc.text("GOLDSTREAM",21,10);
+    doc.setTextColor(...GOLD); doc.setFontSize(6); doc.setFont("helvetica","normal"); doc.text("WEALTH INTELLIGENCE PLATFORM",21,14.5);
+    doc.setTextColor(...GREY); doc.setFontSize(6); doc.text(`CONFIDENTIAL  ·  ${now}`,W-10,9,"right");
+    doc.setTextColor(...WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.text("ASSET ANALYTICS & RISK MATRIX",W-10,14,"right");
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.8); doc.line(0,18,W,18);
+
+    doc.setFillColor(...MED); doc.rect(0,20,W,8,"F");
+    doc.setFillColor(...GOLD); doc.rect(0,20,2.5,8,"F");
+    doc.setTextColor(...WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.text("INDIVIDUAL ASSET PERFORMANCE MATRIX",12,25.5);
+    doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(6); doc.text(`Generated: ${now}`,W-10,25.5,"right");
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.5); doc.line(10,30,W-10,30);
+
+    const ahdrs = ["ASSET","GROSS YIELD","LTV","CASH YIELD","APPR.","5Y VALUE","DSCR","HEALTH"];
+    const axs = [10,48,68,86,106,122,148,168]; 
+    doc.setFillColor(...MED); doc.rect(10,33,W-20,6,"F");
+    ahdrs.forEach((h,i)=>{ doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(5.5); doc.text(h,axs[i]+1.5,37); });
+
+    let aRowY = 39;
+    properties.forEach((p,i)=>{
+      const eq = p.value-p.mortgage;
+      const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
+      const gross = p.value>0?(p.rent*12/p.value*100):0;
+      const ltv = p.value>0?(p.mortgage/p.value*100):0;
+      const cashY = eq>0?(cf2*12/eq*100):0;
+      const proj5 = p.value*Math.pow(1+p.appreciation/100,5);
+      const loan = p.mortgage; const rm = 0.07/12; const nn = 360;
+      const mort = loan>0?loan*(rm*Math.pow(1+rm,nn))/(Math.pow(1+rm,nn)-1):0;
+      const dscr = mort>0?((p.rent-p.expenses)/mort):0;
+      const score2 = Math.min(100, 60+(cf2>0?15:0)+(ltv<=70?15:0)+(gross>=6?10:0));
+      const bg2 = i%2===0?[18,18,18]:[14,14,14];
+      doc.setFillColor(...(bg2 as [number,number,number])); doc.rect(10,aRowY,W-20,8,"F");
+      const aRow = [
+        {t:p.name.slice(0,18),c:WHITE,b:true},
+        {t:fmtP(gross),c:gross>=6?GREEN:RED,b:true},
+        {t:fmtP(ltv),c:ltv<=70?GREEN:ltv<=80?GOLD:RED,b:true},
+        {t:fmtP(cashY),c:cashY>=8?GREEN:cashY>=4?GOLD:RED,b:true},
+        {t:fmtP(p.appreciation)+"/yr",c:BLUE,b:false},
+        {t:fmtM(proj5),c:WHITE,b:true},
+        {t:dscr.toFixed(2)+"x",c:dscr>=1.25?GREEN:dscr>=1?GOLD:RED,b:true},
+        {t:score2+"/100",c:score2>=75?GREEN:score2>=55?GOLD:RED,b:true},
+      ];
+      aRow.forEach((d,j)=>{ doc.setTextColor(...(d.c as [number,number,number])); doc.setFont("helvetica",d.b?"bold":"normal"); doc.setFontSize(6.5); doc.text(d.t,axs[j]+1.5,aRowY+5); });
+      doc.setDrawColor(25,25,25); doc.setLineWidth(0.2); doc.line(10,aRowY+8,W-10,aRowY+8);
+      aRowY+=8;
+    });
+
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.5); doc.line(10,aRowY+2,W-10,aRowY+2);
+
+    // Allocation bars
+    doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("PORTFOLIO ALLOCATION BY VALUE",10,aRowY+10);
+    const barColors2 = [GOLD,BLUE,GREEN,[232,121,249],[249,115,22]] as number[][];
+    properties.forEach((p,i)=>{
+      const by = aRowY+16+i*8;
+      const pct2 = totalValue>0?p.value/totalValue:0;
+      const bw2 = 100;
+      doc.setFillColor(35,35,35); doc.rect(60,by,bw2,4,"F");
+      doc.setFillColor(...(barColors2[i%barColors2.length] as [number,number,number])); doc.rect(60,by,bw2*pct2,4,"F");
+      doc.setTextColor(...WHITE); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text(p.name.slice(0,22),58,by+3,"right");
+      doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.text(`${fmtP(pct2*100)}  ${fmtM(p.value)}`,162,by+3);
+    });
+
+    // Disclaimer
+    const discY = H-38;
+    doc.setFillColor(13,13,13); doc.rect(10,discY,W-20,25,"F");
+    doc.setDrawColor(42,42,42); doc.setLineWidth(0.4); doc.rect(10,discY,W-20,25,"S");
+    doc.setTextColor(...GREY); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("IMPORTANT DISCLOSURES",13,discY+6);
+    doc.setFont("helvetica","normal"); doc.setFontSize(5);
+    const disc = `This report is generated by Goldstream Wealth Intelligence and is intended solely for the named recipient. All figures are based on user-inputted data and do not constitute financial, legal, or investment advice. Past performance of real estate assets is not indicative of future results. Portfolio values, cash flows, and projections are estimates only. Goldstream is not a registered investment advisor. Report generated: ${now}.`;
+    const dlines = doc.splitTextToSize(disc, W-26);
+    doc.setTextColor(...GREY);
+    dlines.slice(0,4).forEach((dl: string, li: number) => doc.text(dl,13,discY+12+li*4));
+
+    // Footer p2
+    doc.setFillColor(...MED); doc.rect(0,H-12,W,12,"F");
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.4); doc.line(0,H-12,W,H-12);
+    doc.setTextColor(...GREY); doc.setFont("helvetica","normal"); doc.setFontSize(5.5); doc.text(`GOLDSTREAM WEALTH INTELLIGENCE  ·  CONFIDENTIAL AND PROPRIETARY`,10,H-5);
+    doc.setTextColor(...GOLD); doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.text("Page 2",W-10,H-5,"right");
+
+    doc.save(`goldstream-portfolio-${new Date().toISOString().split("T")[0]}.pdf`);
+
+  };
+
+  loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+    .then(runReport);
+}} style={{ fontSize: "12px", padding: "8px 16px", background: "transparent", color: "#34d399", borderRadius: "8px", fontWeight: "700", border: "1px solid rgba(52,211,153,0.4)", cursor: "pointer" }}>↓ PDF Report</button>
+<button onClick={() => {
+  const _props = properties;
+  const now = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+  const totalValue = _props.reduce((s,p)=>s+p.value,0);
+  const totalMortgage = _props.reduce((s,p)=>s+p.mortgage,0);
+  const totalEquity = totalValue - totalMortgage;
+  const totalExp = _props.reduce((s,p)=>s+p.expenses,0);
+  const totalRent = _props.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").reduce((s,p)=>s+p.rent,0);
+  const monthlyCF = totalRent - totalExp;
+  const loadXL = (src: string) => new Promise<void>(res => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement("script"); s.src = src; s.onload = () => res(); document.head.appendChild(s);
+  });
+  loadXL("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js").then(() => {
+    const XL = (window as any).XLSX;
+    const wb = XL.utils.book_new();
+    const summaryRows = [
+      ["GOLDSTREAM — PORTFOLIO INTELLIGENCE REPORT"],
+      [`Generated: ${now}`],[],
+      ["PORTFOLIO SUMMARY"],
+      ["Total Portfolio Value", totalValue],["Total Mortgage", totalMortgage],
+      ["Net Equity", totalEquity],["Monthly Cash Flow", monthlyCF],
+      ["Active Properties", _props.length],[],
+      ["ASSET HOLDINGS"],
+      ["Name","Type","Address","Value ($)","Mortgage ($)","Equity ($)","Rent/mo ($)","Expenses/mo ($)","Cash Flow/mo ($)","Gross Yield %","LTV %","Cash Yield %","Appreciation %","Status","Group"],
+      ..._props.map(p => {
+        const eq = p.value-p.mortgage;
+        const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
+        const grossY = p.value>0?(p.rent*12/p.value*100):0;
+        const ltv2 = p.value>0?(p.mortgage/p.value*100):0;
+        const cashY2 = eq>0?(cf2*12/eq*100):0;
+        return [p.name,p.type,p.address,p.value,p.mortgage,eq,p.rent,p.expenses,Math.round(cf2),+grossY.toFixed(1),+ltv2.toFixed(1),+cashY2.toFixed(1),p.appreciation,p.occupancyStatus,p.groupTag];
+      }),
+      [],[`TOTALS`,"","",totalValue,totalMortgage,totalEquity,"",totalExp,monthlyCF],
+    ];
+    const ws1 = XL.utils.aoa_to_sheet(summaryRows);
+    ws1["!cols"] = [{wch:28},{wch:16},{wch:30},{wch:16},{wch:16},{wch:16},{wch:14},{wch:16},{wch:16},{wch:14},{wch:10},{wch:12},{wch:14},{wch:12},{wch:18}];
+    XL.utils.book_append_sheet(wb, ws1, "Portfolio Summary");
+    const analyticsRows = [
+      ["GOLDSTREAM — ASSET ANALYTICS & RISK MATRIX"],[`Generated: ${now}`],[],
+      ["Asset","Gross Yield %","LTV %","Cash Yield %","Appreciation %/yr","5Y Projected Value ($)","DSCR","Health Score","Monthly NOI ($)","Break-Even Occ %"],
+      ..._props.map(p => {
+        const eq = p.value-p.mortgage;
+        const cf2 = p.occupancyStatus==="occupied"||p.occupancyStatus==="str"?p.rent-p.expenses:-p.expenses;
+        const gross = p.value>0?(p.rent*12/p.value*100):0;
+        const ltv2 = p.value>0?(p.mortgage/p.value*100):0;
+        const cashY2 = eq>0?(cf2*12/eq*100):0;
+        const proj5 = p.value*Math.pow(1+p.appreciation/100,5);
+        const loan=p.mortgage; const rm=0.07/12; const nn=360;
+        const mort = loan>0?loan*(rm*Math.pow(1+rm,nn))/(Math.pow(1+rm,nn)-1):0;
+        const dscr = mort>0?((p.rent-p.expenses)/mort):0;
+        const score2 = Math.min(100,60+(cf2>0?15:0)+(ltv2<=70?15:0)+(gross>=6?10:0));
+        const be = p.rent>0?(p.expenses/p.rent*100):100;
+        return [p.name,+gross.toFixed(1),+ltv2.toFixed(1),+cashY2.toFixed(1),p.appreciation,+proj5.toFixed(0),+dscr.toFixed(2),score2,Math.round(cf2),+be.toFixed(1)];
+      }),
+    ];
+    const ws2 = XL.utils.aoa_to_sheet(analyticsRows);
+    ws2["!cols"] = [{wch:28},{wch:14},{wch:10},{wch:14},{wch:16},{wch:20},{wch:10},{wch:14},{wch:16},{wch:18}];
+    XL.utils.book_append_sheet(wb, ws2, "Asset Analytics");
+    XL.writeFile(wb, `goldstream-portfolio-${new Date().toISOString().split("T")[0]}.xlsx`);
+  });
+}} style={{ fontSize: "12px", padding: "8px 16px", background: "transparent", color: "#34d399", borderRadius: "8px", fontWeight: "700", border: "1px solid rgba(52,211,153,0.4)", cursor: "pointer" }}>↓ Excel</button>
+ 
             <button onClick={onAdd} style={{ fontSize: "12px", padding: "8px 16px", background: "#f59e0b", color: "#000", borderRadius: "8px", fontWeight: "700", border: "none", cursor: "pointer" }}>+ Add Property</button>
           </div>
         </div>
@@ -958,7 +1380,10 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
             const grossYield = p.value > 0 ? ((p.rent * 12 / p.value) * 100).toFixed(1) : "—";
             return (
               <div key={p.id} onClick={() => onSelect(isSelected ? null : p.id)}
-                style={{ background: isSelected ? "rgba(245,158,11,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${isSelected ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: "20px", overflow: "hidden", cursor: "pointer", transition: "all 0.25s", boxShadow: isSelected ? "0 0 0 1px rgba(245,158,11,0.2), 0 20px 40px rgba(0,0,0,0.4)" : "0 4px 20px rgba(0,0,0,0.2)", position: "relative" }}>
+                style={{ background: isSelected ? "rgba(245,158,11,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid ${isSelected ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: "20px", overflow: "hidden", cursor: "pointer", transition: "all 0.25s", boxShadow: isSelected ? "0 0 0 1px rgba(245,158,11,0.2), 0 20px 40px rgba(0,0,0,0.4)" : "0 4px 20px rgba(0,0,0,0.2)", position: "relative" }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 0 1px rgba(245,158,11,0.15), 0 20px 40px rgba(0,0,0,0.4)")}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = isSelected ? "0 0 0 1px rgba(245,158,11,0.2), 0 20px 40px rgba(0,0,0,0.4)" : "0 4px 20px rgba(0,0,0,0.2)")}
+              >
                 {/* Satellite image — tall */}
                 <div style={{ height: "200px", position: "relative", overflow: "hidden" }}>
                   <SatelliteThumb lat={p.lat} lng={p.lng} address={p.address} />
@@ -969,8 +1394,16 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
                     <span style={{ fontSize: "13px", fontWeight: "900", color: scoreColor, lineHeight: 1 }}>{score}</span>
                     <span style={{ fontSize: "6px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "0.3px" }}>SCORE</span>
                   </div>
-                  {/* Flag top-left */}
-                  <div style={{ position: "absolute", top: "12px", left: "12px" }}><FlagPill address={p.address} /></div>
+                  {/* Flag + accuracy badge top-left */}
+                  <div style={{ position: "absolute", top: "12px", left: "12px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <FlagPill address={p.address} />
+                    {p.lat && p.lng && Math.abs(p.lat) > 0.01 && (
+                      <span style={{ fontSize: "8px", fontWeight: "800", padding: "1px 6px", borderRadius: "4px", background: "rgba(52,211,153,0.18)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)", backdropFilter: "blur(6px)" }}>✓ Parcel-level</span>
+                    )}
+                    {(!p.lat || !p.lng || Math.abs(p.lat) <= 0.01) && p.address && (
+                      <span style={{ fontSize: "8px", fontWeight: "800", padding: "1px 6px", borderRadius: "4px", background: "rgba(245,158,11,0.18)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", backdropFilter: "blur(6px)" }}>~ Block-level</span>
+                    )}
+                  </div>
                   {/* Status pill bottom-left */}
                   <div style={{ position: "absolute", bottom: "12px", left: "12px", fontSize: "10px", padding: "4px 10px", borderRadius: "999px", background: oc.bg, color: oc.color, border: `1px solid ${oc.border}`, fontWeight: "800", backdropFilter: "blur(8px)" }}>{occupancyLabel(p)}</div>
                   {/* Value bottom-right */}
@@ -993,11 +1426,19 @@ function PropertyTable({ properties, selected, onSelect, onEdit, onDelete, onAdd
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                     <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "12px", padding: "12px 14px" }}>
                       <p style={{ fontSize: "9px", color: "rgba(245,158,11,0.6)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "800", marginBottom: "5px" }}>Equity</p>
-                      <p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-0.5px" }}>{fmt(equity)}</p>
+                      <p style={{ fontSize: "22px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-0.5px" }}>{fmt(equity)}</p>
+                      {p.mortgage > 0 && (
+                        <div style={{ marginTop: "6px" }}>
+                          <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.min(100, (p.mortgage / p.value) * 100)}%`, background: (p.mortgage / p.value) <= 0.7 ? "#34d399" : (p.mortgage / p.value) <= 0.85 ? "#f59e0b" : "#f87171", borderRadius: "999px" }} />
+                          </div>
+                          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", marginTop: "2px" }}>LTV {((p.mortgage / p.value) * 100).toFixed(0)}% · {fmt(p.mortgage)} owed</p>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ background: cf >= 0 ? "rgba(52,211,153,0.07)" : "rgba(248,113,113,0.07)", border: `1px solid ${cf >= 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)"}`, borderRadius: "12px", padding: "12px 14px" }}>
+                    <div style={{ background: cf >= 0 ? "rgba(52,211,153,0.07)" : "rgba(248,113,113,0.07)", border: `1px solid ${cf >= 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)"}`, borderRadius: "12px", padding: "12px 14px", transition: "box-shadow 0.2s" }}>
                       <p style={{ fontSize: "9px", color: cf >= 0 ? "rgba(52,211,153,0.6)" : "rgba(248,113,113,0.6)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "800", marginBottom: "5px" }}>Cash Flow</p>
-                      <p style={{ fontSize: "20px", fontWeight: "900", color: cf >= 0 ? "#34d399" : "#f87171", letterSpacing: "-0.5px" }}>{cf >= 0 ? "+" : ""}{fmtFull(cf)}<span style={{ fontSize: "11px", fontWeight: "600" }}>/mo</span></p>
+                      <p style={{ fontSize: "22px", fontWeight: "900", color: cf >= 0 ? "#34d399" : "#f87171", letterSpacing: "-0.5px" }}>{cf >= 0 ? "+" : ""}{fmtFull(cf)}<span style={{ fontSize: "11px", fontWeight: "600" }}>/mo</span></p>
                     </div>
                   </div>
 
@@ -1122,14 +1563,26 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
   const [coords, setCoords] = useState<{lat: number; lng: number} | null>(
     lat && lng && Math.abs(lat) > 0.01 ? { lat, lng } : null
   );
+  const [zoom, setZoom] = useState(19);
+  const [tilesLoaded, setTilesLoaded] = useState(0);
+  const [showControls, setShowControls] = useState(false);
+  const totalTiles = 9;
 
   useEffect(() => {
     if (!coords && address) {
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } })
+      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(address)}&limit=1`)
         .then(r => r.json())
-        .then(d => { if (d?.[0]) setCoords({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) }); });
+        .then(d => {
+          const f = d?.features?.[0];
+          if (f) { setCoords({ lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] }); return; }
+          return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } })
+            .then(r => r.json())
+            .then(d2 => { if (d2?.[0]) setCoords({ lat: parseFloat(d2[0].lat), lng: parseFloat(d2[0].lon) }); });
+        });
     }
   }, [address]);
+
+  useEffect(() => { setTilesLoaded(0); }, [zoom, coords]);
 
   if (!coords) {
     return (
@@ -1139,9 +1592,8 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
     );
   }
 
-  const z = 19;
   const tileSize = 256;
-  const scale = Math.pow(2, z);
+  const scale = Math.pow(2, zoom);
   const worldX = (coords.lng + 180) / 360 * scale;
   const worldY = (1 - Math.log(Math.tan(coords.lat * Math.PI / 180) + 1 / Math.cos(coords.lat * Math.PI / 180)) / Math.PI) / 2 * scale;
   const tileX = Math.floor(worldX);
@@ -1152,24 +1604,45 @@ function SatelliteThumb({ lat, lng, address }: { lat: number; lng: number; addre
   const tiles = [];
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
-      const tx = tileX + dx;
-      const ty = tileY + dy;
-      const offsetX = (dx - fracX) * tileSize;
-      const offsetY = (dy - fracY) * tileSize;
-      tiles.push({ tx, ty, offsetX, offsetY });
+      tiles.push({ tx: tileX + dx, ty: tileY + dy, offsetX: (dx - fracX) * tileSize, offsetY: (dy - fracY) * tileSize });
     }
   }
 
+  const zoomLevels = [{ label: "Street", z: 19 }, { label: "Block", z: 16 }, { label: "Hood", z: 14 }];
+
   return (
-    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}>
+    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", background: "#0a0f14" }}
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
+    >
+      <style>{`@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }`}</style>
+      {tilesLoaded < totalTiles && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none", background: "linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+      )}
       {tiles.map(({ tx, ty, offsetX, offsetY }) => (
-        <img
-          key={`${tx}-${ty}`}
-          src={`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`}
+        <img key={`${tx}-${ty}-${zoom}`}
+          src={`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`}
+          onLoad={() => setTilesLoaded(n => n + 1)}
           style={{ position: "absolute", width: `${tileSize}px`, height: `${tileSize}px`, left: `calc(50% + ${offsetX}px)`, top: `calc(50% + ${offsetY}px)`, imageRendering: "crisp-edges" }}
           alt=""
         />
       ))}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 20 }}>
+        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: "1px", background: "rgba(245,158,11,0.35)", transform: "translateY(-0.5px)" }} />
+        <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: "1px", background: "rgba(245,158,11,0.35)", transform: "translateX(-0.5px)" }} />
+      </div>
+      <div style={{ position: "absolute", top: "50%", left: "50%", zIndex: 30, pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
+        <div style={{ width: "12px", height: "12px", borderRadius: "50% 50% 50% 0", background: "#f59e0b", border: "2px solid #fff", transform: "rotate(-45deg)", boxShadow: "0 0 6px rgba(245,158,11,0.8)" }} />
+      </div>
+      {showControls && (
+        <div style={{ position: "absolute", bottom: "8px", left: "50%", transform: "translateX(-50%)", zIndex: 40, display: "flex", gap: "4px" }}>
+          {zoomLevels.map(({ label, z }) => (
+            <button key={z} onClick={(e) => { e.stopPropagation(); setZoom(z); }}
+              style={{ padding: "2px 7px", fontSize: "9px", fontWeight: "700", borderRadius: "4px", border: "none", cursor: "pointer", background: zoom === z ? "#f59e0b" : "rgba(0,0,0,0.65)", color: zoom === z ? "#000" : "rgba(255,255,255,0.7)", transition: "all 0.15s" }}
+            >{label}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1340,6 +1813,22 @@ function PropertyDetail({ property: p, onEdit, onClose }: any) {
   const [activeView, setActiveView] = useState<"satellite"|"mockup"|"animation">("satellite");
   const [animPlaying, setAnimPlaying] = useState(false);
   const improvementVal = Math.round(p.value * 0.06);
+  const ltv = p.value > 0 ? (p.mortgage / p.value) * 100 : 0;
+  const ltvColor = ltv <= 70 ? "#34d399" : ltv <= 85 ? "#f59e0b" : "#f87171";
+  const appRate = (p.appreciation || 3.5) / 100;
+  const proj5yr = p.value * Math.pow(1 + appRate, 5);
+  const proj5equity = proj5yr - p.mortgage;
+  const equityGain5 = proj5equity - equity;
+  const monthlyMortgageEst = p.mortgage > 0 ? p.mortgage * (0.07 / 12) * Math.pow(1 + 0.07 / 12, 360) / (Math.pow(1 + 0.07 / 12, 360) - 1) : 0;
+  const annualPrincipal = monthlyMortgageEst * 12 - (p.mortgage * 0.07);
+  const yearsToPayoff = annualPrincipal > 0 ? Math.ceil(p.mortgage / annualPrincipal) : null;
+  const chartYears = [0, 1, 2, 3, 4, 5];
+  const chartValues = chartYears.map(y => p.value * Math.pow(1 + appRate, y));
+  const chartEquity = chartYears.map(y => p.value * Math.pow(1 + appRate, y) - p.mortgage);
+  const maxChart = Math.max(...chartValues);
+  const CW = 280; const CH = 80;
+  const valPts = chartYears.map((_, i) => `${(i / 5) * CW},${CH - (chartValues[i] / maxChart) * (CH - 10) - 5}`).join(" ");
+  const eqPts = chartYears.map((_, i) => `${(i / 5) * CW},${CH - (chartEquity[i] / maxChart) * (CH - 10) - 5}`).join(" ");
 
   useEffect(() => { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
   useEffect(() => { if (activeView !== "animation") setAnimPlaying(false); }, [activeView]);
@@ -1383,6 +1872,78 @@ function PropertyDetail({ property: p, onEdit, onClose }: any) {
       <div style={{ background: "linear-gradient(90deg,rgba(5,46,22,0.8),rgba(10,48,32,0.6))", border: "1px solid rgba(20,83,45,0.6)", borderRadius: "10px", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: "600" }}>🔥 Improvement opportunity detected</span>
         <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", fontWeight: "900", color: "#22c55e" }}>+{fmtFull(improvementVal)} potential</span>
+      </div>
+
+      {/* LTV Gauge + 5yr Projection + Paydown */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+
+        {/* LTV Gauge */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${ltvColor}22`, borderRadius: "14px", padding: "14px 16px" }}>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "10px" }}>LTV Gauge</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+            <div style={{ position: "relative", width: "48px", height: "48px", flexShrink: 0 }}>
+              <svg width="48" height="48" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5"/>
+                <circle cx="24" cy="24" r="18" fill="none" stroke={ltvColor} strokeWidth="5"
+                  strokeDasharray={`${2 * Math.PI * 18}`}
+                  strokeDashoffset={`${2 * Math.PI * 18 * (1 - Math.min(ltv, 100) / 100)}`}
+                  style={{ transition: "stroke-dashoffset 1s" }}
+                  strokeLinecap="round"/>
+              </svg>
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: "10px", fontWeight: "900", color: ltvColor }}>{ltv.toFixed(0)}%</span>
+              </div>
+            </div>
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: "900", color: ltvColor }}>{ltv.toFixed(1)}% LTV</p>
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>{fmt(p.mortgage)} owed</p>
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{fmt(equity)} equity</p>
+            </div>
+          </div>
+          <p style={{ fontSize: "9px", color: ltvColor, fontWeight: "700" }}>{ltv <= 70 ? "✓ Conservative leverage" : ltv <= 85 ? "⚡ Monitor closely" : "⚠ High leverage"}</p>
+        </div>
+
+        {/* 5-Year Projection chart */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "14px", padding: "14px 16px" }}>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "6px" }}>5-Year Projection</p>
+          <svg viewBox={`0 0 ${CW} ${CH}`} style={{ width: "100%", height: "60px" }}>
+            <defs>
+              <linearGradient id={`pg_${p.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.2"/>
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
+              </linearGradient>
+              <linearGradient id={`eg_${p.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#34d399" stopOpacity="0.15"/>
+                <stop offset="100%" stopColor="#34d399" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <polygon points={`0,${CH} ${valPts} ${CW},${CH}`} fill={`url(#pg_${p.id})`}/>
+            <polyline points={valPts} fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinejoin="round"/>
+            <polyline points={eqPts} fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinejoin="round" strokeDasharray="4,2"/>
+            {[0,1,2,3,4,5].map(i => <text key={i} x={(i/5)*CW} y={CH+2} fill="rgba(255,255,255,0.15)" fontSize="8" textAnchor="middle">Y{i}</text>)}
+          </svg>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
+            <div><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)" }}>Value Y5</p><p style={{ fontSize: "13px", fontWeight: "800", color: "#f59e0b" }}>{fmt(proj5yr)}</p></div>
+            <div style={{ textAlign: "right" }}><p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)" }}>Equity Y5</p><p style={{ fontSize: "13px", fontWeight: "800", color: "#34d399" }}>+{fmt(equityGain5)}</p></div>
+          </div>
+          <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}><div style={{ width: "12px", height: "2px", background: "#f59e0b" }}/><span style={{ fontSize: "8px", color: "rgba(255,255,255,0.25)" }}>Value</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}><div style={{ width: "12px", height: "0", borderTop: "1.5px dashed #34d399" }}/><span style={{ fontSize: "8px", color: "rgba(255,255,255,0.25)" }}>Equity</span></div>
+          </div>
+        </div>
+
+        {/* Mortgage Paydown */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "14px", padding: "14px 16px" }}>
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "10px" }}>Mortgage Paydown</p>
+          {p.mortgage > 0 ? <>
+            <p style={{ fontSize: "22px", fontWeight: "900", color: "#60a5fa", letterSpacing: "-1px" }}>{yearsToPayoff ?? "—"}<span style={{ fontSize: "12px", fontWeight: "600", color: "rgba(96,165,250,0.6)" }}> yrs</span></p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginBottom: "10px" }}>est. payoff timeline</p>
+            <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginBottom: "6px" }}>
+              <div style={{ height: "100%", width: `${Math.min(100, 100 - ltv)}%`, background: "#60a5fa", borderRadius: "999px", boxShadow: "0 0 6px rgba(96,165,250,0.4)" }}/>
+            </div>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)" }}>{(100 - ltv).toFixed(0)}% paid off · {fmt(annualPrincipal)}/yr principal</p>
+          </> : <p style={{ fontSize: "13px", color: "#34d399", fontWeight: "700" }}>✓ Owned free & clear</p>}
+        </div>
       </div>
 
       {/* Metrics */}
