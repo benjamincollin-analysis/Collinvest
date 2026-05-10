@@ -1,0 +1,621 @@
+﻿function DecisionEngine({ property: p }: { property: Property }) {
+  const [active, setActive] = useState<"hold"|"brrrr"|"sell"|"str">("hold");
+  const equity = p.value - p.mortgage;
+  const cf = propCashFlow(p);
+  const appRate = (p.appreciation || 3.5) / 100;
+
+  // HOLD & RENT
+  const holdApp5 = p.value * (Math.pow(1 + appRate, 5) - 1);
+  const holdCF5 = cf * 12 * 5;
+  const holdNetWorth5 = equity + holdApp5 + holdCF5;
+
+  // BRRRR — refinance at 75% LTV, pull cash, redeploy
+  const refiLoan = p.value * 0.75;
+  const capitalPulled = Math.max(0, refiLoan - p.mortgage);
+  const newMortPayment = refiLoan > 0 ? refiLoan * (0.07/12) * Math.pow(1+0.07/12,360) / (Math.pow(1+0.07/12,360)-1) : 0;
+  const brrrrMonthlyCF = p.rent - p.expenses - newMortPayment;
+  const brrrrCF5 = brrrrMonthlyCF * 12 * 5;
+  const brrrrNewEquity = capitalPulled * 0.25;
+  const brrrrNetWorth5 = equity + holdApp5 + brrrrCF5 + brrrrNewEquity;
+
+  // SELL NOW
+  const salePrice = p.value * Math.pow(1 + appRate, 0.5);
+  const sellingCosts = salePrice * 0.06;
+  const capitalGains = Math.max(0, (salePrice - p.value) * 0.20);
+  const sellNet = salePrice - p.mortgage - sellingCosts - capitalGains;
+
+  // STR CONVERSION
+  const strRent = p.rent * 2.2;
+  const strExp = p.expenses * 1.4;
+  const strCF = strRent - strExp;
+  const strCF5 = strCF * 12 * 5;
+  const strNetWorth5 = equity + holdApp5 + strCF5;
+
+  // Detect jurisdiction
+  const isUS = ["tx","fl","ca","ny","il","co","wa","ma","ga","az","nv","houston","miami","dallas","austin","new york","los angeles","chicago","denver","seattle","boston","atlanta","phoenix","las vegas","san francisco","usa","united states"].some(k => p.address?.toLowerCase().includes(k));
+  const isFR = ["france","paris","lyon","bordeaux","marseille","nice","toulouse","nantes"," fr "].some(k => p.address?.toLowerCase().includes(k));
+
+    const isUS = ["tx","fl","ca","ny","il","co","wa","ma","ga","az","nv","houston","miami","dallas","austin","new york","los angeles","chicago","denver","seattle","boston","atlanta","phoenix","las vegas","san francisco","usa","united states"].some(k => p.address?.toLowerCase().includes(k));
+  const isFR = ["france","paris","lyon","bordeaux","marseille","nice","toulouse","nantes"," fr "].some(k => p.address?.toLowerCase().includes(k));
+
+  const strategies = [
+    {
+      key: "hold" as const,
+      icon: "🏠", label: "Hold & Rent", color: "#34d399", bg: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)",
+      headline: fmt(holdNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Stable wealth builder",
+      metrics: [
+        { label: "Monthly CF", value: (cf>=0?"+":"")+fmtFull(cf)+"/mo", good: cf>=0 },
+        { label: "5Y Appreciation", value: "+"+fmt(holdApp5), good: true },
+        { label: "5Y Cash Flow", value: (holdCF5>=0?"+":"")+fmt(holdCF5), good: holdCF5>=0 },
+        { label: "Capital Freed", value: "$0", good: false },
+      ],
+      pros: ["Passive income", "Builds equity", "Tax deductions"],
+      cons: ["Capital locked", "Tenant risk"],
+    },
+    {
+      key: "brrrr" as const,
+      icon: "🔄", label: "BRRRR", color: "#a78bfa", bg: "rgba(167,139,250,0.08)", border: "rgba(167,139,250,0.2)",
+      headline: fmt(brrrrNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Fastest portfolio scale",
+      metrics: [
+        { label: "Capital Recycled", value: fmt(capitalPulled), good: capitalPulled>0 },
+        { label: "New Monthly CF", value: (brrrrMonthlyCF>=0?"+":"")+fmtFull(brrrrMonthlyCF)+"/mo", good: brrrrMonthlyCF>=0 },
+        { label: "New Deal Equity", value: "+"+fmt(brrrrNewEquity), good: true },
+        { label: "5Y Net Worth", value: fmt(brrrrNetWorth5), good: true },
+      ],
+      pros: ["Recycle capital", "Scale faster", "Keep the asset"],
+      cons: ["Higher mortgage", "Execution risk"],
+    },
+    {
+      key: "sell" as const,
+      icon: "💰", label: "Sell Now", color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)",
+      headline: fmt(sellNet), headlineSub: "net proceeds",
+      verdict: "Immediate liquidity",
+      metrics: [
+        { label: "Est. Sale Price", value: fmt(salePrice), good: true },
+        { label: "Selling Costs", value: "-"+fmt(sellingCosts), good: false },
+        { label: "Capital Gains Tax", value: "-"+fmt(capitalGains), good: false },
+        { label: "Net in Hand", value: fmt(sellNet), good: true },
+      ],
+      pros: ["Immediate cash", "Zero landlord risk", "Redeploy freely"],
+      cons: ["Lose appreciation", "Tax event", "Transaction costs"],
+    },
+    {
+      key: "str" as const,
+      icon: "🏖", label: "Convert to STR", color: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.2)",
+      headline: fmt(strNetWorth5), headlineSub: "5yr net worth",
+      verdict: "Maximum cash flow",
+      metrics: [
+        { label: "Est. STR Rent", value: fmt(strRent)+"/mo", good: true },
+        { label: "STR Expenses", value: "-"+fmt(strExp)+"/mo", good: false },
+        { label: "Monthly CF", value: (strCF>=0?"+":"")+fmtFull(strCF)+"/mo", good: strCF>=0 },
+        { label: "5Y Cash Flow", value: "+"+fmt(strCF5), good: true },
+      ],
+      pros: ["2x+ rental income", "Flexibility", "Market rate nightly"],
+      cons: ["Active management", "Regulation risk", "Seasonality"],
+    },
+  ];
+
+  // Tax strategy data
+  const annualRent = p.rent * 12;
+  const annualExpenses = p.expenses * 12;
+  const annualNOI = annualRent - annualExpenses;
+  const depreciationUS = p.value * 0.85 / 27.5; // residential cost basis / 27.5yr
+  const taxableIncomeWithDep = Math.max(0, annualNOI - depreciationUS);
+  const taxSavedUS = depreciationUS * 0.37; // top bracket
+  const costSegBonus = depreciationUS * 0.3 * 5; // 30% reclassified to 5yr, 5yr benefit
+  const gain1031 = equity * 0.20; // capital gains deferred
+  const llcSavingsUS = annualNOI * 0.035; // SE tax saving via S-corp election
+  const sciTaxFR = annualNOI * 0.30; // SCI IS rate
+  const deficitFoncier = Math.max(0, annualExpenses - annualRent) * 0.30; // deductible deficit
+  const pretInfineSavingFR = annualNOI * 0.042; // interest deduction benefit
+
+  const TAX_STRATEGIES: Record<string, {
+    icon: string; title: string; headline: string; headlineSub: string;
+    color: string; bg: string; border: string;
+    metrics: {label: string; value: string; good: boolean}[];
+    steps: string[]; pros: string[]; cons: string[];
+    jurisdiction: "US" | "FR" | "BOTH";
+  }> = {
+    depreciation: {
+      icon: "📉", title: "Depreciation Shield", headline: fmtFull(Math.round(taxSavedUS)) + "/yr", headlineSub: "tax saved annually",
+      color: "#34d399", bg: "rgba(52,211,153,0.07)", border: "rgba(52,211,153,0.2)",
+      metrics: [
+        { label: "Annual depreciation", value: fmtFull(Math.round(depreciationUS)), good: true },
+        { label: "Tax saved (37% bracket)", value: fmtFull(Math.round(taxSavedUS)) + "/yr", good: true },
+        { label: "Taxable income after dep.", value: fmtFull(Math.round(taxableIncomeWithDep)) + "/yr", good: taxableIncomeWithDep < annualNOI },
+        { label: "Cost seg. bonus (5yr)", value: "+" + fmtFull(Math.round(costSegBonus)), good: true },
+      ],
+      steps: ["Order cost segregation study ($3–8K)", "Reclassify 20–30% of building to 5–7yr property", "Claim accelerated depreciation in year 1", "Repeat on each acquisition"],
+      pros: ["Largest legal tax shelter in US real estate", "Non-cash deduction — no out-of-pocket cost", "Cost seg can front-load 5yr of depreciation into year 1"],
+      cons: ["Depreciation recapture at sale (25%)", "Must own property — no benefit on REITs", "Cost seg study required for bonus depreciation"],
+      jurisdiction: "US",
+    },
+    llc: {
+      icon: "🏛", title: "LLC + S-Corp Election", headline: fmtFull(Math.round(llcSavingsUS)) + "/yr", headlineSub: "SE tax savings",
+      color: "#60a5fa", bg: "rgba(96,165,250,0.07)", border: "rgba(96,165,250,0.2)",
+      metrics: [
+        { label: "Annual NOI", value: fmtFull(Math.round(annualNOI)), good: true },
+        { label: "SE tax saved (S-corp)", value: fmtFull(Math.round(llcSavingsUS)) + "/yr", good: true },
+        { label: "Asset protection", value: "Personal assets shielded", good: true },
+        { label: "Setup cost", value: "$800–2,500 one-time", good: true },
+      ],
+      steps: ["Form LLC in property state ($50–500)", "Elect S-corp status if NOI > $40K/yr", "Pay yourself reasonable salary through LLC", "Excess profit flows as distribution (no SE tax)"],
+      pros: ["Liability protection — personal assets untouchable", "S-corp election saves 3.8% SE tax on distributions", "Easier to bring in partners or investors"],
+      cons: ["Annual filing fees ($100–800/state)", "S-corp adds payroll complexity", "Due-on-sale clause — lender must consent to transfer"],
+      jurisdiction: "US",
+    },
+    exchange1031: {
+      icon: "🔄", title: "1031 Exchange", headline: fmtFull(Math.round(gain1031)), headlineSub: "capital gains deferred",
+      color: "#f59e0b", bg: "rgba(245,158,11,0.07)", border: "rgba(245,158,11,0.2)",
+      metrics: [
+        { label: "Current equity", value: fmtFull(equity), good: true },
+        { label: "Est. capital gains (20%)", value: fmtFull(Math.round(gain1031)), good: false },
+        { label: "Tax deferred via 1031", value: fmtFull(Math.round(gain1031)), good: true },
+        { label: "Identification window", value: "45 days", good: true },
+      ],
+      steps: ["Sell current property through qualified intermediary (QI)", "Identify replacement property within 45 days", "Close on replacement within 180 days", "Defer 100% of capital gains — no limit on repeating"],
+      pros: ["Defer 100% of capital gains tax indefinitely", "Step up basis at death eliminates tax entirely", "Upgrade into larger properties tax-free"],
+      cons: ["Must identify replacement in 45 days — tight timeline", "Like-kind rules — must stay in real estate", "QI fees $1,000–2,500"],
+      jurisdiction: "US",
+    },
+    sci: {
+      icon: "🏢", title: "SCI (Société Civile Immobilière)", headline: fmtFull(Math.round(sciTaxFR)) + "/yr", headlineSub: "IS tax at 15–25%",
+      color: "#a78bfa", bg: "rgba(167,139,250,0.07)", border: "rgba(167,139,250,0.2)",
+      metrics: [
+        { label: "Annual NOI", value: fmtFull(Math.round(annualNOI)), good: true },
+        { label: "IS tax rate", value: "15% up to €42K, 25% above", good: true },
+        { label: "Wealth transmission", value: "Shares donated over time", good: true },
+        { label: "Setup cost", value: "€1,500–3,000 notaire", good: true },
+      ],
+      steps: ["Create SCI with notaire (€1,500–3,000)", "Transfer property into SCI", "Elect IS regime if scale warrants it", "Donate shares to heirs progressively (gifts tax-free up to €100K/child/15yr)"],
+      pros: ["Optimal wealth transmission to children", "IS regime: deduct depreciation, interest, all charges", "Multiple owners (investors, family) easily managed"],
+      cons: ["IR regime: income taxed at personal rate (can be high)", "Transfer costs when property goes in (3–8%)", "Annual accounting required"],
+      jurisdiction: "FR",
+    },
+    deficitFoncier: {
+      icon: "📊", title: "Déficit Foncier", headline: fmtFull(Math.round(deficitFoncier)) + "/yr", headlineSub: "tax deduction",
+      color: "#f87171", bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.2)",
+      metrics: [
+        { label: "Annual expenses", value: fmtFull(Math.round(annualExpenses)), good: true },
+        { label: "Annual rent income", value: fmtFull(Math.round(annualRent)), good: true },
+        { label: "Deductible deficit", value: fmtFull(Math.round(Math.max(0, annualExpenses - annualRent))), good: true },
+        { label: "Tax saved (30% bracket)", value: fmtFull(Math.round(deficitFoncier)) + "/yr", good: true },
+      ],
+      steps: ["Ensure property is in IR (revenus fonciers) regime", "Undertake qualifying renovation work", "Deduct expenses in excess of rental income from global income", "Cap: €10,700/yr deductible on global income, rest carries forward 10yr"],
+      pros: ["Reduce taxable income on ALL income sources (not just rental)", "Works with Pinel, Malraux, heritage zones for bigger deductions", "10-year carryforward of excess deficit"],
+      cons: ["Requires real expenses > rental income", "Only works in IR regime, not IS", "Sale within 3 years reverses the benefit"],
+      jurisdiction: "FR",
+    },
+  };
+
+  const visibleTaxStrategies = Object.entries(TAX_STRATEGIES).filter(([, s]) =>
+    s.jurisdiction === "BOTH" || (s.jurisdiction === "US" && isUS) || (s.jurisdiction === "FR" && isFR)
+  );
+  const [activeTax, setActiveTax] = useState<string>(visibleTaxStrategies[0]?.[0] || "depreciation");
+
+  const annualRent = p.rent * 12;
+  const annualExpenses = p.expenses * 12;
+  const annualNOI = annualRent - annualExpenses;
+  const depreciationUS = p.value * 0.85 / 27.5;
+  const taxSavedUS = depreciationUS * 0.37;
+  const costSegBonus = depreciationUS * 0.3 * 5;
+  const gain1031 = equity * 0.20;
+  const llcSavingsUS = annualNOI * 0.035;
+  const sciTaxFR = annualNOI * 0.30;
+  const deficitFoncier = Math.max(0, annualExpenses - annualRent) * 0.30;
+
+  const TAX_STRATEGIES: Record<string, {
+    icon: string; title: string; headline: string; headlineSub: string;
+    color: string; bg: string; border: string;
+    metrics: {label: string; value: string; good: boolean}[];
+    steps: string[]; pros: string[]; cons: string[];
+    jurisdiction: "US" | "FR" | "BOTH";
+  }> = {
+    depreciation: {
+      icon: "📉", title: "Depreciation Shield", headline: fmtFull(Math.round(taxSavedUS)) + "/yr", headlineSub: "tax saved annually",
+      color: "#34d399", bg: "rgba(52,211,153,0.07)", border: "rgba(52,211,153,0.2)",
+      metrics: [
+        { label: "Annual depreciation", value: fmtFull(Math.round(depreciationUS)), good: true },
+        { label: "Tax saved (37% bracket)", value: fmtFull(Math.round(taxSavedUS)) + "/yr", good: true },
+        { label: "Taxable income after dep.", value: fmtFull(Math.round(Math.max(0, annualNOI - depreciationUS))) + "/yr", good: true },
+        { label: "Cost seg. bonus (5yr)", value: "+" + fmtFull(Math.round(costSegBonus)), good: true },
+      ],
+      steps: ["Order cost segregation study ($3–8K)", "Reclassify 20–30% of building to 5–7yr property", "Claim accelerated depreciation in year 1", "Repeat on each acquisition"],
+      pros: ["Largest legal tax shelter in US real estate", "Non-cash deduction — no out-of-pocket cost", "Cost seg can front-load 5yr of depreciation into year 1"],
+      cons: ["Depreciation recapture at sale (25%)", "Must own property — no benefit on REITs", "Cost seg study required for bonus depreciation"],
+      jurisdiction: "US",
+    },
+    llc: {
+      icon: "🏛", title: "LLC + S-Corp Election", headline: fmtFull(Math.round(llcSavingsUS)) + "/yr", headlineSub: "SE tax savings",
+      color: "#60a5fa", bg: "rgba(96,165,250,0.07)", border: "rgba(96,165,250,0.2)",
+      metrics: [
+        { label: "Annual NOI", value: fmtFull(Math.round(annualNOI)), good: true },
+        { label: "SE tax saved (S-corp)", value: fmtFull(Math.round(llcSavingsUS)) + "/yr", good: true },
+        { label: "Asset protection", value: "Personal assets shielded", good: true },
+        { label: "Setup cost", value: "$800–2,500 one-time", good: true },
+      ],
+      steps: ["Form LLC in property state ($50–500)", "Elect S-corp status if NOI > $40K/yr", "Pay yourself reasonable salary through LLC", "Excess profit flows as distribution (no SE tax)"],
+      pros: ["Liability protection — personal assets untouchable", "S-corp election saves 3.8% SE tax on distributions", "Easier to bring in partners or investors"],
+      cons: ["Annual filing fees ($100–800/state)", "S-corp adds payroll complexity", "Due-on-sale clause — lender must consent to transfer"],
+      jurisdiction: "US",
+    },
+    exchange1031: {
+      icon: "🔄", title: "1031 Exchange", headline: fmtFull(Math.round(gain1031)), headlineSub: "capital gains deferred",
+      color: "#f59e0b", bg: "rgba(245,158,11,0.07)", border: "rgba(245,158,11,0.2)",
+      metrics: [
+        { label: "Current equity", value: fmtFull(equity), good: true },
+        { label: "Est. capital gains (20%)", value: fmtFull(Math.round(gain1031)), good: false },
+        { label: "Tax deferred via 1031", value: fmtFull(Math.round(gain1031)), good: true },
+        { label: "Identification window", value: "45 days", good: true },
+      ],
+      steps: ["Sell current property through qualified intermediary (QI)", "Identify replacement property within 45 days", "Close on replacement within 180 days", "Defer 100% of capital gains — no limit on repeating"],
+      pros: ["Defer 100% of capital gains tax indefinitely", "Step up basis at death eliminates tax entirely", "Upgrade into larger properties tax-free"],
+      cons: ["Must identify replacement in 45 days — tight timeline", "Like-kind rules — must stay in real estate", "QI fees $1,000–2,500"],
+      jurisdiction: "US",
+    },
+    sci: {
+      icon: "🏢", title: "SCI", headline: fmtFull(Math.round(sciTaxFR)) + "/yr", headlineSub: "IS tax at 15–25%",
+      color: "#a78bfa", bg: "rgba(167,139,250,0.07)", border: "rgba(167,139,250,0.2)",
+      metrics: [
+        { label: "Annual NOI", value: fmtFull(Math.round(annualNOI)), good: true },
+        { label: "IS tax rate", value: "15% up to €42K, 25% above", good: true },
+        { label: "Wealth transmission", value: "Shares donated over time", good: true },
+        { label: "Setup cost", value: "€1,500–3,000 notaire", good: true },
+      ],
+      steps: ["Create SCI with notaire (€1,500–3,000)", "Transfer property into SCI", "Elect IS regime if scale warrants it", "Donate shares to heirs progressively"],
+      pros: ["Optimal wealth transmission to children", "IS regime: deduct depreciation, interest, all charges", "Multiple owners easily managed"],
+      cons: ["IR regime: income taxed at personal rate", "Transfer costs when property goes in (3–8%)", "Annual accounting required"],
+      jurisdiction: "FR",
+    },
+    deficitFoncier: {
+      icon: "📊", title: "Déficit Foncier", headline: fmtFull(Math.round(deficitFoncier)) + "/yr", headlineSub: "tax deduction",
+      color: "#f87171", bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.2)",
+      metrics: [
+        { label: "Annual expenses", value: fmtFull(Math.round(annualExpenses)), good: true },
+        { label: "Annual rent income", value: fmtFull(Math.round(annualRent)), good: true },
+        { label: "Deductible deficit", value: fmtFull(Math.round(Math.max(0, annualExpenses - annualRent))), good: true },
+        { label: "Tax saved (30% bracket)", value: fmtFull(Math.round(deficitFoncier)) + "/yr", good: true },
+      ],
+      steps: ["Ensure property is in IR (revenus fonciers) regime", "Undertake qualifying renovation work", "Deduct expenses in excess of rental income from global income", "Cap: €10,700/yr on global income, rest carries forward 10yr"],
+      pros: ["Reduce taxable income on ALL income sources", "Works with Pinel, Malraux for bigger deductions", "10-year carryforward of excess deficit"],
+      cons: ["Requires real expenses > rental income", "Only works in IR regime, not IS", "Sale within 3 years reverses the benefit"],
+      jurisdiction: "FR",
+    },
+  };
+
+  const visibleTaxStrategies = Object.entries(TAX_STRATEGIES).filter(([, s]) =>
+    s.jurisdiction === "BOTH" || (s.jurisdiction === "US" && isUS) || (s.jurisdiction === "FR" && isFR)
+  );
+  const [activeTax, setActiveTax] = useState<string>(visibleTaxStrategies[0]?.[0] || "depreciation");
+
+  const best = strategies.reduce((a,b) => {
+    const aVal = a.key==="sell"?sellNet:a.key==="hold"?holdNetWorth5:a.key==="brrrr"?brrrrNetWorth5:strNetWorth5;
+    const bVal = b.key==="sell"?sellNet:b.key==="hold"?holdNetWorth5:b.key==="brrrr"?brrrrNetWorth5:strNetWorth5;
+    return aVal > bVal ? a : b;
+  }).key;
+
+  const activeS = strategies.find(s => s.key === active)!;
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "20px", marginTop: "16px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 8px #f59e0b", animation: "blink 1.5s infinite" }} />
+          <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.8)", letterSpacing: "2px", fontWeight: "800", textTransform: "uppercase" }}>Decision Engine</span>
+        </div>
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", fontWeight: "600" }}>What should you do with {p.name}?</span>
+      </div>
+
+      {/* Strategy tabs */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "20px" }}>
+        {strategies.map(s => {
+          const isActive = active === s.key;
+          const isBest = best === s.key;
+          return (
+            <div key={s.key} onClick={() => setActive(s.key)}
+              style={{ background: isActive ? s.bg : "rgba(255,255,255,0.02)", border: `2px solid ${isActive ? s.color + "88" : "rgba(255,255,255,0.06)"}`, borderRadius: "16px", padding: "18px 14px", cursor: "pointer", transition: "all 0.2s", position: "relative", textAlign: "center", boxShadow: isActive ? `0 0 0 4px ${s.color}10` : "none" }}>
+              {isBest && (
+                <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", fontSize: "9px", fontWeight: "900", color: "#000", background: s.color, borderRadius: "999px", padding: "3px 10px", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>★ BEST</div>
+              )}
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>{s.icon}</div>
+              <p style={{ fontSize: "11px", fontWeight: "800", color: isActive ? s.color : "rgba(255,255,255,0.4)", marginBottom: "8px", letterSpacing: "0.3px" }}>{s.label}</p>
+              <div style={{ height: "1px", background: isActive ? s.color + "33" : "rgba(255,255,255,0.05)", marginBottom: "8px" }} />
+              <p style={{ fontSize: "20px", fontWeight: "900", color: isActive ? s.color : "rgba(255,255,255,0.75)", letterSpacing: "-0.8px", lineHeight: 1 }}>{s.headline}</p>
+              <p style={{ fontSize: "9px", color: isActive ? s.color + "99" : "rgba(255,255,255,0.25)", marginTop: "4px", fontWeight: "600", letterSpacing: "0.3px" }}>{s.headlineSub}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Active strategy detail */}
+      <div style={{ background: activeS.bg, border: `1px solid ${activeS.border}`, borderRadius: "18px", overflow: "hidden" }}>
+        {/* Top accent bar */}
+        <div style={{ height: "3px", background: `linear-gradient(90deg, ${activeS.color}88, ${activeS.color})` }} />
+        <div style={{ padding: "22px 24px" }}>
+          {/* Headline */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                <span style={{ fontSize: "22px" }}>{activeS.icon}</span>
+                <p style={{ fontSize: "16px", fontWeight: "900", color: activeS.color }}>{activeS.label}</p>
+              </div>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>{activeS.verdict}</p>
+            </div>
+            <div style={{ textAlign: "right", background: `${activeS.color}12`, border: `1px solid ${activeS.color}33`, borderRadius: "12px", padding: "12px 18px" }}>
+              <p style={{ fontSize: "32px", fontWeight: "900", color: activeS.color, letterSpacing: "-1.5px", lineHeight: 1 }}>{activeS.headline}</p>
+              <p style={{ fontSize: "10px", color: `${activeS.color}88`, marginTop: "3px", fontWeight: "700", letterSpacing: "0.5px", textTransform: "uppercase" }}>{activeS.headlineSub}</p>
+            </div>
+          </div>
+
+          {/* Metrics */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "18px" }}>
+            {activeS.metrics.map(m => (
+              <div key={m.label} style={{ background: "rgba(0,0,0,0.18)", borderRadius: "12px", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255,255,255,0.04)" }}>
+                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{m.label}</p>
+                <p style={{ fontSize: "16px", fontWeight: "900", color: m.good ? "#34d399" : "#f87171" }}>{m.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Pros & Cons */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div style={{ background: "rgba(52,211,153,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(52,211,153,0.12)" }}>
+              <p style={{ fontSize: "9px", color: "#34d399", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✓ Pros</p>
+              {activeS.pros.map(pro => (
+                <div key={pro} style={{ display: "flex", alignItems: "flex-start", gap: "7px", marginBottom: "6px" }}>
+                  <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#34d399", flexShrink: 0, marginTop: "5px" }} />
+                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{pro}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: "rgba(248,113,113,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(248,113,113,0.12)" }}>
+              <p style={{ fontSize: "9px", color: "#f87171", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✗ Cons</p>
+              {activeS.cons.map(con => (
+                <div key={con} style={{ display: "flex", alignItems: "flex-start", gap: "7px", marginBottom: "6px" }}>
+                  <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#f87171", flexShrink: 0, marginTop: "5px" }} />
+                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{con}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Education Panel */}
+      <div style={{ marginTop: "16px", background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "24px" }}>
+        {active === "hold" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#34d399", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is Hold & Rent?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>You keep the property and rent it to long-term tenants (6–12 month leases). You collect monthly rent, pay your mortgage and expenses, and keep the difference as cash flow. Over time the property appreciates and your mortgage balance decreases — building wealth automatically.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🛠 Best tools to find tenants:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Zillow Rental Manager","Apartments.com","Facebook Marketplace","Craigslist","Kijiji (Canada)","SeLoger (France)","Leboncoin (France)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)", color: "#34d399", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "brrrr" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#a78bfa", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is BRRRR?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>BRRRR stands for <strong style={{color:"#fff"}}>Buy, Rehab, Rent, Refinance, Repeat</strong>. You refinance your existing property at 75% of its current value — pulling out the difference as cash. That cash funds your next deal without selling. Example: property worth $400K, mortgage $200K → refinance at $300K → pocket $100K to buy another property while keeping this one rented.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🏦 BRRRR-friendly lenders:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Visio Lending","Lima One Capital","Kiavi (US)","RCN Capital","National Bank (Canada)","Crédit Foncier (France)","Hypotheekshop (EU)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "sell" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#f59e0b", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What does Sell Now mean?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>You list the property on the market, pay your agent (typically 3–6% commission), close within 30–90 days, and receive the net proceeds after paying off the mortgage and costs. Capital gains tax applies on profit (20% long-term in the US). The cash is then free to be redeployed into a better deal, a 1031 exchange, or another asset class.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>🏡 Best platforms to sell:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Zillow (US)","Realtor.com (US)","MLS via agent (US)","Centris (Canada)","SeLoger (France)","Rightmove (UK)","Idealista (Spain)","Bayut (UAE)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {active === "str" && (
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "900", color: "#60a5fa", marginBottom: "10px", letterSpacing: "-0.3px" }}>📖 What is STR (Short-Term Rental)?</p>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.8", marginBottom: "14px" }}>STR means renting your property nightly or weekly instead of long-term. Think Airbnb or VRBO. A property that earns $2,000/mo long-term can earn $3,500–$5,000/mo as an STR in a good market. The tradeoff: higher income but more active management (guest check-ins, cleaning, dynamic pricing). Some cities restrict or ban STRs — always check local regulations first.</p>
+            <p style={{ fontSize: "12px", fontWeight: "800", color: "rgba(255,255,255,0.5)", marginBottom: "10px", marginTop: "4px" }}>📱 Best STR platforms by region:</p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+              {["Airbnb (Global)","VRBO (US/Canada)","Booking.com (Europe)","Gîtes de France (France)","Plum Guide (UK/EU)","Houfy (US)","Vacasa (US)"].map(t => (
+                <span key={t} style={{ fontSize: "10px", padding: "3px 9px", borderRadius: "999px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa", fontWeight: "600" }}>{t}</span>
+              ))}
+            </div>
+            <div style={{ padding: "10px 12px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "8px" }}>
+              <p style={{ fontSize: "10px", fontWeight: "800", color: "#f87171", marginBottom: "3px" }}>⚠ Check regulations first</p>
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", lineHeight: "1.5" }}>Cities like Paris, Barcelona, NYC, and Vancouver have strict STR limits. Always verify your municipality's rules before converting.</p>
+            </div>
+          </div>
+        )}
+        {/* Universal advice */}
+        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <p style={{ fontSize: "13px", fontWeight: "900", color: "#f59e0b", marginBottom: "10px" }}>💡 Goldstream Recommendation</p>
+          {active === "hold" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if your cash flow is positive and you have no immediate capital needs. Let appreciation and mortgage paydown work for you. Review annually.</p>}
+          {active === "brrrr" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if you want to scale your portfolio without selling. Requires good credit and a lender comfortable with investment properties. Confirm the new monthly payment still generates positive cash flow before proceeding.</p>}
+          {active === "sell" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if the market is at peak, your cash flow is negative, or you have a better deal ready to deploy capital into. Consider a 1031 exchange in the US to defer capital gains tax.</p>}
+          {active === "str" && <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>Best if your property is in a tourist area, city center, or near a university. Run AirDNA or Mashvisor analysis first to verify STR demand in your specific market before investing in furnishings.</p>}
+        </div>
+      </div>
+
+
+
+      {/* ── TAX & STRUCTURE TAB ── */}
+      {visibleTaxStrategies.length > 0 && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "20px", marginTop: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 8px #a78bfa", animation: "blink 1.5s infinite" }} />
+            <span style={{ fontSize: "10px", color: "rgba(167,139,250,0.8)", letterSpacing: "2px", fontWeight: "800", textTransform: "uppercase" }}>Tax & Structure · {isUS ? "US" : "France"} Jurisdiction</span>
+          </div>
+
+          {/* Tax strategy tabs */}
+          <div style={{ display: "flex", gap: "6px", marginBottom: "18px", overflowX: "auto", paddingBottom: "2px" }}>
+            {visibleTaxStrategies.map(([key, s]) => (
+              <button key={key} onClick={() => setActiveTax(key)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: "800", border: `1px solid ${activeTax === key ? s.color + "66" : "rgba(255,255,255,0.08)"}`, background: activeTax === key ? s.bg : "rgba(255,255,255,0.02)", color: activeTax === key ? s.color : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "14px" }}>{s.icon}</span>
+                {s.title}
+              </button>
+            ))}
+          </div>
+
+          {/* Active tax strategy */}
+          {(() => {
+            const [, s] = visibleTaxStrategies.find(([k]) => k === activeTax) || visibleTaxStrategies[0];
+            return (
+              <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: "16px", overflow: "hidden" }}>
+                <div style={{ height: "2px", background: s.color }} />
+                <div style={{ padding: "20px 22px" }}>
+                  {/* Headline */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "28px" }}>{s.icon}</span>
+                      <div>
+                        <p style={{ fontSize: "16px", fontWeight: "900", color: s.color }}>{s.title}</p>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{isUS ? "US Tax Strategy" : "French Tax Strategy"}</p>
+                      </div>
+                    </div>
+                    <div style={{ background: `${s.color}12`, border: `1px solid ${s.color}33`, borderRadius: "12px", padding: "12px 18px", textAlign: "right" }}>
+                      <p style={{ fontSize: "28px", fontWeight: "900", color: s.color, letterSpacing: "-1px", lineHeight: 1 }}>{s.headline}</p>
+                      <p style={{ fontSize: "10px", color: `${s.color}88`, marginTop: "3px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.headlineSub}</p>
+                    </div>
+                  </div>
+
+                  {/* Metrics */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "18px" }}>
+                    {s.metrics.map(m => (
+                      <div key={m.label} style={{ background: "rgba(0,0,0,0.18)", borderRadius: "10px", padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255,255,255,0.04)" }}>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{m.label}</p>
+                        <p style={{ fontSize: "14px", fontWeight: "900", color: m.good ? s.color : "#f87171" }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Steps */}
+                  <div style={{ background: "rgba(0,0,0,0.15)", borderRadius: "12px", padding: "14px 16px", marginBottom: "14px" }}>
+                    <p style={{ fontSize: "9px", color: `${s.color}88`, fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>How to Execute</p>
+                    {s.steps.map((step, i) => (
+                      <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px", alignItems: "flex-start" }}>
+                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: `${s.color}18`, border: `1px solid ${s.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "900", color: s.color, flexShrink: 0 }}>{i + 1}</div>
+                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.5", paddingTop: "2px" }}>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pros / Cons */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <div style={{ background: "rgba(52,211,153,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(52,211,153,0.12)" }}>
+                      <p style={{ fontSize: "9px", color: "#34d399", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✓ Pros</p>
+                      {s.pros.map((pro, i) => (
+                        <div key={i} style={{ display: "flex", gap: "7px", marginBottom: "6px" }}>
+                          <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#34d399", flexShrink: 0, marginTop: "5px" }} />
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{pro}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ background: "rgba(248,113,113,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(248,113,113,0.12)" }}>
+                      <p style={{ fontSize: "9px", color: "#f87171", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✗ Cons</p>
+                      {s.cons.map((con, i) => (
+                        <div key={i} style={{ display: "flex", gap: "7px", marginBottom: "6px" }}>
+                          <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#f87171", flexShrink: 0, marginTop: "5px" }} />
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{con}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", textAlign: "center", marginTop: "10px" }}>Projections based on current market value, appreciation rate & rental income. Not financial advice.</p>
+
+      {visibleTaxStrategies.length > 0 && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "18px", padding: "20px", marginTop: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 8px #a78bfa", animation: "blink 1.5s infinite" }} />
+            <span style={{ fontSize: "10px", color: "rgba(167,139,250,0.8)", letterSpacing: "2px", fontWeight: "800", textTransform: "uppercase" }}>Tax & Structure · {isUS ? "US" : "France"} Jurisdiction</span>
+          </div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "18px", overflowX: "auto", paddingBottom: "2px" }}>
+            {visibleTaxStrategies.map(([key, s]) => (
+              <button key={key} onClick={() => setActiveTax(key)} style={{ flexShrink: 0, padding: "8px 14px", borderRadius: "10px", fontSize: "11px", fontWeight: "800", border: `1px solid ${activeTax === key ? s.color + "66" : "rgba(255,255,255,0.08)"}`, background: activeTax === key ? s.bg : "rgba(255,255,255,0.02)", color: activeTax === key ? s.color : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "14px" }}>{s.icon}</span>{s.title}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const entry = visibleTaxStrategies.find(([k]) => k === activeTax) || visibleTaxStrategies[0];
+            if (!entry) return null;
+            const [, s] = entry;
+            return (
+              <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: "16px", overflow: "hidden" }}>
+                <div style={{ height: "2px", background: s.color }} />
+                <div style={{ padding: "20px 22px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "28px" }}>{s.icon}</span>
+                      <div>
+                        <p style={{ fontSize: "16px", fontWeight: "900", color: s.color }}>{s.title}</p>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{isUS ? "US Tax Strategy" : "French Tax Strategy"}</p>
+                      </div>
+                    </div>
+                    <div style={{ background: `${s.color}12`, border: `1px solid ${s.color}33`, borderRadius: "12px", padding: "12px 18px", textAlign: "right" }}>
+                      <p style={{ fontSize: "28px", fontWeight: "900", color: s.color, letterSpacing: "-1px", lineHeight: 1 }}>{s.headline}</p>
+                      <p style={{ fontSize: "10px", color: `${s.color}88`, marginTop: "3px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.headlineSub}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+                    {s.metrics.map(m => (
+                      <div key={m.label} style={{ background: "rgba(0,0,0,0.18)", borderRadius: "10px", padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255,255,255,0.04)" }}>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{m.label}</p>
+                        <p style={{ fontSize: "14px", fontWeight: "900", color: m.good ? s.color : "#f87171" }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background: "rgba(0,0,0,0.15)", borderRadius: "12px", padding: "14px 16px", marginBottom: "14px" }}>
+                    <p style={{ fontSize: "9px", color: `${s.color}88`, fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>How to Execute</p>
+                    {s.steps.map((step, i) => (
+                      <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px", alignItems: "flex-start" }}>
+                        <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: `${s.color}18`, border: `1px solid ${s.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "900", color: s.color, flexShrink: 0 }}>{i + 1}</div>
+                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.5", paddingTop: "2px" }}>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <div style={{ background: "rgba(52,211,153,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(52,211,153,0.12)" }}>
+                      <p style={{ fontSize: "9px", color: "#34d399", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✓ Pros</p>
+                      {s.pros.map((pro, i) => (
+                        <div key={i} style={{ display: "flex", gap: "7px", marginBottom: "6px" }}>
+                          <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#34d399", flexShrink: 0, marginTop: "5px" }} />
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{pro}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ background: "rgba(248,113,113,0.05)", borderRadius: "12px", padding: "14px 16px", border: "1px solid rgba(248,113,113,0.12)" }}>
+                      <p style={{ fontSize: "9px", color: "#f87171", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" }}>✗ Cons</p>
+                      {s.cons.map((con, i) => (
+                        <div key={i} style={{ display: "flex", gap: "7px", marginBottom: "6px" }}>
+                          <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#f87171", flexShrink: 0, marginTop: "5px" }} />
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", lineHeight: "1.4" }}>{con}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.15)", textAlign: "center", marginTop: "10px" }}>Not tax advice. Consult a CPA or notaire for your specific situation.</p>
+        </div>
+      )}
+    </div>
+  );
+}
