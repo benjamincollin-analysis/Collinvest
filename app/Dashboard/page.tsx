@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
@@ -524,7 +524,7 @@ const [showCompare, setShowCompare] = useState(false);
   const chartPts = (pts: typeof projReal) => pts.map((p, i) => `${(i / 10) * (CW - 40) + 20},${CH - 20 - ((p.value / maxVal) * (CH - 40))}`).join(" ");
   const goalY = CH - 20 - ((GOAL_PORTFOLIO / maxVal) * (CH - 40)); const mile1Y = CH - 20 - ((MILESTONE / maxVal) * (CH - 40));
   const IS: React.CSSProperties = { width: "100%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
-  const tabStyle = (t: string) => ({ padding: "8px 24px", borderRadius: "10px", fontSize: "11px", fontWeight: 700 as const, border: "none", cursor: "pointer" as const, transition: "all 0.2s", background: activeTab === t ? "rgba(245,166,35,0.15)" : "transparent", color: activeTab === t ? "#f5a623" : "rgba(255,255,255,0.4)", boxShadow: activeTab === t ? "inset 0 0 0 1.5px rgba(245,166,35,0.6)" : "none", borderColor: activeTab === t ? "rgba(245,166,35,0.5)" : "transparent", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: "4px", flex: 1, minWidth: "100px" });
+  const tabStyle = (t: string) => ({ padding: "8px 24px", borderRadius: "10px", fontSize: "11px", fontWeight: 700 as const, border: activeTab === t ? "1px solid rgba(245,166,35,0.6)" : "1px solid transparent", cursor: "pointer" as const, transition: "all 0.2s", background: activeTab === t ? "rgba(245,166,35,0.15)" : "transparent", color: activeTab === t ? "#f5a623" : "rgba(255,255,255,0.4)", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: "4px", flex: 1, minWidth: "100px" });
 
   if (loading) return (<div style={{ minHeight: "100vh", background: "#080808", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}><div style={{ width: "28px", height: "28px", background: "#f59e0b", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: "#000" }}>GS</div><p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px", letterSpacing: "1px" }}>LOADING PORTFOLIO...</p></div>);
 
@@ -566,12 +566,12 @@ const [showCompare, setShowCompare] = useState(false);
           position:sticky; top:0; z-index:9; padding:0 32px;
           box-shadow:0 1px 0 rgba(245,166,35,0.08), 0 4px 24px rgba(0,0,0,0.5);
         }
-        .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; padding:11px 16px; border-right:1px solid rgba(255,255,255,0.05); gap:2px; }
+        .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:11px 16px; border-right:1px solid rgba(255,255,255,0.05); gap:3px; }
         .gs-strip-desktop .strip-cell:last-child { border-right:none; }
         .gs-strip-goal-row { display:flex; align-items:center; gap:12px; padding:5px 32px; border-bottom:1px solid rgba(255,255,255,0.04); background:rgba(5,5,5,0.95); position:sticky; top:58px; z-index:8; }
-        .gs-strip-label { font-size:8px; color:rgba(255,255,255,0.25); letter-spacing:1.8px; text-transform:uppercase; font-weight:700; display:flex; align-items:center; gap:5px; }
-        .gs-strip-value { font-size:16px; font-weight:900; letter-spacing:-0.5px; line-height:1; }
-        .gs-strip-sub { font-size:9px; color:rgba(255,255,255,0.2); margin-top:1px; }
+        .gs-strip-label { font-size:9px; color:rgba(255,255,255,0.35); letter-spacing:1.5px; text-transform:uppercase; font-weight:700; display:flex; align-items:center; gap:5px; }
+        .gs-strip-value { font-size:18px; font-weight:900; letter-spacing:-0.8px; line-height:1; }
+        .gs-strip-sub { font-size:10px; color:rgba(255,255,255,0.55); margin-top:1px; font-weight:600; }
         .gs-strip-dot { width:5px; height:5px; border-radius:50%; background:#34d399; box-shadow:0 0 5px #34d399; animation:gsdotpulse 2s infinite; display:inline-block; }
         @keyframes gsdotpulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
@@ -658,7 +658,7 @@ const [showCompare, setShowCompare] = useState(false);
     { key: "getfinanced", label: "Get Financed", svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
     { key: "community",   label: "Community",    svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
   ] as const).map(({ key, label, svg }) => (
-    <button key={key} onClick={() => setActiveTab(key)} style={tabStyle(key)}>
+    <button key={key} onClick={() => setActiveTab(key)} style={tabStyle(key)} onMouseEnter={e => { if (activeTab !== key) { e.currentTarget.style.color = "rgba(245,166,35,0.7)"; }}} onMouseLeave={e => { if (activeTab !== key) { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}}>
       <span style={{ lineHeight: 1 }}>{svg}</span>
       <span style={{ fontSize: "12px", letterSpacing: "0.4px", fontWeight: 600, textTransform: "uppercase" as const, whiteSpace: "nowrap" as const }}>{label}</span>
     </button>
@@ -698,12 +698,12 @@ const [showCompare, setShowCompare] = useState(false);
 
       <div className="gs-strip-desktop">
         {[
-          { label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}` },
-          { label: "Net Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to goal` },
-          { label: "Occupancy", value: `${properties.length > 0 ? Math.round(properties.filter(p => p.occupancyStatus === "occupied").length / properties.length * 100) : 0}%`, color: "#60a5fa", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} of ${properties.length} occupied` },
-          { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} active` },
-          { label: "Avg Cap Rate", value: properties.length > 0 ? `${(properties.reduce((s, p) => { const noi = (p.rent - p.expenses) * 12; return s + (p.value > 0 ? noi / p.value * 100 : 0); }, 0) / properties.length).toFixed(1)}%` : "?", color: "#fff", sub: "benchmark: 5-10%" },
-        ].map((m) => (
+          { label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`, glow: "rgba(245,158,11,0.15)" },
+          { label: "Net Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to goal`, glow: "rgba(52,211,153,0.1)" },
+          { label: "Occupancy", value: `${properties.length > 0 ? Math.round(properties.filter(p => p.occupancyStatus === "occupied").length / properties.length * 100) : 0}%`, color: "#60a5fa", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} of ${properties.length} occupied`, glow: "rgba(96,165,250,0.08)" },
+          { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} active`, glow: "rgba(255,255,255,0.04)" },
+          { label: "Investor Rank", value: `#${Math.max(1, 247 - Math.floor(properties.length * 3))}`, color: "#f59e0b", sub: `Top ${Math.max(1, 12 - properties.length)}% · Builder II`, glow: "rgba(245,158,11,0.08)" },
+        ].map((m: any) => (
           <div key={m.label} className="strip-cell">
             <span className="gs-strip-label">{m.label}</span>
             <span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span>
@@ -711,11 +711,11 @@ const [showCompare, setShowCompare] = useState(false);
           </div>
         ))}
         <div className="strip-cell" style={{ borderLeft: "1px solid rgba(52,211,153,0.12)", alignItems: "center", justifyContent: "center" }}>
-          <span className="gs-strip-label"><span className="gs-strip-dot" />Today</span>
+          
           <LiveIncomeCounter monthlyCashFlow={monthlyCashFlow} />
         </div>
         <div className="strip-cell" style={{ alignItems: "center", justifyContent: "center", borderRight: "none" }}>
-          <button onClick={() => { setActiveTab("home"); openAdd(); }} style={{ padding: "7px 14px", background: "#f59e0b", color: "#000", borderRadius: "7px", fontWeight: "800", fontSize: "11px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>+ Add</button>
+          <div style={{ display:"flex", gap:"6px" }}><button onClick={() => { setActiveTab("home"); openAdd(); }} style={{ padding: "7px 11px", background: "rgba(245,158,11,0.12)", color: "#f59e0b", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(245,158,11,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Property</button><button onClick={() => setActiveTab("myprojects")} style={{ padding: "7px 11px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(167,139,250,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Project</button></div>
         </div>
       </div>
 
@@ -8881,3 +8881,5 @@ function DealLabTab({ user, incomingListing }: { user: any; incomingListing?: an
 }
 
 export default Dashboard;
+
+
