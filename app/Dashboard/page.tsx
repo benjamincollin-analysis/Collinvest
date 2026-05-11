@@ -569,7 +569,7 @@ const [showCompare, setShowCompare] = useState(false);
         .gs-strip-desktop .strip-cell { display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:11px 16px; border-right:1px solid rgba(255,255,255,0.05); gap:3px; }
         .gs-strip-desktop .strip-cell:last-child { border-right:none; }
         .gs-strip-goal-row { display:flex; align-items:center; gap:12px; padding:5px 32px; border-bottom:1px solid rgba(255,255,255,0.04); background:rgba(5,5,5,0.95); position:sticky; top:58px; z-index:8; }
-        .gs-strip-label { font-size:9px; color:rgba(255,255,255,0.35); letter-spacing:1.5px; text-transform:uppercase; font-weight:700; display:flex; align-items:center; gap:5px; }
+        .gs-strip-label { font-size:9px; color:rgba(255,255,255,0.52); letter-spacing:1.5px; text-transform:uppercase; font-weight:700; display:flex; align-items:center; gap:5px; }
         .gs-strip-value { font-size:18px; font-weight:900; letter-spacing:-0.8px; line-height:1; }
         .gs-strip-sub { font-size:10px; color:rgba(255,255,255,0.55); margin-top:1px; font-weight:600; }
         .gs-strip-dot { width:5px; height:5px; border-radius:50%; background:#34d399; box-shadow:0 0 5px #34d399; animation:gsdotpulse 2s infinite; display:inline-block; }
@@ -698,8 +698,8 @@ const [showCompare, setShowCompare] = useState(false);
 
       <div className="gs-strip-desktop">
         {[
-          { label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`, glow: "rgba(245,158,11,0.15)" },
-          { label: "Net Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `${cashFlowPct.toFixed(1)}% to goal`, glow: "rgba(52,211,153,0.1)" },
+          { label: "Portfolio", value: fmt(totalValue), color: "#f59e0b", sub: `? ${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`, subColor: "#22d97a", glow: "rgba(245,158,11,0.15)" },
+          { label: "Net Cash Flow", value: `${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}/mo`, color: monthlyCashFlow >= 0 ? "#34d399" : "#f87171", sub: `? ${cashFlowPct.toFixed(1)}% to goal`, subColor: "#22d97a", glow: "rgba(52,211,153,0.1)" },
           { label: "Occupancy", value: `${properties.length > 0 ? Math.round(properties.filter(p => p.occupancyStatus === "occupied").length / properties.length * 100) : 0}%`, color: "#60a5fa", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} of ${properties.length} occupied`, glow: "rgba(96,165,250,0.08)" },
           { label: "Properties", value: String(properties.length), color: "#fff", sub: `${properties.filter(p => p.occupancyStatus === "occupied").length} active`, glow: "rgba(255,255,255,0.04)" },
           { label: "Investor Rank", value: `#${Math.max(1, 247 - Math.floor(properties.length * 3))}`, color: "#f59e0b", sub: `Top ${Math.max(1, 12 - properties.length)}% · Builder II`, glow: "rgba(245,158,11,0.08)" },
@@ -707,7 +707,7 @@ const [showCompare, setShowCompare] = useState(false);
           <div key={m.label} className="strip-cell">
             <span className="gs-strip-label">{m.label}</span>
             <span className="gs-strip-value" style={{ color: m.color }}>{m.value}</span>
-            <span className="gs-strip-sub">{m.sub}</span>
+            <span className="gs-strip-sub" style={{ color: (m as any).subColor || undefined }}>{m.sub}</span>
           </div>
         ))}
         <div className="strip-cell" style={{ borderLeft: "1px solid rgba(52,211,153,0.12)", alignItems: "center", justifyContent: "center" }}>
@@ -715,22 +715,22 @@ const [showCompare, setShowCompare] = useState(false);
           <LiveIncomeCounter monthlyCashFlow={monthlyCashFlow} />
         </div>
         <div className="strip-cell" style={{ alignItems: "center", justifyContent: "center", borderRight: "none" }}>
-          <div style={{ display:"flex", gap:"6px" }}><button onClick={() => { setActiveTab("home"); openAdd(); }} style={{ padding: "7px 11px", background: "rgba(245,158,11,0.12)", color: "#f59e0b", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(245,158,11,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Property</button><button onClick={() => setActiveTab("myprojects")} style={{ padding: "7px 11px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(167,139,250,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Project</button></div>
+          <div style={{ display:"flex", gap:"6px" }}><button onClick={() => { setActiveTab("home"); openAdd(); }} style={{ padding: "7px 11px", background: "rgba(245,158,11,0.12)", color: "#f59e0b", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(245,158,11,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Property</button><button onClick={() => { setActiveTab("myprojects"); setTimeout(() => { const btn = document.querySelector("[data-new-project]") as HTMLButtonElement; if(btn) btn.click(); }, 300); }} style={{ padding: "7px 11px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", borderRadius: "7px", fontWeight: "800", fontSize: "10px", border: "1px solid rgba(167,139,250,0.3)", cursor: "pointer", whiteSpace: "nowrap" }}>+ Project</button></div>
         </div>
       </div>
 
       <div className="gs-strip-goal-row">
-        <span style={{ fontSize: "8px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", fontWeight: "700", whiteSpace: "nowrap" }}>Portfolio goal</span>
+        <span style={{ fontSize: "8px", letterSpacing: "1.5px", textTransform: "uppercase", color: "#f59e0b", fontWeight: "700", whiteSpace: "nowrap" }}>Portfolio goal</span>
         <div style={{ flex: 1, height: "2px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${Math.min(100, portfolioPct)}%`, background: "#f59e0b", borderRadius: "999px", transition: "width 1s" }} />
         </div>
-        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.22)", whiteSpace: "nowrap" }}>{fmt(totalValue)} / {fmt(GOAL_PORTFOLIO)} - {portfolioPct.toFixed(1)}%</span>
+        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", fontWeight: "700", whiteSpace: "nowrap" }}>{fmt(totalValue)} / {fmt(GOAL_PORTFOLIO)} <span style={{ color: "#f59e0b", fontWeight: "800" }}>{portfolioPct.toFixed(1)}%</span></span>
         <div style={{ width: "1px", height: "10px", background: "rgba(255,255,255,0.08)" }} />
-        <span style={{ fontSize: "8px", letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", fontWeight: "700", whiteSpace: "nowrap" }}>Cash flow goal</span>
+        <span style={{ fontSize: "8px", letterSpacing: "1.5px", textTransform: "uppercase", color: "#34d399", fontWeight: "700", whiteSpace: "nowrap" }}>Cash flow goal</span>
         <div style={{ flex: 1, height: "2px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${Math.min(100, cashFlowPct)}%`, background: "#34d399", borderRadius: "999px", transition: "width 1s" }} />
         </div>
-        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.22)", whiteSpace: "nowrap" }}>{fmtFull(monthlyCashFlow)}/mo / ${GOAL_CASHFLOW.toLocaleString()} - {cashFlowPct.toFixed(1)}%</span>
+        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", fontWeight: "700", whiteSpace: "nowrap" }}>{fmtFull(monthlyCashFlow)}/mo / ${GOAL_CASHFLOW.toLocaleString()} <span style={{ color: "#34d399", fontWeight: "800" }}>{cashFlowPct.toFixed(1)}%</span></span>
       </div>
 
       <div className="gs-strip-mobile">
@@ -4543,7 +4543,7 @@ function ProjectsTab({ user }: { user: any }) {
           <h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.8px", background: "linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Projects</h2>
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "4px", letterSpacing: "0.3px" }}>Timeline · Budget · Team · Health Score</p>
         </div>
-        <button onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ New Project</button>
+        <button data-new-project onClick={() => setShowForm(true)} style={{ padding: "10px 20px", background: "#a78bfa", color: "#000", borderRadius: "10px", fontWeight: "800", fontSize: "13px", border: "none", cursor: "pointer" }}>+ New Project</button>
       </div>
 
 <MissionControl projects={projects} userId={user?.id} totalEquity={projects.reduce((s,p)=>s+(p.budget||0)-(p.spent||0),0)} />
@@ -8881,5 +8881,6 @@ function DealLabTab({ user, incomingListing }: { user: any; incomingListing?: an
 }
 
 export default Dashboard;
+
 
 
