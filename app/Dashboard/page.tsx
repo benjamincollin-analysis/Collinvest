@@ -4877,71 +4877,22 @@ function ProjectsTab({ user }: { user: any }) {
                           setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: history, spent: newSpent } : pr));
                         }} team={p.team} trades={p.trades || []} />
 
-                        {/* Trade Breakdown */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", marginTop: "24px" }}>
-                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Trade Breakdown <span style={{ color: "rgba(255,255,255,0.2)", textTransform: "none", letterSpacing: "0", fontWeight: "400" }}>· quoted vs actual · press Enter to save</span></p>
-                          <button onClick={() => { const newTrades = [...(p.trades || []), { name: "New Trade", quoted: 0, actual: 0, assignedTo: "" }]; updateTrades(p, newTrades); }} style={{ fontSize: "11px", padding: "5px 12px", background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: "6px", color: "#a78bfa", cursor: "pointer", fontWeight: "700" }}>+ Add Trade</button>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }}>
-                          {(p.trades && p.trades.length > 0 ? p.trades : TRADE_CATEGORIES.slice(0, 6).map((name: string) => ({ name, quoted: 0, actual: 0, assignedTo: "" }))).map((trade: any, ti: number) => {
-                            const trades = p.trades && p.trades.length > 0 ? p.trades : TRADE_CATEGORIES.slice(0, 6).map((n: string) => ({ name: n, quoted: 0, actual: 0, assignedTo: "" }));
-                            const over = trade.actual > trade.quoted && trade.quoted > 0;
-                            const tradeColor = over ? "#f87171" : trade.actual > 0 ? "#34d399" : "rgba(255,255,255,0.3)";
-                            return (
-                              <TradeCard
-                                key={ti}
-                                trade={trade}
-                                index={ti}
-                                tradeColor={tradeColor}
-                                over={over}
-                                team={p.team}
-onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; await updateTrades(p, t); }}                                onDelete={() => { const t = trades.filter((_: any, i: number) => i !== ti); updateTrades(p, t); }}
-                                fmtMoney={fmtMoney}
-                                onLog={async (entry: any) => {
-                                  const history = [...(p.budgetHistory || []), entry];
-                                  const newSpent = p.spent + entry.amount;
-                                  await supabase.from("projects").update({ budget_history: history, spent: newSpent }).eq("id", p.id);
-                                  setProjects(prev => prev.map(pr => pr.id === p.id ? { ...pr, budgetHistory: history, spent: newSpent } : pr));
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-
-                        {p.trades && p.trades.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginTop: "12px", padding: "14px 18px", background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "12px" }}>
-                            <div>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Contractors Quoted</p>
-                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>what trades estimated</p>
-                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.quoted || 0), 0))}</p>
-                            </div>
-                            <div>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Contractors Actual</p>
-                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>final trade invoices</p>
-                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>{fmtMoney(p.trades.reduce((s: number, t: any) => s + (t.actual || 0), 0))}</p>
-                            </div>
-                            <div>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "2px", letterSpacing: "1px", textTransform: "uppercase" }}>Total Spent</p>
-                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginBottom: "6px" }}>all payments logged</p>
-                              <p style={{ fontSize: "20px", fontWeight: "900", color: "#34d399" }}>{fmtMoney(p.spent)}</p>
-                            </div>
-                          </div>
-                        )}
-
                         {p.budgetHistory && p.budgetHistory.length > 0 && (
                           <div style={{ marginTop: "24px" }}>
                             <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "10px" }}>📋 Spend History</p>
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                               {[...(p.budgetHistory || [])].reverse().map((entry: any, ei: number) => (
-                                <div key={ei} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "10px", flexWrap: "wrap", gap: "8px" }}>
-                                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{entry.date}</span>
-                                    {entry.trade && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontWeight: "700" }}>{entry.trade}</span>}
-                                    {entry.enteredBy && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>by {entry.enteredBy}</span>}
-                                    {entry.note && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>{entry.note}</span>}
+                                <div key={ei} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                                      {entry.trade && <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", fontWeight: "800", border: "1px solid rgba(167,139,250,0.25)" }}>{entry.trade}</span>}
+                                      <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{entry.date}</span>
+                                      {entry.enteredBy && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>by {entry.enteredBy}</span>}
+                                    </div>
+                                    {entry.note && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{entry.note}</p>}
                                   </div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                    <span style={{ fontSize: "14px", fontWeight: "800", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+                                    <span style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
                                     <button onClick={() => {
                                       const original = [...(p.budgetHistory || [])];
                                       original.reverse();
@@ -4949,11 +4900,10 @@ onUpdate={async (updated: any) => { const t = [...trades]; t[ti] = updated; awai
                                       original.reverse();
                                       supabase.from("projects").update({ budget_history: original }).eq("id", p.id);
                                       setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: original } : pr));
-                                    }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", padding: "0 4px" }} title="Delete entry">×</button>
+                                    }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "18px" }}>x</button>
                                   </div>
                                 </div>
                               ))}
-
                             </div>
                           </div>
                         )}
