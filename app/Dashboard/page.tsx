@@ -4843,11 +4843,19 @@ function ProjectsTab({ user }: { user: any }) {
                       <div style={{ padding: "24px" }}>
                         {/* KPI strip */}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
-                          {[
-                            { label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa", sub: "project ceiling" },
-                            { label: "Spent", value: fmtMoney(p.spent), color: "#f87171", sub: `${budgetPct.toFixed(1)}% used` },
-                            { label: "Remaining", value: fmtMoney(Math.max(0, p.budget - p.spent)), color: p.budget > p.spent ? "#34d399" : "#f87171", sub: p.budget > p.spent ? "on budget" : "over budget ⚠" },
-                          ].map(m => (
+                          {[...(() => {
+                              const plannedTotal = (p.budgetHistory || []).filter((e: any) => e.planned).reduce((s: number, e: any) => s + (e.quoted || 0), 0);
+                              const committed = p.spent + plannedTotal;
+                              const remaining = Math.max(0, p.budget - committed);
+                              const overBudget = committed > p.budget;
+                              return [
+                                { label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa", sub: "project ceiling" },
+                                { label: "Paid", value: fmtMoney(p.spent), color: "#f87171", sub: `${budgetPct.toFixed(1)}% of budget` },
+                                { label: "Planned", value: fmtMoney(plannedTotal), color: "#f59e0b", sub: `${p.budget > 0 ? ((plannedTotal/p.budget)*100).toFixed(1) : 0}% upcoming` },
+                                { label: "Total Committed", value: fmtMoney(committed), color: overBudget ? "#f87171" : "#60a5fa", sub: overBudget ? "over budget" : `${p.budget > 0 ? ((committed/p.budget)*100).toFixed(1) : 0}% of budget` },
+                                { label: "Remaining", value: fmtMoney(remaining), color: remaining > 0 ? "#34d399" : "#f87171", sub: remaining > 0 ? "available" : "over budget" },
+                              ];
+                            })()].map(m => (
                             <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.color}22`, borderRadius: "14px", padding: "18px 20px" }}>
                               <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: "600" }}>{m.label}</p>
                               <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px" }}>{m.value}</p>
@@ -4885,14 +4893,19 @@ function ProjectsTab({ user }: { user: any }) {
                                 <div key={ei} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
                                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
                                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                                      {entry.planned && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontWeight: "800", border: "1px solid rgba(245,158,11,0.3)" }}>PLANNED</span>}
                                       {entry.trade && <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", fontWeight: "800", border: "1px solid rgba(167,139,250,0.25)" }}>{entry.trade}</span>}
                                       <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{entry.date}</span>
                                       {entry.enteredBy && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>by {entry.enteredBy}</span>}
+                                      {entry.quoted > 0 && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Quoted: <span style={{ color: entry.quoted > entry.amount ? "#34d399" : entry.quoted < entry.amount ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{fmtMoney(entry.quoted)}</span></span>}
                                     </div>
                                     {entry.note && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{entry.note}</p>}
                                   </div>
                                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-                                    <span style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                    <div style={{ textAlign: "right" }}>
+                                    {entry.planned ? <span style={{ fontSize: "16px", fontWeight: "900", color: "#f59e0b" }}>~{fmtMoney(entry.quoted || 0)}</span> : <span style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>}
+                                    {entry.planned && entry.plannedDate && <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>Due {entry.plannedDate}</p>}
+                                  </div>
                                     <button onClick={() => {
                                       const original = [...(p.budgetHistory || [])];
                                       original.reverse();
@@ -6014,6 +6027,9 @@ function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: num
 
 function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
   const [amount, setAmount] = useState("");
+  const [quoted, setQuoted] = useState("");
+  const [mode, setMode] = useState<"paid"|"planned">("paid");
+  const [plannedDate, setPlannedDate] = useState("");
   const [note, setNote] = useState("");
   const [trade, setTrade] = useState("");
   const [enteredBy, setEnteredBy] = useState("Owner");
@@ -6026,8 +6042,8 @@ function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: 
 
   function handleSave() {
     if (!amount) return;
-    onLog({ amount: parseFloat(amount), note, trade, enteredBy, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
-    setAmount(""); setNote(""); setTrade(""); setEnteredBy("Owner");
+    onLog({ amount: mode === "planned" ? 0 : parseFloat(amount), quoted: parseFloat(quoted) || parseFloat(amount) || 0, note, trade, enteredBy, planned: mode === "planned", plannedDate: mode === "planned" ? plannedDate : "", date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
+    setAmount(""); setQuoted(""); setNote(""); setTrade(""); setEnteredBy("Owner"); setPlannedDate("");
   }
 
   function handleAddPerson() {
@@ -6042,11 +6058,25 @@ function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: 
 
   return (
     <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
-      <p style={{ fontSize: "10px", color: "rgba(248,113,113,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700", marginBottom: "12px" }}>?? Log Spend</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <p style={{ fontSize: "10px", color: mode === "paid" ? "rgba(248,113,113,0.7)" : "rgba(245,158,11,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700" }}>{mode === "paid" ? "?? Log Spend" : "?? Plan Expense"}</p>
+        <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "3px" }}>
+          <button onClick={() => setMode("paid")} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", border: "none", cursor: "pointer", background: mode === "paid" ? "#f87171" : "transparent", color: mode === "paid" ? "#000" : "rgba(255,255,255,0.4)" }}>Paid</button>
+          <button onClick={() => setMode("planned")} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", border: "none", cursor: "pointer", background: mode === "planned" ? "#f59e0b" : "transparent", color: mode === "planned" ? "#000" : "rgba(255,255,255,0.4)" }}>Planned</button>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
         <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Amount ($) *</p>
-          <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f87171" }} />
+          <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>{mode === "paid" ? "Amount Paid ($) *" : "Expected Amount ($)"}</p>
+              <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: mode === "paid" ? "#f87171" : "#f59e0b" }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>{mode === "paid" ? "Quoted ($)" : "Expected Date"} <span style={{ color: "rgba(255,255,255,0.2)" }}>optional</span></p>
+              {mode === "paid" ? <input type="number" placeholder="e.g. 12000" value={quoted} onChange={e => setQuoted(e.target.value)} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f59e0b" }} /> : <input type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} style={{ ...IS2, fontSize: "14px", fontWeight: "700", color: "#f59e0b" }} />}
+            </div>
+          </div>
         </div>
         <div>
           <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Category / Trade</p>
@@ -6080,7 +6110,7 @@ function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: 
           </select>
         </div>
       </div>
-      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>Save Spend Entry</button>
+      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>{mode === "paid" ? "Save Spend Entry" : "Save Planned Expense"}</button>
     </div>
   );
 }
