@@ -1609,7 +1609,6 @@ function TaxStructurePanel({ properties, totalEquity, totalValue }: { properties
 function ProjectIntelligence({ project }: { project: any }) {
   const [aiReport, setAiReport] = useState("");
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const budget = project.budget || 0;
   const spent = project.spent || 0;
   const remaining = Math.max(0, budget - spent);
@@ -1618,6 +1617,12 @@ function ProjectIntelligence({ project }: { project: any }) {
   const totalPhases = (project.phases || []).length;
   const phasePct = totalPhases > 0 ? (donePhases / totalPhases) * 100 : 0;
   const isOnTrack = burnPct <= phasePct + 10;
+
+  const risks = [
+    { label: "Budget Overrun", level: burnPct > 90 ? "HIGH" : burnPct > 70 ? "MED" : null },
+    { label: "Timeline Delay", level: (project.phases || []).some((p: any) => p.status === "delayed") ? "HIGH" : null },
+    { label: "Capital Gap", level: remaining < budget * 0.1 ? "MED" : null },
+  ].filter(r => r.level !== null);
 
   async function generateReport() {
     setLoading(true); setAiReport("");
@@ -1638,18 +1643,16 @@ function ProjectIntelligence({ project }: { project: any }) {
     <div style={{ background: "linear-gradient(135deg,rgba(167,139,250,0.06),rgba(96,165,250,0.03))", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "18px", padding: "20px 24px", margin: "16px 0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>⚡</div>
+          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>?</div>
           <div>
             <p style={{ fontSize: "11px", fontWeight: "800", color: "#a78bfa", letterSpacing: "1px", textTransform: "uppercase" }}>Project Intelligence</p>
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>Financing · Risk · AI Briefing</p>
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>Financing ? Risk ? AI Briefing</p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button onClick={generateReport} disabled={loading} style={{ fontSize: "11px", padding: "7px 14px", background: loading ? "rgba(167,139,250,0.1)" : "#a78bfa", color: loading ? "#a78bfa" : "#000", border: "none", borderRadius: "8px", cursor: loading ? "not-allowed" : "pointer", fontWeight: "800" }}>{loading ? "Analyzing..." : "🤖 AI Briefing"}</button>
-          <button onClick={() => setExpanded(!expanded)} style={{ fontSize: "11px", padding: "7px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "700" }}>{expanded ? "▲ Less" : "▼ Details"}</button>
-        </div>
+        <button onClick={generateReport} disabled={loading} style={{ fontSize: "11px", padding: "7px 14px", background: loading ? "rgba(167,139,250,0.1)" : "#a78bfa", color: loading ? "#a78bfa" : "#000", border: "none", borderRadius: "8px", cursor: loading ? "not-allowed" : "pointer", fontWeight: "800" }}>{loading ? "Analyzing..." : "AI Briefing"}</button>
       </div>
 
+      {/* 4 KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px", marginBottom: "14px" }}>
         {[
           { label: "Budget Health", value: isOnTrack ? "On Track" : "At Risk", color: isOnTrack ? "#34d399" : "#f87171" },
@@ -1664,40 +1667,31 @@ function ProjectIntelligence({ project }: { project: any }) {
         ))}
       </div>
 
+      {/* Risk status ? only show issues, otherwise green line */}
+      {risks.length === 0
+        ? <p style={{ fontSize: "11px", color: "#34d399", fontWeight: "600", opacity: 0.7 }}>All systems green ? Low risk across budget, timeline and capital</p>
+        : <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {risks.map(r => (
+              <span key={r.label} style={{ fontSize: "10px", padding: "3px 10px", borderRadius: "999px", background: r.level === "HIGH" ? "rgba(248,113,113,0.12)" : "rgba(245,158,11,0.12)", color: r.level === "HIGH" ? "#f87171" : "#f59e0b", border: `1px solid ${r.level === "HIGH" ? "rgba(248,113,113,0.3)" : "rgba(245,158,11,0.3)"}`, fontWeight: "700" }}>{r.label} ? {r.level}</span>
+            ))}
+          </div>
+      }
+
+      {/* AI Report */}
       {aiReport && (
-        <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "12px", padding: "14px 18px", marginBottom: "14px" }}>
+        <div style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "12px", padding: "14px 18px", marginTop: "14px" }}>
           {aiReport.split("\n").map((line, i) => {
             const m = line.match(/^\*\*(.*?)\*\*(.*)/);
             if (m) return <p key={i} style={{ fontSize: "13px", lineHeight: "1.7", marginBottom: "8px" }}><span style={{ color: "#a78bfa", fontWeight: "800" }}>{m[1]}</span><span style={{ color: "rgba(255,255,255,0.65)" }}>{m[2]}</span></p>;
-            return line ? <p key={i} style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7", marginBottom: "6px" }}>{line}</p> : null;
-          })}
-        </div>
-      )}
-
-      {expanded && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-          {[
-            { risk: "Budget Overrun", level: burnPct > phasePct + 15 ? "HIGH" : burnPct > phasePct + 5 ? "MED" : "LOW", note: burnPct > phasePct ? "Spending ahead of progress" : "Spend aligned with progress" },
-            { risk: "Timeline Delay", level: (project.phases || []).some((p: any) => p.status === "delayed") ? "HIGH" : "LOW", note: (project.phases || []).some((p: any) => p.status === "delayed") ? "Delayed phases detected" : "All phases on schedule" },
-            { risk: "Capital Gap", level: remaining < budget * 0.1 ? "HIGH" : remaining < budget * 0.2 ? "MED" : "LOW", note: remaining < budget * 0.15 ? "Less than 15% budget remaining" : "Adequate reserves" },
-            { risk: "Exit Risk", level: !project.end_date ? "MED" : "LOW", note: project.end_date ? "Exit date defined" : "No completion date set" },
-          ].map(r => {
-            const rc = r.level === "HIGH" ? "#f87171" : r.level === "MED" ? "#f59e0b" : "#34d399";
-            return (
-              <div key={r.risk} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", background: `${rc}06`, border: `1px solid ${rc}22`, borderRadius: "10px" }}>
-                <div>
-                  <p style={{ fontSize: "12px", fontWeight: "700", color: "#fff", marginBottom: "2px" }}>{r.risk}</p>
-                  <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>{r.note}</p>
-                </div>
-                <span style={{ fontSize: "10px", fontWeight: "900", color: rc, background: `${rc}18`, border: `1px solid ${rc}33`, borderRadius: "999px", padding: "3px 10px" }}>{r.level}</span>
-              </div>
-            );
+            return line ? <p key={i} style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.7" }}>{line}</p> : null;
           })}
         </div>
       )}
     </div>
   );
 }
+
+
 function MapSection({ properties, selected, onSelect }: { properties: Property[]; selected: number | null; onSelect: (id: number) => void }) {
   const [filterGroup, setFilterGroup] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -4841,78 +4835,100 @@ function ProjectsTab({ user }: { user: any }) {
 
                     {section === "budget" && (
                       <div style={{ padding: "24px" }}>
-                        {/* KPI strip */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px", marginBottom: "20px" }}>
-                          {[...(() => {
-                              const plannedTotal = (p.budgetHistory || []).filter((e: any) => e.planned).reduce((s: number, e: any) => s + (e.quoted || 0), 0);
-                              const committed = p.spent + plannedTotal;
-                              const remaining = Math.max(0, p.budget - committed);
-                              const overBudget = committed > p.budget;
-                              return [
-                                { label: "Total Budget", value: fmtMoney(p.budget), color: "#a78bfa", sub: "project ceiling" },
-                                { label: "Paid", value: fmtMoney(p.spent), color: "#f87171", sub: `${budgetPct.toFixed(1)}% of budget` },
-                                { label: "Planned", value: fmtMoney(plannedTotal), color: "#f59e0b", sub: `${p.budget > 0 ? ((plannedTotal/p.budget)*100).toFixed(1) : 0}% upcoming` },
-                                { label: "Total Committed", value: fmtMoney(committed), color: overBudget ? "#f87171" : "#60a5fa", sub: overBudget ? "over budget" : `${p.budget > 0 ? ((committed/p.budget)*100).toFixed(1) : 0}% of budget` },
-                                { label: "Remaining", value: fmtMoney(remaining), color: remaining > 0 ? "#34d399" : "#f87171", sub: remaining > 0 ? "available" : "over budget" },
-                              ];
-                            })()].map(m => (
-                            <div key={m.label} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.color}22`, borderRadius: "14px", padding: "18px 20px" }}>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: "600" }}>{m.label}</p>
-                              <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-0.5px" }}>{m.value}</p>
-                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>{m.sub}</p>
+
+                        {/* FORECAST BAR */}
+                        {(() => {
+                          const plannedTotal = (p.budgetHistory || []).filter((e: any) => e.planned).reduce((s: number, e: any) => s + (e.quoted || 0), 0);
+                          const committed = p.spent + plannedTotal;
+                          const remaining = Math.max(0, p.budget - committed);
+                          const paidPct = p.budget > 0 ? Math.min(100, (p.spent / p.budget) * 100) : 0;
+                          const plannedPct = p.budget > 0 ? Math.min(100 - paidPct, (plannedTotal / p.budget) * 100) : 0;
+                          const overBudget = committed > p.budget;
+                          return (
+                            <div style={{ marginBottom: "24px" }}>
+                              {/* 3 hero numbers */}
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                                {[
+                                  { label: "Paid", value: fmtMoney(p.spent), sub: `${paidPct.toFixed(1)}% of budget`, color: "#f87171", bg: "rgba(248,113,113,0.06)", border: "rgba(248,113,113,0.15)" },
+                                  { label: "Planned", value: fmtMoney(plannedTotal), sub: `${plannedPct.toFixed(1)}% upcoming`, color: "#f59e0b", bg: "rgba(245,158,11,0.06)", border: "rgba(245,158,11,0.15)" },
+                                  { label: "Remaining", value: fmtMoney(remaining), sub: overBudget ? "? over budget" : "available to spend", color: remaining > 0 ? "#34d399" : "#f87171", bg: remaining > 0 ? "rgba(52,211,153,0.06)" : "rgba(248,113,113,0.06)", border: remaining > 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)" },
+                                ].map(m => (
+                                  <div key={m.label} style={{ background: m.bg, border: `1px solid ${m.border}`, borderRadius: "16px", padding: "18px 20px" }}>
+                                    <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "700", marginBottom: "8px" }}>{m.label}</p>
+                                    <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-1px", lineHeight: 1 }}>{m.value}</p>
+                                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "6px" }}>{m.sub}</p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Stacked forecast bar */}
+                              <div style={{ marginBottom: "8px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>Budget Forecast</span>
+                                  <span style={{ fontSize: "10px", color: overBudget ? "#f87171" : "rgba(255,255,255,0.4)", fontWeight: "700" }}>{fmtMoney(committed)} committed of {fmtMoney(p.budget)}</span>
+                                </div>
+                                <div style={{ height: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden", display: "flex" }}>
+                                  <div style={{ width: `${paidPct}%`, background: "#f87171", borderRadius: "999px 0 0 999px", transition: "width 0.8s", boxShadow: "0 0 8px rgba(248,113,113,0.4)" }} />
+                                  <div style={{ width: `${plannedPct}%`, background: "#f59e0b", transition: "width 0.8s", boxShadow: "0 0 8px rgba(245,158,11,0.3)", backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.15) 4px, rgba(0,0,0,0.15) 8px)" }} />
+                                </div>
+                                <div style={{ display: "flex", gap: "16px", marginTop: "8px" }}>
+                                  {[{ color: "#f87171", label: "Paid" }, { color: "#f59e0b", label: "Planned" }, { color: "rgba(255,255,255,0.15)", label: "Remaining" }].map(l => (
+                                    <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                      <div style={{ width: "8px", height: "8px", borderRadius: "2px", background: l.color }} />
+                                      <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>{l.label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
 
-                        {/* Budget bar */}
-                        <div style={{ marginBottom: "20px" }}>
-                          <div style={{ height: "10px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${budgetPct}%`, background: budgetPct > 90 ? "#f87171" : budgetPct > 70 ? "#f59e0b" : "#34d399", borderRadius: "999px", transition: "width 0.6s", boxShadow: budgetPct > 90 ? "0 0 12px rgba(248,113,113,0.5)" : "0 0 12px rgba(245,158,11,0.4)" }} />
-                          </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>$0</span>
-                            <span style={{ fontSize: "10px", color: budgetPct > 90 ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{budgetPct.toFixed(1)}% spent</span>
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)" }}>{fmtMoney(p.budget)}</span>
-                          </div>
-                        </div>
-
-                        {/* Log Spend Entry */}
+                        {/* LOG SPEND */}
                         <ProjectIntelligence project={p} />
                         <LogSpendEntry project={p} onLog={(entry: any) => {
                           const history = [...(p.budgetHistory || []), entry];
-                          const newSpent = p.spent + entry.amount;
+                          const newSpent = entry.planned ? p.spent : p.spent + entry.amount;
                           supabase.from("projects").update({ budget_history: history, spent: newSpent }).eq("id", p.id);
                           setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: history, spent: newSpent } : pr));
                         }} team={p.team} trades={p.trades || []} />
 
+                        {/* SPEND HISTORY */}
                         {p.budgetHistory && p.budgetHistory.length > 0 && (
                           <div style={{ marginTop: "24px" }}>
-                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700", marginBottom: "10px" }}>📋 Spend History</p>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "700" }}>Spend History</p>
+                              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>{p.budgetHistory.length} entries</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                               {[...(p.budgetHistory || [])].reverse().map((entry: any, ei: number) => (
-                                <div key={ei} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                                <div key={ei} style={{ background: entry.planned ? "rgba(245,158,11,0.04)" : "rgba(255,255,255,0.03)", border: `1px solid ${entry.planned ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.07)"}`, borderRadius: "14px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
                                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
                                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                                       {entry.planned && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "999px", background: "rgba(245,158,11,0.15)", color: "#f59e0b", fontWeight: "800", border: "1px solid rgba(245,158,11,0.3)" }}>PLANNED</span>}
                                       {entry.trade && <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", background: "rgba(167,139,250,0.12)", color: "#a78bfa", fontWeight: "800", border: "1px solid rgba(167,139,250,0.25)" }}>{entry.trade}</span>}
                                       <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{entry.date}</span>
                                       {entry.enteredBy && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>by {entry.enteredBy}</span>}
-                                      {entry.quoted > 0 && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Quoted: <span style={{ color: entry.quoted > entry.amount ? "#34d399" : entry.quoted < entry.amount ? "#f87171" : "#f59e0b", fontWeight: "700" }}>{fmtMoney(entry.quoted)}</span></span>}
+                                      {entry.quoted > 0 && !entry.planned && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)" }}>Quoted: <span style={{ color: entry.quoted > entry.amount ? "#34d399" : "#f87171", fontWeight: "700" }}>{fmtMoney(entry.quoted)}</span></span>}
                                     </div>
                                     {entry.note && <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{entry.note}</p>}
+                                    {entry.planned && entry.plannedDate && <p style={{ fontSize: "10px", color: "rgba(245,158,11,0.6)", fontWeight: "600" }}>Due: {entry.plannedDate}</p>}
                                   </div>
                                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
                                     <div style={{ textAlign: "right" }}>
-                                    {entry.planned ? <span style={{ fontSize: "16px", fontWeight: "900", color: "#f59e0b" }}>~{fmtMoney(entry.quoted || 0)}</span> : <span style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>}
-                                    {entry.planned && entry.plannedDate && <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>Due {entry.plannedDate}</p>}
-                                  </div>
+                                      {entry.planned
+                                        ? <span style={{ fontSize: "18px", fontWeight: "900", color: "#f59e0b" }}>~{fmtMoney(entry.quoted || 0)}</span>
+                                        : <span style={{ fontSize: "20px", fontWeight: "900", color: "#f87171" }}>-{fmtMoney(entry.amount)}</span>
+                                      }
+                                    </div>
                                     <button onClick={() => {
                                       const original = [...(p.budgetHistory || [])];
                                       original.reverse();
                                       original.splice(ei, 1);
                                       original.reverse();
-                                      supabase.from("projects").update({ budget_history: original }).eq("id", p.id);
-                                      setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: original } : pr));
+                                      const newSpent = entry.planned ? p.spent : p.spent - entry.amount;
+                                      supabase.from("projects").update({ budget_history: original, spent: Math.max(0, newSpent) }).eq("id", p.id);
+                                      setProjects(projects.map(pr => pr.id === p.id ? { ...pr, budgetHistory: original, spent: Math.max(0, newSpent) } : pr));
                                     }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "18px" }}>x</button>
                                   </div>
                                 </div>
@@ -4921,8 +4937,7 @@ function ProjectsTab({ user }: { user: any }) {
                           </div>
                         )}
                       </div>
-                    )}
-                    {/* ACTIVITY LOG */}
+                    )} {/* ACTIVITY LOG */}
                     {section === "activity" && (
                       <ActivityLog project={p} />
                     )}
@@ -6026,91 +6041,99 @@ function CashTracker({ totalEquity, totalRemaining, userId }: { totalEquity: num
 }
 
 function LogSpendEntry({ project, onLog, team, trades }: { project: any; onLog: (e: any) => void; team: any[]; trades: any[] }) {
-  const [amount, setAmount] = useState("");
-  const [quoted, setQuoted] = useState("");
-  const [mode, setMode] = useState<"paid"|"planned">("paid");
-  const [plannedDate, setPlannedDate] = useState("");
-  const [note, setNote] = useState("");
-  const [trade, setTrade] = useState("");
+  const [paidAmt, setPaidAmt] = useState("");
+  const [paidTrade, setPaidTrade] = useState("");
+  const [paidNote, setPaidNote] = useState("");
+  const [paidQuoted, setPaidQuoted] = useState("");
+  const [planAmt, setPlanAmt] = useState("");
+  const [planTrade, setPlanTrade] = useState("");
+  const [planNote, setPlanNote] = useState("");
+  const [planDate, setPlanDate] = useState("");
   const [enteredBy, setEnteredBy] = useState("Owner");
   const [showAddPerson, setShowAddPerson] = useState(false);
-  const [newPersonName, setNewPersonName] = useState("");
-  const [newPersonRole, setNewPersonRole] = useState("Contractor");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState("Contractor");
   const [localTeam, setLocalTeam] = useState<any[]>(team);
-  const IS2: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", width: "100%" };
+  const IS: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "9px 12px", fontSize: "13px", color: "#fff", outline: "none", fontFamily: "inherit", width: "100%" };
   const ALL_CATS = ["Architecture","Engineering","Permits","Demo","Foundation","Framing","Plumbing","Electrical","HVAC","Insulation","Drywall","Flooring","Painting","Roofing","Windows","Finishing","Landscaping","Other"];
+  const lbl = (t: string) => <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>{t}</p>;
 
-  function handleSave() {
-    if (!amount) return;
-    onLog({ amount: mode === "planned" ? 0 : parseFloat(amount), quoted: parseFloat(quoted) || parseFloat(amount) || 0, note, trade, enteredBy, planned: mode === "planned", plannedDate: mode === "planned" ? plannedDate : "", date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
-    setAmount(""); setQuoted(""); setNote(""); setTrade(""); setEnteredBy("Owner"); setPlannedDate("");
-  }
-
-  function handleAddPerson() {
-    if (!newPersonName.trim()) return;
-    const person = { name: newPersonName.trim(), role: newPersonRole };
-    const updated = [...localTeam, person];
-    setLocalTeam(updated);
-    setEnteredBy(person.name);
-    setNewPersonName("");
+  function addPerson() {
+    if (!newName.trim()) return;
+    const p = { name: newName.trim(), role: newRole };
+    setLocalTeam(t => [...t, p]);
+    setEnteredBy(p.name);
+    setNewName("");
     setShowAddPerson(false);
   }
 
+  function savePaid() {
+    if (!paidAmt) return;
+    onLog({ amount: parseFloat(paidAmt), quoted: parseFloat(paidQuoted) || 0, note: paidNote, trade: paidTrade, enteredBy, planned: false, plannedDate: "", date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
+    setPaidAmt(""); setPaidQuoted(""); setPaidNote(""); setPaidTrade("");
+  }
+
+  function savePlan() {
+    if (!planAmt) return;
+    onLog({ amount: 0, quoted: parseFloat(planAmt), note: planNote, trade: planTrade, enteredBy, planned: true, plannedDate: planDate, date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) });
+    setPlanAmt(""); setPlanNote(""); setPlanTrade(""); setPlanDate("");
+  }
+
+  const catSelect = (val: string, set: (v: string) => void) => (
+    <select value={val} onChange={e => set(e.target.value)} style={{ ...IS }}>
+      <option value="">Select category</option>
+      {ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+    </select>
+  );
+
   return (
-    <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "14px", padding: "16px 20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-        <p style={{ fontSize: "10px", color: mode === "paid" ? "rgba(248,113,113,0.7)" : "rgba(245,158,11,0.7)", letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "700" }}>{mode === "paid" ? "?? Log Spend" : "?? Plan Expense"}</p>
-        <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "3px" }}>
-          <button onClick={() => setMode("paid")} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", border: "none", cursor: "pointer", background: mode === "paid" ? "#f87171" : "transparent", color: mode === "paid" ? "#000" : "rgba(255,255,255,0.4)" }}>Paid</button>
-          <button onClick={() => setMode("planned")} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", border: "none", cursor: "pointer", background: mode === "planned" ? "#f59e0b" : "transparent", color: mode === "planned" ? "#000" : "rgba(255,255,255,0.4)" }}>Planned</button>
+    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", overflow: "hidden", marginBottom: "24px" }}>
+
+      {/* LOG PAYMENT */}
+      <div style={{ padding: "16px 20px" }}>
+        <p style={{ fontSize: "9px", color: "rgba(248,113,113,0.7)", letterSpacing: "1.8px", textTransform: "uppercase", fontWeight: "800", marginBottom: "12px" }}>LOG PAYMENT</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.5fr 1.2fr auto", gap: "8px", alignItems: "end" }}>
+          <div>{lbl("Amount Paid *")}<input type="number" placeholder="15,000" value={paidAmt} onChange={e => setPaidAmt(e.target.value)} onKeyDown={e => e.key === "Enter" && savePaid()} style={{ ...IS, fontWeight: "800", color: "#f87171" }} /></div>
+          <div>{lbl("Quoted opt.")}<input type="number" placeholder="12,000" value={paidQuoted} onChange={e => setPaidQuoted(e.target.value)} style={{ ...IS, color: "#f59e0b" }} /></div>
+          <div>{lbl("Note opt.")}<input type="text" placeholder="First payment - roof" value={paidNote} onChange={e => setPaidNote(e.target.value)} style={IS} /></div>
+          <div>{lbl("Category")}{catSelect(paidTrade, setPaidTrade)}</div>
+          <button onClick={savePaid} disabled={!paidAmt} style={{ padding: "9px 18px", background: paidAmt ? "#f87171" : "rgba(248,113,113,0.15)", color: paidAmt ? "#000" : "rgba(255,255,255,0.25)", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: paidAmt ? "pointer" : "not-allowed", whiteSpace: "nowrap" as const }}>Save</button>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-        <div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>{mode === "paid" ? "Amount Paid ($) *" : "Expected Amount ($)"}</p>
-              <input type="number" placeholder="e.g. 15000" value={amount} onChange={e => setAmount(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: mode === "paid" ? "#f87171" : "#f59e0b" }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>{mode === "paid" ? "Quoted ($)" : "Expected Date"} <span style={{ color: "rgba(255,255,255,0.2)" }}>optional</span></p>
-              {mode === "paid" ? <input type="number" placeholder="e.g. 12000" value={quoted} onChange={e => setQuoted(e.target.value)} style={{ ...IS2, fontSize: "16px", fontWeight: "800", color: "#f59e0b" }} /> : <input type="date" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} style={{ ...IS2, fontSize: "14px", fontWeight: "700", color: "#f59e0b" }} />}
-            </div>
-          </div>
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Category / Trade</p>
-          <select value={trade} onChange={e => setTrade(e.target.value)} style={{ ...IS2 }}>
-            <option value="">? Select category ?</option>
-            {trades.length > 0 && trades.map((t: any, i: number) => <option key={"t"+i} value={t.name}>{t.name}</option>)}
-            {ALL_CATS.filter(cat => !trades.find((t: any) => t.name === cat)).map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Note</p>
-          <input type="text" placeholder="e.g. First payment ? roof work" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSave()} style={IS2} />
-        </div>
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Entered By</p>
-            <button onClick={() => setShowAddPerson(!showAddPerson)} style={{ fontSize: "9px", color: "#a78bfa", background: "none", border: "none", cursor: "pointer", fontWeight: "700" }}>+ Quick add</button>
-          </div>
-          {showAddPerson && (
-            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
-              <input type="text" placeholder="Name" value={newPersonName} onChange={e => setNewPersonName(e.target.value)} style={{ ...IS2, flex: 2 }} />
-              <input type="text" placeholder="Role" value={newPersonRole} onChange={e => setNewPersonRole(e.target.value)} style={{ ...IS2, flex: 1 }} />
-              <button onClick={handleAddPerson} style={{ padding: "0 12px", background: "#a78bfa", color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Add</button>
-            </div>
-          )}
-          <select value={enteredBy} onChange={e => setEnteredBy(e.target.value)} style={{ ...IS2 }}>
-            <option value="Owner">Owner (you)</option>
-            {localTeam.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} ? {m.role}</option>)}
-          </select>
+
+      {/* DIVIDER */}
+      <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "0 20px" }} />
+
+      {/* PLAN EXPENSE */}
+      <div style={{ padding: "16px 20px" }}>
+        <p style={{ fontSize: "9px", color: "rgba(245,158,11,0.7)", letterSpacing: "1.8px", textTransform: "uppercase", fontWeight: "800", marginBottom: "12px" }}>PLAN EXPENSE</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.5fr 1.2fr auto", gap: "8px", alignItems: "end" }}>
+          <div>{lbl("Expected Amount *")}<input type="number" placeholder="25,000" value={planAmt} onChange={e => setPlanAmt(e.target.value)} onKeyDown={e => e.key === "Enter" && savePlan()} style={{ ...IS, fontWeight: "800", color: "#f59e0b" }} /></div>
+          <div>{lbl("Due Date opt.")}<input type="date" value={planDate} onChange={e => setPlanDate(e.target.value)} style={{ ...IS, color: "#f59e0b" }} /></div>
+          <div>{lbl("Note opt.")}<input type="text" placeholder="Roofing quote from ABC Co." value={planNote} onChange={e => setPlanNote(e.target.value)} style={IS} /></div>
+          <div>{lbl("Category")}{catSelect(planTrade, setPlanTrade)}</div>
+          <button onClick={savePlan} disabled={!planAmt} style={{ padding: "9px 18px", background: planAmt ? "#f59e0b" : "rgba(245,158,11,0.15)", color: planAmt ? "#000" : "rgba(255,255,255,0.25)", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: planAmt ? "pointer" : "not-allowed", whiteSpace: "nowrap" as const }}>Save</button>
         </div>
       </div>
-      <button onClick={handleSave} disabled={!amount} style={{ width: "100%", padding: "12px", background: amount ? "#f87171" : "rgba(248,113,113,0.2)", color: amount ? "#000" : "rgba(255,255,255,0.3)", borderRadius: "10px", fontWeight: "800", fontSize: "14px", border: "none", cursor: amount ? "pointer" : "not-allowed" }}>{mode === "paid" ? "Save Spend Entry" : "Save Planned Expense"}</button>
+
+      {/* DIVIDER */}
+      <div style={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
+
+      {/* ENTERED BY - shared */}
+      <div style={{ padding: "12px 20px", display: "flex", gap: "12px", alignItems: "center", background: "rgba(255,255,255,0.01)" }}>
+        <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", whiteSpace: "nowrap" }}>Entered By</p>
+        <select value={enteredBy} onChange={e => setEnteredBy(e.target.value)} style={{ ...IS, flex: 1 }}>
+          <option value="Owner">Owner (you)</option>
+          {localTeam.map((m: any, i: number) => <option key={i} value={m.name}>{m.name} - {m.role}</option>)}
+        </select>
+        <button onClick={() => setShowAddPerson(!showAddPerson)} style={{ fontSize: "10px", color: "#a78bfa", background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontWeight: "700", whiteSpace: "nowrap" as const }}>+ Quick add</button>
+        {showAddPerson && <>
+          <input type="text" placeholder="Name" value={newName} onChange={e => setNewName(e.target.value)} style={{ ...IS, flex: 1 }} />
+          <input type="text" placeholder="Role" value={newRole} onChange={e => setNewRole(e.target.value)} style={{ ...IS, flex: 1 }} />
+          <button onClick={addPerson} style={{ padding: "6px 14px", background: "#a78bfa", color: "#000", borderRadius: "8px", fontWeight: "800", fontSize: "12px", border: "none", cursor: "pointer" }}>Add</button>
+        </>}
+      </div>
+
     </div>
   );
 }
