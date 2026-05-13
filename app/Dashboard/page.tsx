@@ -1643,7 +1643,7 @@ function ProjectIntelligence({ project }: { project: any }) {
     <div style={{ background: "linear-gradient(135deg,rgba(167,139,250,0.06),rgba(96,165,250,0.03))", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "18px", padding: "20px 24px", margin: "16px 0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>?</div>
+          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#a78bfa", fontWeight: "900" }}>P</div>
           <div>
             <p style={{ fontSize: "11px", fontWeight: "800", color: "#a78bfa", letterSpacing: "1px", textTransform: "uppercase" }}>Project Intelligence</p>
             <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>Financing ? Risk ? AI Briefing</p>
@@ -1669,7 +1669,7 @@ function ProjectIntelligence({ project }: { project: any }) {
 
       {/* Risk status ? only show issues, otherwise green line */}
       {risks.length === 0
-        ? <p style={{ fontSize: "11px", color: "#34d399", fontWeight: "600", opacity: 0.7 }}>All systems green ? Low risk across budget, timeline and capital</p>
+        ? <p style={{ fontSize: "11px", color: "#34d399", fontWeight: "600", opacity: 0.7 }}>All systems green - Low risk across budget, timeline and capital</p>
         : <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {risks.map(r => (
               <span key={r.label} style={{ fontSize: "10px", padding: "3px 10px", borderRadius: "999px", background: r.level === "HIGH" ? "rgba(248,113,113,0.12)" : "rgba(245,158,11,0.12)", color: r.level === "HIGH" ? "#f87171" : "#f59e0b", border: `1px solid ${r.level === "HIGH" ? "rgba(248,113,113,0.3)" : "rgba(245,158,11,0.3)"}`, fontWeight: "700" }}>{r.label} ? {r.level}</span>
@@ -4836,6 +4836,20 @@ function ProjectsTab({ user }: { user: any }) {
                     {section === "budget" && (
                       <div style={{ padding: "24px" }}>
 
+                        {/* TOTAL BUDGET HEADER */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                          <div>
+                            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "700", marginBottom: "4px" }}>Total Budget</p>
+                            <p style={{ fontSize: "36px", fontWeight: "900", color: "#a78bfa", letterSpacing: "-2px", lineHeight: 1 }}>{fmtMoney(p.budget)}</p>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>project ceiling</p>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "700", marginBottom: "4px" }}>Budget used</p>
+                            <p style={{ fontSize: "36px", fontWeight: "900", color: budgetPct > 90 ? "#f87171" : "#fff", letterSpacing: "-2px", lineHeight: 1 }}>{budgetPct.toFixed(1)}%</p>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>{p.budgetHistory?.length || 0} transactions</p>
+                          </div>
+                        </div>
+
                         {/* FORECAST BAR */}
                         {(() => {
                           const plannedTotal = (p.budgetHistory || []).filter((e: any) => e.planned).reduce((s: number, e: any) => s + (e.quoted || 0), 0);
@@ -4849,13 +4863,13 @@ function ProjectsTab({ user }: { user: any }) {
                               {/* 3 hero numbers */}
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                                 {[
-                                  { label: "Paid", value: fmtMoney(p.spent), sub: `${paidPct.toFixed(1)}% of budget`, color: "#f87171", bg: "rgba(248,113,113,0.06)", border: "rgba(248,113,113,0.15)" },
-                                  { label: "Planned", value: fmtMoney(plannedTotal), sub: `${plannedPct.toFixed(1)}% upcoming`, color: "#f59e0b", bg: "rgba(245,158,11,0.06)", border: "rgba(245,158,11,0.15)" },
-                                  { label: "Remaining", value: fmtMoney(remaining), sub: overBudget ? "? over budget" : "available to spend", color: remaining > 0 ? "#34d399" : "#f87171", bg: remaining > 0 ? "rgba(52,211,153,0.06)" : "rgba(248,113,113,0.06)", border: remaining > 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)" },
-                                ].map(m => (
-                                  <div key={m.label} style={{ background: m.bg, border: `1px solid ${m.border}`, borderRadius: "16px", padding: "18px 20px" }}>
+                                  { label: "Paid", value: fmtMoney(p.spent), sub: `${paidPct.toFixed(1)}% of budget`, color: "#f87171", bg: "rgba(248,113,113,0.04)", border: "rgba(248,113,113,0.12)", top: "#f87171" },
+                                  { label: "Planned", value: fmtMoney(plannedTotal), sub: `${plannedPct.toFixed(1)}% upcoming`, color: "#f59e0b", bg: "rgba(245,158,11,0.04)", border: "rgba(245,158,11,0.12)", top: "#f59e0b" },
+                                  { label: "Remaining", value: fmtMoney(remaining), sub: overBudget ? "over budget" : "available to spend", color: remaining > 0 ? "#34d399" : "#f87171", bg: remaining > 0 ? "rgba(52,211,153,0.04)" : "rgba(248,113,113,0.04)", border: remaining > 0 ? "rgba(52,211,153,0.12)" : "rgba(248,113,113,0.12)", top: remaining > 0 ? "#34d399" : "#f87171" },
+                                  ].map(m => (
+                                  <div key={m.label} style={{ background: m.bg, border: `1px solid ${m.border}`, borderRadius: "16px", padding: "18px 20px", borderTop: `2px solid ${m.top}` }}>
                                     <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "700", marginBottom: "8px" }}>{m.label}</p>
-                                    <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-1px", lineHeight: 1 }}>{m.value}</p>
+                                    <p style={{ fontSize: "30px", fontWeight: "900", color: m.color, letterSpacing: "-1.5px", lineHeight: 1 }}>{m.value}</p>
                                     <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "6px" }}>{m.sub}</p>
                                   </div>
                                 ))}
@@ -4867,7 +4881,7 @@ function ProjectsTab({ user }: { user: any }) {
                                   <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>Budget Forecast</span>
                                   <span style={{ fontSize: "10px", color: overBudget ? "#f87171" : "rgba(255,255,255,0.4)", fontWeight: "700" }}>{fmtMoney(committed)} committed of {fmtMoney(p.budget)}</span>
                                 </div>
-                                <div style={{ height: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden", display: "flex" }}>
+                                <div style={{ height: "16px", background: "rgba(255,255,255,0.05)", borderRadius: "999px", overflow: "hidden", display: "flex" }}>
                                   <div style={{ width: `${paidPct}%`, background: "#f87171", borderRadius: "999px 0 0 999px", transition: "width 0.8s", boxShadow: "0 0 8px rgba(248,113,113,0.4)" }} />
                                   <div style={{ width: `${plannedPct}%`, background: "#f59e0b", transition: "width 0.8s", boxShadow: "0 0 8px rgba(245,158,11,0.3)", backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.15) 4px, rgba(0,0,0,0.15) 8px)" }} />
                                 </div>
