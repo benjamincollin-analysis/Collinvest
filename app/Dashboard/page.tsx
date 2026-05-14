@@ -4846,38 +4846,38 @@ function ProjectsTab({ user }: { user: any }) {
                           return (<>
 
                           {/* HEADER */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", alignItems: "center", marginBottom: "24px", paddingBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                            <div>
-                              <p style={{ fontSize: "9px", color: "rgba(167,139,250,0.6)", textTransform: "uppercase", letterSpacing: "2.5px", fontWeight: "800", marginBottom: "8px" }}>Total Budget</p>
-                              <p style={{ fontSize: "28px", fontWeight: "900", color: "#a78bfa", letterSpacing: "-1px", lineHeight: 1, textShadow: "0 0 40px rgba(167,139,250,0.3)" }}>{fmtMoney(p.budget)}</p>
-                              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "8px" }}>across {p.budgetHistory?.length || 0} transactions</p>
-                            </div>
-                            <div style={{ textAlign: "center" }}>
-                              <p style={{ fontSize: "32px", fontWeight: "900", color: "rgba(255,255,255,0.85)", letterSpacing: "-1px", textTransform: "uppercase" }}>{p.name}</p>
-                              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "4px", fontWeight: "600" }}>{p.type}</p>
-                            </div>
-                            <div style={{ textAlign: "right" }}>
-                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "2.5px", fontWeight: "800", marginBottom: "8px" }}>Committed</p>
-                              <p style={{ fontSize: "28px", fontWeight: "900", color: overBudget ? "#f87171" : "#fff", letterSpacing: "-1px", lineHeight: 1 }}>{fmtMoney(committed)}</p>
-                              <p style={{ fontSize: "11px", color: overBudget ? "#f87171" : "rgba(255,255,255,0.25)", marginTop: "8px" }}>{overBudget ? "over budget" : `${p.budget > 0 ? ((committed/p.budget)*100).toFixed(1) : 0}% deployed`}</p>
-                            </div>
-                          </div>
-
-                          {/* 3 HERO CARDS */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "20px" }}>
-                            {[
-                              { label: "Paid", value: fmtMoney(p.spent), sub: `${paidPct.toFixed(1)}% of budget`, color: "#f87171", glow: "rgba(248,113,113,0.15)", border: "rgba(248,113,113,0.35)" },
-                              { label: "Planned", value: fmtMoney(plannedTotal), sub: `${plannedPct.toFixed(1)}% upcoming`, color: "#f59e0b", glow: "rgba(245,158,11,0.15)", border: "rgba(245,158,11,0.35)" },
-                              { label: "Remaining", value: fmtMoney(remaining), sub: overBudget ? "over budget" : "available to spend", color: remaining > 0 ? "#34d399" : "#f87171", glow: remaining > 0 ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)", border: remaining > 0 ? "rgba(52,211,153,0.35)" : "rgba(248,113,113,0.35)" },
-                            ].map((m: any) => (
-                              <div key={m.label} style={{ background: m.glow, border: `1px solid ${m.border}`, borderRadius: "18px", padding: "16px 18px", position: "relative", overflow: "hidden", boxShadow: `0 4px 24px ${m.glow}` }}>
-                                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: m.color, boxShadow: `0 0 12px ${m.color}` }} />
-                                <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "2px", fontWeight: "800", marginBottom: "12px" }}>{m.label}</p>
-                                <p style={{ fontSize: "26px", fontWeight: "900", color: m.color, letterSpacing: "-1.5px", lineHeight: 1, textShadow: `0 0 20px ${m.color}55` }}>{m.value}</p>
-                                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "10px", fontWeight: "600" }}>{m.sub}</p>
+                          <div style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.1), rgba(96,165,250,0.05))", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "20px", padding: "22px 26px", marginBottom: "20px", position: "relative", overflow: "hidden" }}>
+                            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #a78bfa, #60a5fa, transparent)" }} />
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#a78bfa", boxShadow: "0 0 8px #a78bfa", animation: "blink 1.5s infinite" }} />
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                              <div style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "14px", padding: "16px 18px" }}>
+                                <p style={{ fontSize: "9px", color: "rgba(167,139,250,0.7)", textTransform: "uppercase", letterSpacing: "2px", fontWeight: "800", marginBottom: "8px" }}>Total Budget</p>
+                                <p style={{ fontSize: "26px", fontWeight: "900", color: "#a78bfa", letterSpacing: "-1px", lineHeight: 1 }}>{fmtMoney(p.budget)}</p>
+                                <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "8px" }}>{p.budgetHistory?.length || 0} transactions</p>
                               </div>
-                            ))}
-                          </div>
+                              <div style={{ background: overBudget ? "rgba(248,113,113,0.1)" : "rgba(245,158,11,0.08)", border: `1px solid ${overBudget ? "rgba(248,113,113,0.3)" : "rgba(245,158,11,0.25)"}`, borderRadius: "14px", padding: "16px 18px" }}>
+                                <p style={{ fontSize: "9px", color: overBudget ? "rgba(248,113,113,0.7)" : "rgba(245,158,11,0.7)", textTransform: "uppercase", letterSpacing: "2px", fontWeight: "800", marginBottom: "8px" }}>Committed</p>
+                                <p style={{ fontSize: "26px", fontWeight: "900", color: overBudget ? "#f87171" : "#f59e0b", letterSpacing: "-1px", lineHeight: 1 }}>{fmtMoney(committed)}</p>
+                                <p style={{ fontSize: "11px", color: overBudget ? "#f87171" : "rgba(255,255,255,0.25)", marginTop: "8px" }}>{overBudget ? "⚠ over budget" : `${p.budget > 0 ? ((committed/p.budget)*100).toFixed(1) : 0}% deployed`}</p>
+                              </div>
+                              <div style={{ background: remaining > 0 ? "rgba(52,211,153,0.08)" : "rgba(248,113,113,0.08)", border: `1px solid ${remaining > 0 ? "rgba(52,211,153,0.25)" : "rgba(248,113,113,0.25)"}`, borderRadius: "14px", padding: "16px 18px" }}>
+                                <p style={{ fontSize: "26px", fontWeight: "900", color: remaining > 0 ? "#34d399" : "#f87171", letterSpacing: "-1px", lineHeight: 1 }}>{fmtMoney(remaining)}</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                           {/* FORECAST BAR */}
                           <div style={{ marginBottom: "24px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "18px 22px" }}>
@@ -4957,7 +4957,7 @@ function ProjectsTab({ user }: { user: any }) {
                                 ))}
                               </div>
                             )}
-                          </div>
+
 
                           </>);
                         })()}
