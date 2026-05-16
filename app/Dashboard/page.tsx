@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
@@ -655,7 +655,7 @@ const [showCompare, setShowCompare] = useState(false);
     { key: "home",        label: "Home",         svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { key: "finddeals",   label: "Find Deals",   svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
     { key: "myprojects",  label: "My Projects",  svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },
-    { key: "getfinanced", label: "Get Financed", svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
+    { key: "getfinanced", label: "Structuring", svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
     { key: "community",   label: "Community",    svg: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
   ] as const).map(({ key, label, svg }) => (
     <button key={key} onClick={() => setActiveTab(key)} style={tabStyle(key)} onMouseEnter={e => { if (activeTab !== key) { e.currentTarget.style.color = "rgba(245,166,35,0.7)"; }}} onMouseLeave={e => { if (activeTab !== key) { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}}>
@@ -7228,13 +7228,13 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
 
   return (
     <div>
-      <div style={{ display: "flex", gap: "4px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "4px", marginBottom: "24px" }}>
-        {subNav.map(({ key, label }) => (
-          <button key={key} onClick={() => setSub(key)} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "700", border: `1px solid ${sub === key ? "rgba(245,158,11,0.45)" : "transparent"}`, cursor: "pointer", background: sub === key ? "rgba(245,158,11,0.14)" : "transparent", color: sub === key ? "#f59e0b" : "rgba(255,255,255,0.4)", transition: "all 0.15s" }}>
-            {label}
-          </button>
-        ))}
-      </div>
+
+
+
+
+
+
+
 
       <FinancingTab
         properties={properties}
@@ -7557,9 +7557,9 @@ function FinancingTab({ properties, user, incomingListing, forcedSubTab }: { pro
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
           <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 6px #f59e0b", animation: "blink 1.5s infinite" }} />
-          <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" as const }}>Financing · Find the right loan in 3 steps</span>
+          <span style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", letterSpacing: "2px", fontWeight: "700", textTransform: "uppercase" as const }}>STRUCTURING · FIND THE RIGHT LOAN IN 3 STEPS</span>
         </div>
-        <h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.8px" }}>Financing</h2>
+        <h2 style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "-0.8px" }}>Structuring</h2>
       </div>
 
       {/* Sub nav */}
@@ -7764,7 +7764,78 @@ function FinancingTab({ properties, user, incomingListing, forcedSubTab }: { pro
           )}
         </div>
       )}
-
+{/* ── VERIFIED LENDER NETWORK ── */}
+      {subTab === "finder" && (
+        <div style={{ marginTop: "32px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
+            <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #f59e0b, #f97316)", borderRadius: "2px", boxShadow: "0 0 12px #f59e0b" }} />
+            <div>
+              <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Verified Lender Network</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "2px" }}>Know what you need? Go straight to the right lender.</p>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+            {([
+              { name: "Kiavi", hq: "San Francisco, CA · USA", scale: "$20B+ funded", specialty: "Fix & Flip · DSCR · Bridge", icon: "⚡", color: "#f59e0b", great: ["Fix & flip investors", "Short-term bridge loans", "Experienced investors (5+ deals)", "Fast closings (7-10 days)"], notFor: ["First-time investors", "Owner-occupied homes", "Commercial or mixed-use"], alt: "LendingTree", link: "https://www.kiavi.com" },
+              { name: "LendingTree", hq: "Charlotte, NC · USA", scale: "$100B+ mkt", specialty: "Mortgages · Refi · HELOC", icon: "🌳", color: "#34d399", great: ["Comparing multiple lenders", "Conventional mortgages", "Refinancing & HELOC", "All experience levels"], notFor: ["Hard money loans", "Fix & flip short-term", "Non-US properties"], alt: "Kiavi", link: "https://www.lendingtree.com" },
+              { name: "Credible", hq: "San Francisco, CA · USA", scale: "$3B+ facilitated", specialty: "Mortgage · Refi · Rate Comparison", icon: "🎯", color: "#60a5fa", great: ["Rate shopping across lenders", "Conventional purchases", "Refinancing", "Clean credit profiles"], notFor: ["Hard money", "Fix & flip", "Complex portfolios"], alt: "LendingTree", link: "https://www.credible.com" },
+            ] as any[]).map((l) => (
+              <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" as const, boxShadow: `0 8px 32px ${l.color}10` }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)`, boxShadow: `0 0 20px ${l.color}` }} />
+                <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
+                  <div style={{ width: "54px", height: "54px", borderRadius: "16px", background: `${l.color}18`, border: `2px solid ${l.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0, boxShadow: `0 0 20px ${l.color}30` }}>{l.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: "22px", fontWeight: "900", color: l.color, letterSpacing: "-1px", lineHeight: 1, textShadow: `0 0 20px ${l.color}60` }}>{l.name}</p>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", marginTop: "4px", fontWeight: "600" }}>{l.hq}</p>
+                  </div>
+                  <div style={{ background: `${l.color}20`, border: `1px solid ${l.color}50`, borderRadius: "10px", padding: "6px 12px", boxShadow: `0 0 12px ${l.color}20` }}>
+                    <p style={{ fontSize: "11px", color: l.color, fontWeight: "900", whiteSpace: "nowrap" as const }}>{l.scale}</p>
+                  </div>
+                </div>
+                {/* Specialty */}
+                <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "18px" }}>
+                  <p style={{ fontSize: "11px", color: l.color, fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const }}>{l.specialty}</p>
+                </div>
+                {/* Great For */}
+                <div style={{ marginBottom: "16px" }}>
+                  <p style={{ fontSize: "11px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "14px" }}>✓</span> Great For
+                  </p>
+                  {l.great.map((g: string) => (
+                    <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", fontWeight: "600" }}>{g}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Not Optimal */}
+                <div style={{ marginBottom: "18px" }}>
+                  <p style={{ fontSize: "11px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "14px" }}>✗</span> Not Optimal For
+                  </p>
+                  {l.notFor.map((n: string) => (
+                    <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", fontWeight: "600" }}>{n}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "auto" }}>
+                  {/* Alternative */}
+                  <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <p style={{ fontSize: "11px", color: "#fff", fontWeight: "700" }}>Not the right fit?</p>
+                    <p style={{ fontSize: "12px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                  </div>
+                  {/* CTA */}
+                  <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "15px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px", boxShadow: `0 4px 20px ${l.color}20`, textShadow: `0 0 20px ${l.color}80` }}>Apply with {l.name} →</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* ── CALCULATOR ── */}
       {subTab === "calculator" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
@@ -8145,7 +8216,7 @@ const primaryPhoto = p.primary_photo?.href
             { icon: "🚗", value: d.garage ? `${d.garage} garage` : null },
             { icon: "📅", value: d.yearBuilt ? `Built ${d.yearBuilt}` : null },
           ].filter(s => s.value).map(s => (
-            <span key={s.icon} style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
+            <span key={s.icon} style={{ fontSize: "11px", color: "rgba(255,255,255,0.9)", fontWeight: "700", display: "flex", alignItems: "center", gap: "4px" }}>
               <span style={{ fontSize: "10px" }}>{s.icon}</span> {s.value}
             </span>
           ))}
