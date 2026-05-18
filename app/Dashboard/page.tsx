@@ -7578,27 +7578,25 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
 {/* TAX SECTION */}
       {activeSection === "tax" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-
-          {/* EDUCATION CARDS */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             {([
-              { icon: "🔄", title: "1031 Exchange", color: "#34d399", desc: "Sell a property and reinvest in a like-kind property without paying capital gains tax. One of the most powerful wealth-building tools in US real estate — defer taxes indefinitely.", saving: "Save 15–20% capital gains tax on every sale", steps: [{ text: "Sell your investment property", note: "Must be an investment property — not your primary home", link: null }, { text: "Contact a Qualified Intermediary BEFORE closing", note: "You cannot touch the funds — ever", link: null }, { text: "Identify replacement property within 45 days", note: "IRS hard deadline — no extensions", link: "https://www.irs.gov/publications/p544" }, { text: "Close on new property within 180 days", note: "Another hard IRS deadline", link: null }, { text: "File IRS Form 8824 with your tax return", note: "Reports the exchange to the IRS", link: "https://www.irs.gov/forms-pubs/about-form-8824" }] },
-              { icon: "📉", title: "Cost Segregation", color: "#f59e0b", desc: "An engineer breaks your property into components and accelerates depreciation. Instead of deducting over 27.5 years, you deduct a massive amount in year 1. Game-changing for high earners.", saving: "Save $10K–$80K in year one", steps: [{ text: "Hire a cost segregation engineer", note: "Costs $5K–$15K but pays for itself 5–10x", link: null }, { text: "Engineer identifies short-life components", note: "Appliances, flooring, landscaping depreciate faster", link: null }, { text: "Accelerated depreciation applied to your return", note: "Creates large paper loss that offsets real income", link: null }, { text: "File with your tax return — works retroactively", note: "Can go back 3 years with a cost seg study", link: "https://www.irs.gov/pub/irs-pdf/p946.pdf" }, { text: "Best on properties $500K+ for max ROI", note: "Smaller properties may not justify the study cost", link: null }] },
-              { icon: "🏚️", title: "Bonus Depreciation", color: "#a78bfa", desc: "Deduct a large percentage of eligible property cost in year one. Applies to renovations, equipment, and improvements. Combine with cost seg for maximum impact.", saving: "60% bonus depreciation in year 1 — check current IRS rate", steps: [{ text: "Identify bonus depreciation eligible items", note: "Personal property, improvements, equipment", link: null }, { text: "Work with your CPA to make the election", note: "Must elect on your tax return — opt-in", link: null }, { text: "File IRS Form 4562 with your return", note: "This is where depreciation is reported", link: "https://www.irs.gov/forms-pubs/about-form-4562" }, { text: "Combine with cost seg for maximum deduction", note: "The two strategies stack — don't do one without the other", link: null }] },
-              { icon: "📋", title: "Real Estate Professional", color: "#60a5fa", desc: "If you spend 750+ hours/yr in real estate AND it's your primary activity, you can deduct rental losses against ALL income — including your W2 salary. Life-changing for high earners.", saving: "Unlimited loss deductions against all income", steps: [{ text: "Track every real estate hour you work", note: "Use a spreadsheet or app — IRS will audit this", link: null }, { text: "Meet the 750 hour annual threshold", note: "Must be MORE hours than any other job", link: "https://www.irs.gov/publications/p925" }, { text: "Elect Real Estate Professional status on your return", note: "Work with a CPA who specializes in RE taxes", link: null }, { text: "Document everything — activity logs are mandatory", note: "Audit risk is real — paper trail is your protection", link: null }] },
+              { icon: "🔄", title: "1031 Exchange", color: "#34d399", desc: "Sell a property and reinvest in a like-kind property without paying capital gains tax. One of the most powerful wealth-building tools in US real estate.", saving: "Save 15-20% capital gains tax on every sale", steps: [{ text: "Sell your investment property", note: "Must be an investment property not your primary home", link: null }, { text: "Contact a Qualified Intermediary BEFORE closing", note: "You cannot touch the funds ever", link: null }, { text: "Identify replacement property within 45 days", note: "IRS hard deadline no extensions", link: "https://www.irs.gov/publications/p544" }, { text: "Close on new property within 180 days", note: "Another hard IRS deadline", link: null }, { text: "File IRS Form 8824 with your tax return", note: "Reports the exchange to the IRS", link: "https://www.irs.gov/forms-pubs/about-form-8824" }] },
+              { icon: "📉", title: "Cost Segregation", color: "#f59e0b", desc: "An engineer breaks your property into components and accelerates depreciation. Instead of deducting over 27.5 years you deduct a massive amount in year 1.", saving: "Save $10K-$80K in year one", steps: [{ text: "Hire a cost segregation engineer", note: "Costs $5K-$15K but pays for itself 5-10x", link: null }, { text: "Engineer identifies short-life components", note: "Appliances flooring landscaping depreciate faster", link: null }, { text: "Accelerated depreciation applied to your return", note: "Creates large paper loss that offsets real income", link: null }, { text: "File with your tax return works retroactively", note: "Can go back 3 years with a cost seg study", link: "https://www.irs.gov/pub/irs-pdf/p946.pdf" }, { text: "Best on properties $500K+ for max ROI", note: "Smaller properties may not justify the study cost", link: null }] },
+              { icon: "🏚️", title: "Bonus Depreciation", color: "#a78bfa", desc: "Deduct a large percentage of eligible property cost in year one. Applies to renovations equipment and improvements. Combine with cost seg for maximum impact.", saving: "60% bonus depreciation in year 1", steps: [{ text: "Identify bonus depreciation eligible items", note: "Personal property improvements equipment", link: null }, { text: "Work with your CPA to make the election", note: "Must elect on your tax return opt-in", link: null }, { text: "File IRS Form 4562 with your return", note: "This is where depreciation is reported", link: "https://www.irs.gov/forms-pubs/about-form-4562" }, { text: "Combine with cost seg for maximum deduction", note: "The two strategies stack together", link: null }] },
+              { icon: "📋", title: "Real Estate Professional", color: "#60a5fa", desc: "If you spend 750+ hours per year in real estate AND it is your primary activity you can deduct rental losses against ALL income including your W2 salary.", saving: "Unlimited loss deductions against all income", steps: [{ text: "Track every real estate hour you work", note: "Use a spreadsheet or app IRS will audit this", link: null }, { text: "Meet the 750 hour annual threshold", note: "Must be MORE hours than any other job", link: "https://www.irs.gov/publications/p925" }, { text: "Elect Real Estate Professional status on your return", note: "Work with a CPA who specializes in RE taxes", link: null }, { text: "Document everything activity logs are mandatory", note: "Audit risk is real paper trail is your protection", link: null }] },
             ] as any[]).map((item) => (
               <div key={item.title} style={{ background: `linear-gradient(135deg, ${item.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${item.color}28`, borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${item.color}, transparent)` }} />
                 <div style={{ position: "absolute", top: 0, right: 0, width: "100px", height: "100px", background: `radial-gradient(circle at top right, ${item.color}12, transparent 70%)`, pointerEvents: "none" }} />
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                  <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `${item.color}15`, border: `2px solid ${item.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: `0 0 16px ${item.color}22` }}>{item.icon}</div>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `${item.color}15`, border: `2px solid ${item.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{item.icon}</div>
                   <div>
                     <p style={{ fontSize: "17px", fontWeight: "900", color: item.color }}>{item.title}</p>
                     <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "800" }}>{item.saving}</p>
                   </div>
                 </div>
                 <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", lineHeight: "1.7", marginBottom: "16px" }}>{item.desc}</p>
-                <p style={{ fontSize: "10px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Step by step — exactly what to do</p>
+                <p style={{ fontSize: "10px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Step by step</p>
                 {item.steps.map((step: any, i: number) => (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
                     <div style={{ width: "24px", height: "24px", borderRadius: "7px", background: `${item.color}20`, border: `1px solid ${item.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "900", color: item.color, flexShrink: 0 }}>{i + 1}</div>
@@ -7607,7 +7605,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: "500" }}>{step.note}</p>
                       {step.link && (
                         <a href={step.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "4px", fontSize: "11px", fontWeight: "800", color: item.color, textDecoration: "none", background: `${item.color}15`, border: `1px solid ${item.color}35`, borderRadius: "6px", padding: "3px 8px" }}>
-                          → Official IRS page ↗
+                          Official IRS page
                         </a>
                       )}
                     </div>
@@ -7616,23 +7614,21 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               </div>
             ))}
           </div>
-
-          {/* TAX PARTNER CARDS */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #34d399, transparent)", borderRadius: "2px", boxShadow: "0 0 8px #34d399" }} />
+              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #34d399, transparent)", borderRadius: "2px" }} />
               <div>
-                <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Verified 1031 Exchange Partners</p>
+                <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff" }}>Verified 1031 Exchange Partners</p>
                 <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>Qualified Intermediaries · All 50 states · Your funds are protected</p>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
               {([
-                { name: "IPX1031", hq: "Chicago, IL · USA", scale: "#1 largest QI in the US", icon: "🏆", color: "#34d399", price: "Custom", priceSub: "contact for quote", tag: "⭐ Best Overall", tagColor: "#34d399", specialty: "1031 · ALL EXCHANGE TYPES · FORTUNE 500", great: ["Largest QI in the entire US", "Backed by Fidelity National Financial", "Handles complex billion-dollar exchanges", "All 50 states · all exchange types"], notFor: ["Investors wanting lowest fees", "Simple small exchanges under $200K", "Those wanting a personal boutique feel"], alt: "Exeter 1031", link: "https://www.ipx1031.com" },
-                { name: "Exeter 1031", hq: "San Diego, CA · USA", scale: "Regulated trust account", icon: "🛡️", color: "#a78bfa", price: "~$800–$1,500", priceSub: "standard exchange", tag: "Most Secure", tagColor: "#a78bfa", specialty: "1031 · TRUST ACCOUNT · ALL 50 STATES", great: ["Funds held in regulated trust — not bank account", "Wyoming Division of Banking oversight", "Dedicated advisor per exchange", "Complex reverse and improvement exchanges"], notFor: ["Investors on tight budget", "Simple same-day exchanges", "Those needing the biggest brand name"], alt: "IPX1031", link: "https://www.exeter1031.com" },
-                { name: "Deferred.com", hq: "USA · Nationwide", scale: "7,000+ exchanges done", icon: "⚡", color: "#f59e0b", price: "FREE", priceSub: "earns interest on your funds", tag: "Modern Pick", tagColor: "#f59e0b", specialty: "1031 · DIGITAL · FREE SERVICE", great: ["No fee — they earn from interest on funds", "Start online 24/7 — no office visit needed", "Attorney and CPA on staff", "500+ five-star reviews"], notFor: ["Investors needing complex reverse exchanges", "Those wanting oldest/biggest brand", "High 9-figure exchange amounts"], alt: "IPX1031", link: "https://www.deferred.com" },
+                { name: "IPX1031", hq: "Chicago, IL · USA", scale: "#1 largest QI in the US", icon: "🏆", color: "#34d399", price: "Custom", priceSub: "contact for quote", tag: "Best Overall", tagColor: "#34d399", specialty: "1031 · ALL EXCHANGE TYPES · FORTUNE 500", great: ["Largest QI in the entire US", "Backed by Fidelity National Financial", "Handles complex billion-dollar exchanges", "All 50 states · all exchange types"], notFor: ["Investors wanting lowest fees", "Simple small exchanges under $200K", "Those wanting boutique personal feel"], alt: "Exeter 1031", link: "https://www.ipx1031.com" },
+                { name: "Exeter 1031", hq: "San Diego, CA · USA", scale: "Regulated trust account", icon: "🛡️", color: "#a78bfa", price: "~$800-$1,500", priceSub: "standard exchange", tag: "Most Secure", tagColor: "#a78bfa", specialty: "1031 · TRUST ACCOUNT · ALL 50 STATES", great: ["Funds held in regulated trust not bank", "Wyoming Division of Banking oversight", "Dedicated advisor per exchange", "Complex reverse and improvement exchanges"], notFor: ["Investors on tight budget", "Simple same-day exchanges", "Those needing biggest brand name"], alt: "IPX1031", link: "https://www.exeter1031.com" },
+                { name: "Deferred.com", hq: "USA · Nationwide", scale: "7,000+ exchanges done", icon: "⚡", color: "#f59e0b", price: "FREE", priceSub: "earns interest on your funds", tag: "Modern Pick", tagColor: "#f59e0b", specialty: "1031 · DIGITAL · FREE SERVICE", great: ["No fee — earns from interest on funds", "Start online 24/7 no office visit needed", "Attorney and CPA on staff", "500+ five-star reviews"], notFor: ["Investors needing complex reverse exchanges", "Those wanting oldest biggest brand", "High 9-figure exchange amounts"], alt: "IPX1031", link: "https://www.deferred.com" },
               ] as any[]).map((l) => (
-                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
+                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
                   <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
                   <div style={{ display: "inline-flex", marginBottom: "14px" }}>
@@ -7649,26 +7645,23 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       <p style={{ fontSize: "9px", color: `${l.color}88`, fontWeight: "700", marginTop: "2px" }}>{l.priceSub}</p>
                     </div>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "8px 12px", marginBottom: "14px" }}>
-                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>📊 {l.scale}</p>
-                  </div>
                   <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "16px" }}>
                     <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
                   </div>
                   <div style={{ marginBottom: "16px" }}>
-                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
+                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>GREAT FOR</p>
                     {l.great.map((g: string) => (
                       <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", flexShrink: 0 }} />
                         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginBottom: "18px" }}>
-                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>NOT OPTIMAL FOR</p>
                     {l.notFor.map((n: string) => (
                       <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", flexShrink: 0 }} />
                         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
                       </div>
                     ))}
@@ -7676,44 +7669,41 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                   <div style={{ marginTop: "auto" }}>
                     <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: "600" }}>Not the right fit?</p>
-                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt}</p>
                     </div>
-                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
-                      Start with {l.name} →
+                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none" }}>
+                      Start with {l.name}
                     </a>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
         </div>
       )}
 
       {/* TITLE & CLOSE SECTION */}
       {activeSection === "title" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-
-          {/* EDUCATION CARDS */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             {([
-              { icon: "🔍", title: "Title Search", color: "#f97316", desc: "A title company digs through public records to confirm the seller legally owns the property and there are no hidden liens, unpaid taxes, or legal disputes attached to the deed.", why: "Without it: you could buy a property with $50K in hidden debt", steps: [{ text: "Order title search immediately after contract is signed", note: "Don't wait — title issues kill deals at the last minute", link: null }, { text: "Review the title commitment letter carefully", note: "Lists all exceptions and conditions — read every line", link: null }, { text: "Clear any exceptions, liens, or judgments", note: "Seller must resolve these before closing", link: null }, { text: "Confirm clean chain of title going back 40+ years", note: "Gaps in ownership history = major red flag", link: null }] },
-              { icon: "🛡️", title: "Title Insurance", color: "#f59e0b", desc: "A one-time premium paid at closing that protects you forever against title defects discovered after you own the property. Lenders require lender's title insurance. Owner's policy protects you.", why: "Without it: an old lien surfaces after closing — you pay it", steps: [{ text: "Get lender's title insurance — required by all mortgage lenders", note: "Non-negotiable if you have a loan", link: null }, { text: "Get owner's title insurance — highly recommended", note: "One-time cost at closing · ~0.5% of purchase price", link: null }, { text: "National avg: $1,337 on a $318K home · varies by state", note: "PA averages $3,496 · MO averages $358 — shop around", link: null }, { text: "Coverage protects you for as long as you own the property", note: "No annual renewal — pay once, covered forever", link: null }] },
-              { icon: "📝", title: "Closing Process", color: "#34d399", desc: "Everything that happens at the closing table — what you sign, what you bring, what you receive, and what surprises to avoid. Most investors show up unprepared. You won't.", why: "Without prep: surprised by $8K+ in closing costs on closing day", steps: [{ text: "Review your Closing Disclosure 3 days before closing", note: "Lender must send this 3 days early — review every line", link: "https://www.consumerfinance.gov/owning-a-home/closing-disclosure/" }, { text: "Wire your closing funds 24 hours before closing", note: "Never wire same-day — bank fraud risk is real", link: null }, { text: "Bring government-issued photo ID", note: "Passport or driver's license — no exceptions", link: null }, { text: "Sign all documents — budget 1–2 hours", note: "Ask questions on anything you don't understand", link: null }, { text: "Receive keys and deed — you now own it", note: "Get the deed recorded with your county same day", link: null }] },
-              { icon: "💼", title: "Closing Costs", color: "#a78bfa", desc: "All fees due at closing beyond your down payment. Avg 2–5% of purchase price. Know every line item before closing day so you are never caught off guard.", why: "Avg closing costs: 2–5% of purchase price = $6K–$25K on a $500K deal", steps: [{ text: "Lender fees — origination, underwriting, processing", note: "Shop at least 3 lenders — these fees vary significantly", link: null }, { text: "Title fees — search, insurance, settlement agent", note: "Title insurance is the biggest single fee", link: null }, { text: "Prepaid items — homeowner's insurance, property taxes, interest", note: "You prepay 2–3 months of taxes and insurance at closing", link: null }, { text: "Government fees — recording, transfer tax", note: "Varies hugely by state — check your state rate", link: null }, { text: "Negotiate seller concessions to offset your costs", note: "In buyer's market: ask seller to cover 2–3% of closing costs", link: null }] },
+              { icon: "🔍", title: "Title Search", color: "#f97316", desc: "A title company digs through public records to confirm the seller legally owns the property and there are no hidden liens unpaid taxes or legal disputes attached to the deed.", why: "Without it: you could buy a property with $50K in hidden debt", steps: [{ text: "Order title search immediately after contract is signed", note: "Do not wait — title issues kill deals at the last minute", link: null }, { text: "Review the title commitment letter carefully", note: "Lists all exceptions and conditions — read every line", link: null }, { text: "Clear any exceptions liens or judgments", note: "Seller must resolve these before closing", link: null }, { text: "Confirm clean chain of title going back 40+ years", note: "Gaps in ownership history = major red flag", link: null }] },
+              { icon: "🛡️", title: "Title Insurance", color: "#f59e0b", desc: "A one-time premium paid at closing that protects you forever against title defects discovered after you own the property. Lenders require lender title insurance.", why: "Without it: an old lien surfaces after closing — you pay it", steps: [{ text: "Get lender title insurance — required by all mortgage lenders", note: "Non-negotiable if you have a loan", link: null }, { text: "Get owner title insurance — highly recommended", note: "One-time cost at closing ~0.5% of purchase price", link: null }, { text: "National avg $1,337 on a $318K home — varies hugely by state", note: "PA averages $3,496 · MO averages $358 — shop around", link: null }, { text: "Coverage protects you for as long as you own the property", note: "No annual renewal — pay once covered forever", link: null }] },
+              { icon: "📝", title: "Closing Process", color: "#34d399", desc: "Everything that happens at the closing table — what you sign what you bring what you receive and what surprises to avoid. Most investors show up unprepared.", why: "Without prep: surprised by $8K+ in closing costs on closing day", steps: [{ text: "Review your Closing Disclosure 3 days before closing", note: "Lender must send this 3 days early — review every line", link: "https://www.consumerfinance.gov/owning-a-home/closing-disclosure/" }, { text: "Wire your closing funds 24 hours before closing", note: "Never wire same-day — bank fraud risk is real", link: null }, { text: "Bring government-issued photo ID", note: "Passport or driver license — no exceptions", link: null }, { text: "Sign all documents — budget 1-2 hours", note: "Ask questions on anything you do not understand", link: null }, { text: "Receive keys and deed — you now own it", note: "Get the deed recorded with your county same day", link: null }] },
+              { icon: "💼", title: "Closing Costs", color: "#a78bfa", desc: "All fees due at closing beyond your down payment. Avg 2-5% of purchase price. Know every line item before closing day so you are never caught off guard.", why: "Avg 2-5% of purchase price = $6K-$25K on a $500K deal", steps: [{ text: "Lender fees — origination underwriting processing", note: "Shop at least 3 lenders — these fees vary significantly", link: null }, { text: "Title fees — search insurance settlement agent", note: "Title insurance is the biggest single fee", link: null }, { text: "Prepaid items — homeowner insurance property taxes interest", note: "You prepay 2-3 months of taxes and insurance at closing", link: null }, { text: "Government fees — recording transfer tax", note: "Varies hugely by state — check your state rate", link: null }, { text: "Negotiate seller concessions to offset your costs", note: "In buyer market: ask seller to cover 2-3% of closing costs", link: null }] },
             ] as any[]).map((item) => (
               <div key={item.title} style={{ background: `linear-gradient(135deg, ${item.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${item.color}28`, borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${item.color}, transparent)` }} />
                 <div style={{ position: "absolute", top: 0, right: 0, width: "100px", height: "100px", background: `radial-gradient(circle at top right, ${item.color}12, transparent 70%)`, pointerEvents: "none" }} />
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                  <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `${item.color}15`, border: `2px solid ${item.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: `0 0 16px ${item.color}22` }}>{item.icon}</div>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `${item.color}15`, border: `2px solid ${item.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{item.icon}</div>
                   <div>
                     <p style={{ fontSize: "17px", fontWeight: "900", color: item.color }}>{item.title}</p>
                     <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "700" }}>{item.why}</p>
                   </div>
                 </div>
                 <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", lineHeight: "1.7", marginBottom: "16px" }}>{item.desc}</p>
-                <p style={{ fontSize: "10px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Step by step — exactly what to do</p>
+                <p style={{ fontSize: "10px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Step by step</p>
                 {item.steps.map((step: any, i: number) => (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
                     <div style={{ width: "24px", height: "24px", borderRadius: "7px", background: `${item.color}20`, border: `1px solid ${item.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "900", color: item.color, flexShrink: 0 }}>{i + 1}</div>
@@ -7722,7 +7712,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: "500" }}>{step.note}</p>
                       {step.link && (
                         <a href={step.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "4px", fontSize: "11px", fontWeight: "800", color: item.color, textDecoration: "none", background: `${item.color}15`, border: `1px solid ${item.color}35`, borderRadius: "6px", padding: "3px 8px" }}>
-                          → Go directly ↗
+                          Go directly
                         </a>
                       )}
                     </div>
@@ -7731,27 +7721,24 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               </div>
             ))}
           </div>
-
-          {/* TITLE PARTNER CARDS */}
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #f97316, transparent)", borderRadius: "2px", boxShadow: "0 0 8px #f97316" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #f97316, transparent)", borderRadius: "2px" }} />
               <div>
-                <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Verified Title Partners</p>
-                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>Big Four national underwriters · All 50 states · Always get 3 local quotes</p>
+                <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff" }}>Verified Title Partners</p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>Big Four · All 50 states · Always get 3 local quotes</p>
               </div>
             </div>
-            <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "12px", padding: "12px 16px", marginBottom: "20px", display: "flex", gap: "10px", alignItems: "flex-start" }}>
-              <span style={{ fontSize: "16px", flexShrink: 0 }}>⚠️</span>
-              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", fontWeight: "600", lineHeight: "1.6" }}>Title costs vary dramatically by state — from $358 in Missouri to $3,496 in Pennsylvania for the same deal. Always get at least 3 local quotes. The national companies below provide access to local agents in every state.</p>
+            <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "12px", padding: "12px 16px", marginBottom: "20px" }}>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", fontWeight: "600", lineHeight: "1.6" }}>Title costs vary by state — from $358 in Missouri to $3,496 in Pennsylvania. Always get 3 local quotes.</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
               {([
-                { name: "First American", hq: "Santa Ana, CA · USA", scale: "22.9% US market share", icon: "🏅", color: "#f97316", price: "~0.5–1%", priceSub: "of purchase price", tag: "Fastest Quotes", tagColor: "#f97316", specialty: "TITLE INSURANCE · 60-SECOND QUOTE", great: ["Quote delivered in 60 seconds online", "Residential, commercial, investors", "Offices in every state + international", "Founded 1889 — 130+ years of trust"], notFor: ["Cheapest option in every state", "Small rural county transactions", "Investors who want boutique service"], alt: "Stewart Title", link: "https://www.firstam.com" },
-                { name: "Fidelity National", hq: "Jacksonville, FL · USA", scale: "27% US market share — #1", icon: "🥇", color: "#f59e0b", price: "~0.5–1%", priceSub: "of purchase price", tag: "⭐ Largest in the US", tagColor: "#f59e0b", specialty: "TITLE · SETTLEMENT · INVESTOR FOCUS", great: ["Largest title insurer in the US", "Also backs IPX1031 for 1031 exchanges", "Chicago Title is their investor-friendly brand", "Commercial + residential + multifamily"], notFor: ["Investors wanting online-only experience", "Fastest quote turnaround", "Budget-first investors"], alt: "First American", link: "https://www.fnf.com" },
-                { name: "Stewart Title", hq: "Houston, TX · USA", scale: "9.2% market share · since 1893", icon: "🏛️", color: "#a78bfa", price: "~0.5–1%", priceSub: "of purchase price", tag: "Best for Texas & South", tagColor: "#a78bfa", specialty: "TITLE · COMMERCIAL · RE INVESTORS", great: ["Strong in Texas, Florida, Southeast US", "Exceptional service for complex deals", "Commercial real estate specialist", "Investor-friendly closing processes"], notFor: ["Northeast or Northwest US — weaker coverage", "Investors needing fastest digital quote", "Simple residential transactions"], alt: "Fidelity National", link: "https://www.stewart.com" },
+                { name: "First American", hq: "Santa Ana, CA · USA", scale: "22.9% US market share", icon: "🏅", color: "#f97316", price: "~0.5-1%", priceSub: "of purchase price", tag: "Fastest Quotes", tagColor: "#f97316", specialty: "TITLE INSURANCE · 60-SECOND QUOTE", great: ["Quote delivered in 60 seconds online", "Residential commercial and investors", "Offices in every state and internationally", "Founded 1889 — 130+ years of trust"], notFor: ["Cheapest option in every state", "Small rural county transactions", "Investors who want boutique service"], alt: "Stewart Title", link: "https://www.firstam.com" },
+                { name: "Fidelity National", hq: "Jacksonville, FL · USA", scale: "27% US market share — #1", icon: "🥇", color: "#f59e0b", price: "~0.5-1%", priceSub: "of purchase price", tag: "Largest in the US", tagColor: "#f59e0b", specialty: "TITLE · SETTLEMENT · INVESTOR FOCUS", great: ["Largest title insurer in the US", "Also backs IPX1031 for 1031 exchanges", "Chicago Title is their investor brand", "Commercial residential and multifamily"], notFor: ["Investors wanting online-only experience", "Fastest quote turnaround", "Budget-first investors"], alt: "First American", link: "https://www.fnf.com" },
+                { name: "Stewart Title", hq: "Houston, TX · USA", scale: "9.2% market share · since 1893", icon: "🏛️", color: "#a78bfa", price: "~0.5-1%", priceSub: "of purchase price", tag: "Best for Texas and South", tagColor: "#a78bfa", specialty: "TITLE · COMMERCIAL · RE INVESTORS", great: ["Strong in Texas Florida and Southeast", "Exceptional for complex deals", "Commercial real estate specialist", "Investor-friendly closing processes"], notFor: ["Northeast or Northwest — weaker coverage", "Investors needing fastest digital quote", "Simple residential transactions"], alt: "Fidelity National", link: "https://www.stewart.com" },
               ] as any[]).map((l) => (
-                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
+                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
                   <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
                   <div style={{ display: "inline-flex", marginBottom: "14px" }}>
@@ -7768,26 +7755,23 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       <p style={{ fontSize: "9px", color: `${l.color}88`, fontWeight: "700", marginTop: "2px" }}>{l.priceSub}</p>
                     </div>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "8px 12px", marginBottom: "14px" }}>
-                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>📊 {l.scale}</p>
-                  </div>
                   <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "16px" }}>
                     <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
                   </div>
                   <div style={{ marginBottom: "16px" }}>
-                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
+                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>GREAT FOR</p>
                     {l.great.map((g: string) => (
                       <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", flexShrink: 0 }} />
                         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginBottom: "18px" }}>
-                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>NOT OPTIMAL FOR</p>
                     {l.notFor.map((n: string) => (
                       <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", flexShrink: 0 }} />
                         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
                       </div>
                     ))}
@@ -7795,21 +7779,19 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                   <div style={{ marginTop: "auto" }}>
                     <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: "600" }}>Not the right fit?</p>
-                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt}</p>
                     </div>
-                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
-                      Get a Quote with {l.name} →
+                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none" }}>
+                      Get a Quote with {l.name}
                     </a>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
-        </div>
         </div>
       )}
-    </div>
+</div>
   );
 }
 
