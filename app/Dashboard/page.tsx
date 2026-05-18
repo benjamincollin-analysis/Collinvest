@@ -7406,41 +7406,240 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
         </div>
       )}
 
-      {/* STRUCTURE SECTION */}
+    {/* STRUCTURE SECTION */}
       {activeSection === "structure" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-          {([
-            { icon: "🏛️", title: "LLC", country: "USA", color: "#a78bfa", desc: "Most popular structure for US investors. Separates personal and business liability. Pass-through taxation.", pros: ["Personal asset protection", "Pass-through taxation", "Easy to set up ($50-500)", "Flexible management"], cons: ["Annual fees per state", "Self-employment tax on active income", "Some lenders prefer personal loans"], steps: ["Choose your state (Wyoming or Delaware recommended)", "File Articles of Organization", "Get an EIN from IRS.gov", "Open a business bank account", "Transfer property deed to LLC"] },
-            { icon: "🏢", title: "S-Corp", country: "USA", color: "#f59e0b", desc: "Better for high-income investors. Reduces self-employment tax significantly on active rental income.", pros: ["Reduces self-employment tax", "Salary + distribution split", "Strong legal protection"], cons: ["More complex setup", "Must pay yourself reasonable salary", "100 shareholder limit"], steps: ["Form LLC first", "File IRS Form 2553", "Set up payroll", "Work with a CPA", "Annual S-Corp tax return"] },
-            { icon: "🌐", title: "Holding Company", country: "USA", color: "#34d399", desc: "Parent company that owns multiple LLCs. Each property in its own LLC under the holding company.", pros: ["Maximum asset protection", "Each property ring-fenced", "Easier to bring in investors", "Clean exit per property"], cons: ["More complex + costly to set up", "Multiple bank accounts needed", "Higher accounting fees"], steps: ["Form holding LLC in Wyoming", "Create child LLC per property", "Transfer properties to child LLCs", "Set up inter-company agreements", "Work with RE attorney"] },
-          ] as any[]).map((item) => (
-            <div key={item.title} style={{ background: `linear-gradient(135deg, ${item.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${item.color}30`, borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${item.color}, transparent)` }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-                <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: `${item.color}15`, border: `1px solid ${item.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>{item.icon}</div>
-                <div>
-                  <p style={{ fontSize: "18px", fontWeight: "900", color: item.color }}>{item.title}</p>
-                  <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontWeight: "600" }}>{item.country}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+
+          {/* EDUCATION CARDS */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+            {([
+              { icon: "🏛️", title: "LLC", country: "USA", color: "#a78bfa", desc: "Most popular structure for US investors. Separates personal and business liability. Pass-through taxation means profits flow directly to you — no corporate tax.", pros: ["Personal asset protection", "Pass-through taxation", "Easy to set up ($50–500)", "Flexible management structure"], cons: ["Annual fees per state", "Self-employment tax on active income", "Some lenders prefer personal loans"], steps: [{ text: "Choose your state", note: "Wyoming or Delaware — best protection, lowest fees", link: null }, { text: "File Articles of Organization", note: "Takes 1–5 business days online", link: null }, { text: "Get your EIN from IRS — free, 15 minutes", note: "Do this immediately after formation", link: "https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number" }, { text: "Open a dedicated business bank account", note: "Never mix personal and LLC funds", link: null }, { text: "Transfer property deed to LLC", note: "Work with a RE attorney — critical step", link: null }] },
+              { icon: "🏢", title: "S-Corp", country: "USA", color: "#f59e0b", desc: "Best for investors earning $80K+ net from real estate. Splits income into salary + distributions — you only pay self-employment tax on the salary portion.", pros: ["Reduces self-employment tax significantly", "Salary + distribution income split", "Strong legal protection"], cons: ["More complex to set up and maintain", "Must pay yourself a reasonable salary", "100 shareholder maximum"], steps: [{ text: "Form your LLC first", note: "S-Corp is an IRS election, not a separate entity", link: null }, { text: "File IRS Form 2553 — S-Corp Election", note: "Must file within 75 days of formation", link: "https://www.irs.gov/forms-pubs/about-form-2553" }, { text: "Set up payroll for your salary", note: "Use Gusto or ADP — required by IRS", link: "https://gusto.com" }, { text: "Work with a CPA who knows real estate", note: "Wrong salary = IRS audit risk", link: null }, { text: "File annual S-Corp tax return (Form 1120-S)", note: "Different from personal return — don't skip", link: "https://www.irs.gov/forms-pubs/about-form-1120-s" }] },
+              { icon: "🌐", title: "Holding Company", country: "USA", color: "#34d399", desc: "For investors with 3+ properties. One parent LLC owns multiple child LLCs — each property is ring-fenced. One lawsuit can never touch your other assets.", pros: ["Maximum asset protection at scale", "Each property legally isolated", "Easier to bring in partners per property", "Clean exit — sell one LLC, not the property"], cons: ["More complex and costly to set up", "Multiple bank accounts required", "Higher annual accounting fees"], steps: [{ text: "Form the Holding LLC in Wyoming", note: "Wyoming has the strongest LLC protection laws", link: null }, { text: "Create one child LLC per property", note: "Each LLC = one asset, fully isolated", link: null }, { text: "Get a separate EIN for each entity", note: "Free at IRS — one per day limit", link: "https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number" }, { text: "Set up inter-company operating agreements", note: "Defines ownership structure between entities", link: null }, { text: "Work with a real estate attorney to transfer deeds", note: "Do not skip this — verbal transfer means nothing", link: null }] },
+            ] as any[]).map((item) => (
+              <div key={item.title} style={{ background: `linear-gradient(135deg, ${item.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${item.color}30`, borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${item.color}, transparent)` }} />
+                <div style={{ position: "absolute", top: 0, right: 0, width: "100px", height: "100px", background: `radial-gradient(circle at top right, ${item.color}12, transparent 70%)`, pointerEvents: "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: `${item.color}15`, border: `2px solid ${item.color}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: `0 0 16px ${item.color}22` }}>{item.icon}</div>
+                  <div>
+                    <p style={{ fontSize: "20px", fontWeight: "900", color: item.color, letterSpacing: "-0.5px" }}>{item.title}</p>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: "600" }}>{item.country} · Legal Structure</p>
+                  </div>
                 </div>
+                <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", lineHeight: "1.7", marginBottom: "16px" }}>{item.desc}</p>
+                <div style={{ marginBottom: "12px" }}>
+                  <p style={{ fontSize: "10px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "8px" }}>✓ Advantages</p>
+                  {item.pros.map((p: string) => (
+                    <div key={p} style={{ display: "flex", gap: "8px", marginBottom: "5px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 5px #34d399", marginTop: "5px", flexShrink: 0 }} />
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", fontWeight: "500" }}>{p}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <p style={{ fontSize: "10px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "8px" }}>✗ Watch out for</p>
+                  {item.cons.map((c: string) => (
+                    <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "5px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 5px #f87171", marginTop: "5px", flexShrink: 0 }} />
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.75)", fontWeight: "500" }}>{c}</p>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: "10px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Step by step — exactly what to do</p>
+                {item.steps.map((step: any, i: number) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
+                    <div style={{ width: "24px", height: "24px", borderRadius: "7px", background: `${item.color}20`, border: `1px solid ${item.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "900", color: item.color, flexShrink: 0 }}>{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: "13px", color: "#fff", fontWeight: "700", marginBottom: "2px" }}>{step.text}</p>
+                      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: "500" }}>{step.note}</p>
+                      {step.link && (
+                        <a href={step.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "4px", fontSize: "11px", fontWeight: "800", color: item.color, textDecoration: "none", background: `${item.color}15`, border: `1px solid ${item.color}35`, borderRadius: "6px", padding: "3px 8px" }}>
+                          → Go directly ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.8)", lineHeight: "1.6", marginBottom: "16px" }}>{item.desc}</p>
-              <div style={{ marginBottom: "12px" }}>
-                <p style={{ fontSize: "9px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "8px" }}>✓ Advantages</p>
-                {item.pros.map((p: string) => <div key={p} style={{ display: "flex", gap: "8px", marginBottom: "5px" }}><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#34d399", marginTop: "5px", flexShrink: 0 }} /><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.85)" }}>{p}</p></div>)}
+            ))}
+          </div>
+
+          {/* PARTNER CARDS */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #a78bfa, transparent)", borderRadius: "2px", boxShadow: "0 0 8px #a78bfa" }} />
+              <div>
+                <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Form Your Entity Today</p>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>Verified · All 50 states · Real pricing — no surprises</p>
               </div>
-              <div style={{ marginBottom: "16px" }}>
-                <p style={{ fontSize: "9px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "8px" }}>✗ Watch out for</p>
-                {item.cons.map((c: string) => <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "5px" }}><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#f87171", marginTop: "5px", flexShrink: 0 }} /><p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>{c}</p></div>)}
-              </div>
-              <p style={{ fontSize: "9px", color: `${item.color}99`, fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>How to set it up</p>
-              {item.steps.map((step: string, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "8px" }}>
-                  <div style={{ width: "22px", height: "22px", borderRadius: "6px", background: `${item.color}15`, border: `1px solid ${item.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "900", color: item.color, flexShrink: 0 }}>{i + 1}</div>
-                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", fontWeight: "500", paddingTop: "3px" }}>{step}</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+              {([
+                {
+                  name: "Northwest", hq: "Sioux Falls, SD · USA", scale: "Since 1998", icon: "🔒", color: "#a78bfa",
+                  price: "$39", priceSub: "+ state fees · best value",
+                  agentFee: "Registered agent: FREE year 1 → $125/yr",
+                  specialty: "LLC · PRIVACY · NO UPSELLS",
+                  tag: "⭐ Best Overall", tagColor: "#a78bfa",
+                  great: ["Maximum privacy — their address on all filings", "Zero upsells during checkout", "Real humans answer your calls", "Includes 1 year registered agent free"],
+                  notFor: ["Those wanting a $0 start", "Investors needing legal advice bundled", "International formations"],
+                  alt: "ZenBusiness", link: "https://www.northwestregisteredagent.com",
+                },
+                {
+                  name: "ZenBusiness", hq: "Austin, TX · USA", scale: "4.8★ Trustpilot", icon: "⚡", color: "#34d399",
+                  price: "$0", priceSub: "+ state fees · free to start",
+                  agentFee: "Registered agent: $199/yr after free period",
+                  specialty: "LLC · S-CORP · COMPLIANCE TRACKING",
+                  tag: "Best for Beginners", tagColor: "#34d399",
+                  great: ["$0 to start — only pay state fee", "Guided step-by-step formation", "Compliance deadline tracking", "4.8★ with 28,000+ reviews"],
+                  notFor: ["Privacy-focused investors", "Those wanting zero upsells", "Investors who want flat pricing"],
+                  alt: "Northwest", link: "https://www.zenbusiness.com",
+                },
+                {
+                  name: "Bizee", hq: "Houston, TX · USA", scale: "1M+ businesses formed", icon: "🚀", color: "#f59e0b",
+                  price: "$0", priceSub: "+ state fees · free to start",
+                  agentFee: "Registered agent: FREE year 1 → $119/yr",
+                  specialty: "LLC · FAST FILING · BUDGET",
+                  tag: "Best Budget Pick", tagColor: "#f59e0b",
+                  great: ["$0 formation + free registered agent year 1", "1M+ businesses formed since 2004", "Fast automated filing", "4.7★ Trustpilot · 24,000+ reviews"],
+                  notFor: ["Privacy-conscious investors", "Those wanting hand-holding guidance", "Complex multi-entity structures"],
+                  alt: "Northwest", link: "https://www.bizee.com",
+                },
+              ] as any[]).map((l) => (
+                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
+                  <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
+
+                  {/* Tag */}
+                  <div style={{ display: "inline-flex", alignItems: "center", marginBottom: "14px" }}>
+                    <span style={{ fontSize: "10px", fontWeight: "900", color: l.tagColor, background: `${l.tagColor}18`, border: `1px solid ${l.tagColor}44`, borderRadius: "999px", padding: "3px 10px", letterSpacing: "0.5px" }}>{l.tag}</span>
+                  </div>
+
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+                    <div style={{ width: "54px", height: "54px", borderRadius: "16px", background: `${l.color}18`, border: `2px solid ${l.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0, boxShadow: `0 0 20px ${l.color}25` }}>{l.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: "22px", fontWeight: "900", color: l.color, letterSpacing: "-1px", lineHeight: 1 }}>{l.name}</p>
+                      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: "4px", fontWeight: "600" }}>{l.hq}</p>
+                    </div>
+                    <div style={{ background: `${l.color}20`, border: `1px solid ${l.color}50`, borderRadius: "10px", padding: "6px 12px", textAlign: "center" as const }}>
+                      <p style={{ fontSize: "20px", fontWeight: "900", color: l.color, lineHeight: 1 }}>{l.price}</p>
+                      <p style={{ fontSize: "9px", color: `${l.color}88`, fontWeight: "700", marginTop: "2px" }}>{l.priceSub}</p>
+                    </div>
+                  </div>
+
+                  {/* Registered agent fee */}
+                  <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "8px 12px", marginBottom: "14px" }}>
+                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", fontWeight: "600" }}>🛡 {l.agentFee}</p>
+                  </div>
+
+                  {/* Specialty */}
+                  <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "16px" }}>
+                    <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
+                  </div>
+
+                  {/* Great For */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
+                    {l.great.map((g: string) => (
+                      <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Not Optimal */}
+                  <div style={{ marginBottom: "18px" }}>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
+                    {l.notFor.map((n: string) => (
+                      <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: "600" }}>Not the right fit?</p>
+                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                    </div>
+                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
+                      Form with {l.name} →
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
-          ))}
+          </div>
+
+        </div>
+      )}
+          </div>
+
+          {/* PARTNER CARDS */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #a78bfa, transparent)", borderRadius: "2px" }} />
+              <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff" }}>Verified Legal & LLC Partners</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginLeft: "4px" }}>· All 50 states · form your LLC today</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+              {([
+                { name: "Northwest", hq: "Sioux Falls, SD · USA", scale: "3M+ businesses formed", icon: "🏔️", color: "#a78bfa", specialty: "LLC · REGISTERED AGENT · PRIVACY", great: ["Best privacy protection", "Registered agent included free", "All 50 states same day filing", "No upsells — flat pricing"], notFor: ["Complex multi-entity structures", "Investors needing legal advice", "International formations"], alt: "ZenBusiness", link: "https://www.northwestregisteredagent.com" },
+                { name: "ZenBusiness", hq: "Austin, TX · USA", scale: "$800M+ valuation", icon: "⚡", color: "#34d399", specialty: "LLC · S-CORP · COMPLIANCE", great: ["First-time LLC formation", "Worry-free compliance tracking", "Affordable annual plans", "Fast turnaround 1–2 days"], notFor: ["Investors needing maximum privacy", "Complex holding structures", "Those who want zero upsells"], alt: "Northwest", link: "https://www.zenbusiness.com" },
+                { name: "Stripe Atlas", hq: "San Francisco, CA · USA", scale: "$50B+ Stripe ecosystem", icon: "🌐", color: "#f59e0b", specialty: "LLC · C-CORP · BANKING SETUP", great: ["Tech-forward investors", "Delaware C-Corp or LLC", "Banking + Stripe account included", "Equity and cap table tools"], notFor: ["Simple single-property LLCs", "Investors outside tech ecosystem", "Those needing registered agent only"], alt: "ZenBusiness", link: "https://stripe.com/atlas" },
+              ] as any[]).map((l) => (
+                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
+                  <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
+                    <div style={{ width: "54px", height: "54px", borderRadius: "16px", background: `${l.color}18`, border: `2px solid ${l.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>{l.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: "22px", fontWeight: "900", color: l.color, letterSpacing: "-1px", lineHeight: 1 }}>{l.name}</p>
+                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", marginTop: "4px", fontWeight: "600" }}>{l.hq}</p>
+                    </div>
+                    <div style={{ background: `${l.color}20`, border: `1px solid ${l.color}50`, borderRadius: "10px", padding: "6px 12px" }}>
+                      <p style={{ fontSize: "12px", color: l.color, fontWeight: "900", whiteSpace: "nowrap" }}>{l.scale}</p>
+                    </div>
+                  </div>
+                  <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "18px" }}>
+                    <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
+                  </div>
+                  <div style={{ marginBottom: "16px" }}>
+                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
+                    {l.great.map((g: string) => (
+                      <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom: "18px" }}>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
+                    {l.notFor.map((n: string) => (
+                      <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>Not the right fit?</p>
+                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                    </div>
+                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
+                      Form with {l.name} →
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       )}
 
