@@ -7310,32 +7310,99 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
 
       {/* INSURANCE SECTION */}
       {activeSection === "insurance" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-          {([
-            { icon: "🏠", title: "Property Insurance", color: "#60a5fa", desc: "Covers physical damage to your building from fire, storms, vandalism. Required by most lenders.", why: "Without it: one fire = total financial loss", steps: ["Get a property appraisal", "Compare 3+ quotes", "Choose replacement cost coverage", "Add liability rider"] },
-            { icon: "🏡", title: "Landlord Policy", color: "#60a5fa", desc: "Covers rental income loss, tenant damage, liability if a tenant is injured on your property.", why: "Without it: tenant injury = personal lawsuit", steps: ["Confirm rental use with insurer", "Add loss of rent coverage", "Set liability at $1M minimum", "Review annually"] },
-            { icon: "⚖️", title: "Liability Insurance", color: "#60a5fa", desc: "Protects you personally if someone sues you over your property.", why: "Without it: one lawsuit = personal assets at risk", steps: ["Get umbrella policy ($1-5M)", "Link to your LLC", "Review with your attorney"] },
-            { icon: "🔨", title: "Builder's Risk", color: "#60a5fa", desc: "Essential during renovation or construction. Covers materials, equipment, the structure itself.", why: "Without it: fire during reno = full loss", steps: ["Get coverage before demo starts", "Confirm contractor has own insurance", "Set coverage to total project value"] },
-          ] as any[]).map((item) => (
-            <div key={item.title} style={{ background: "linear-gradient(135deg, rgba(96,165,250,0.08), rgba(0,0,0,0.3))", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #60a5fa, transparent)" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>{item.icon}</div>
-                <div>
-                  <p style={{ fontSize: "16px", fontWeight: "900", color: "#60a5fa" }}>{item.title}</p>
-                  <p style={{ fontSize: "11px", color: "#f87171", fontWeight: "700" }}>{item.why}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+
+          {/* EDUCATION CARDS */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            {([
+              { icon: "🏠", title: "Property Insurance", color: "#60a5fa", desc: "Covers physical damage to your building from fire, storms, vandalism. Required by most lenders. Without this, one fire wipes out your entire investment.", why: "Without it: one fire = total financial loss", steps: ["Get a property appraisal first", "Compare minimum 3 quotes", "Choose replacement cost coverage — not actual cash value", "Add liability rider to every policy"] },
+              { icon: "🏡", title: "Landlord Policy", color: "#60a5fa", desc: "Covers rental income loss, tenant damage, and liability if a tenant is injured on your property. Standard homeowner's insurance does NOT cover this.", why: "Without it: tenant injury = personal lawsuit", steps: ["Confirm rental use with your insurer", "Add loss of rent coverage — critical", "Set liability at $1M minimum", "Review every year as portfolio grows"] },
+              { icon: "⚖️", title: "Umbrella Liability", color: "#60a5fa", desc: "When a lawsuit exceeds your property policy limits, umbrella coverage kicks in. One serious tenant injury can cost $2M+. This is your last line of defense.", why: "Without it: one lawsuit = personal assets at risk", steps: ["Get umbrella policy ($1–5M range)", "Link it directly to your LLC", "Stack it above your landlord policy", "Review with your attorney annually"] },
+              { icon: "🔨", title: "Builder's Risk", color: "#60a5fa", desc: "Essential during renovation or construction. Covers materials, equipment, and the structure itself during the window when nothing else does.", why: "Without it: fire during reno = full loss", steps: ["Get coverage before demo starts — day one", "Confirm contractor has their own insurance", "Set coverage to total project replacement value", "Cancel only after certificate of occupancy"] },
+            ] as any[]).map((item) => (
+              <div key={item.title} style={{ background: "linear-gradient(135deg, rgba(96,165,250,0.08), rgba(0,0,0,0.3))", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "18px", padding: "22px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #60a5fa, transparent)" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                  <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>{item.icon}</div>
+                  <div>
+                    <p style={{ fontSize: "16px", fontWeight: "900", color: "#60a5fa" }}>{item.title}</p>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "700" }}>{item.why}</p>
+                  </div>
                 </div>
+                <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", lineHeight: "1.7", marginBottom: "16px" }}>{item.desc}</p>
+                <p style={{ fontSize: "10px", color: "rgba(96,165,250,0.8)", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Steps to get covered</p>
+                {item.steps.map((step: string, i: number) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                    <div style={{ width: "22px", height: "22px", borderRadius: "6px", background: "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "900", color: "#60a5fa", flexShrink: 0 }}>{i + 1}</div>
+                    <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{step}</p>
+                  </div>
+                ))}
               </div>
-              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.8)", lineHeight: "1.6", marginBottom: "16px" }}>{item.desc}</p>
-              <p style={{ fontSize: "9px", color: "rgba(96,165,250,0.8)", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase" as const, marginBottom: "10px" }}>Steps to get covered</p>
-              {item.steps.map((step: string, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                  <div style={{ width: "22px", height: "22px", borderRadius: "6px", background: "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "900", color: "#60a5fa", flexShrink: 0 }}>{i + 1}</div>
-                  <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", fontWeight: "500" }}>{step}</p>
+            ))}
+          </div>
+
+          {/* PARTNER CARDS */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #60a5fa, transparent)", borderRadius: "2px" }} />
+              <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff" }}>Verified Insurance Partners</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginLeft: "4px" }}>· All 50 states · investor-focused</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              {([
+                { name: "Steadily", hq: "Austin, TX · USA", scale: "$350M+ valuation", icon: "🛡️", color: "#34d399", specialty: "LANDLORD · STR · RENTAL PROPERTY", great: ["Long-term rental investors", "Short-term rental (Airbnb/VRBO)", "All 50 states · instant quote", "Quote in under 60 seconds"], notFor: ["Owner-occupied homes", "Commercial-only properties", "Bundling with auto or home insurance"], alt: "Obie", link: "https://www.steadily.com" },
+                { name: "Obie", hq: "Chicago, IL · USA", scale: "25%+ avg savings", icon: "⚡", color: "#f59e0b", specialty: "MULTIFAMILY · SFR · PORTFOLIO", great: ["Multifamily investors", "Instant bindable quotes online", "Multiple properties in one policy", "Digital-first no-hassle experience"], notFor: ["STR / Airbnb properties", "Personal bundling needs", "Investors who prefer local agents"], alt: "Steadily", link: "https://www.obieinsurance.com" },
+                { name: "NREIG", hq: "Kansas City, MO · USA", scale: "20+ years experience", icon: "🏛️", color: "#a78bfa", specialty: "PORTFOLIO · BLANKET · COMMERCIAL", great: ["Large portfolio investors (10+ units)", "Blanket policies across multiple properties", "Vacant and renovation properties", "Mixed-use and commercial assets"], notFor: ["Single property investors", "STR / short-term rentals", "Investors wanting fast digital quotes"], alt: "Obie", link: "https://www.nreig.com" },
+                { name: "Travelers", hq: "New York, NY · USA", scale: "$40B+ premium written", icon: "✈️", color: "#60a5fa", specialty: "MULTIFAMILY · BUNDLE · COMMERCIAL", great: ["Serious multifamily investors", "LLC and business-structure owners", "Bundling all policies together", "Commercial-grade protection"], notFor: ["Solo first-time landlords", "Digital-first quick quotes", "Short-term rental properties"], alt: "NREIG", link: "https://www.travelers.com" },
+              ] as any[]).map((l) => (
+                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
+                  <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
+                    <div style={{ width: "54px", height: "54px", borderRadius: "16px", background: `${l.color}18`, border: `2px solid ${l.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>{l.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: "22px", fontWeight: "900", color: l.color, letterSpacing: "-1px", lineHeight: 1 }}>{l.name}</p>
+                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", marginTop: "4px", fontWeight: "600" }}>{l.hq}</p>
+                    </div>
+                    <div style={{ background: `${l.color}20`, border: `1px solid ${l.color}50`, borderRadius: "10px", padding: "6px 12px" }}>
+                      <p style={{ fontSize: "12px", color: l.color, fontWeight: "900", whiteSpace: "nowrap" }}>{l.scale}</p>
+                    </div>
+                  </div>
+                  <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "18px" }}>
+                    <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
+                  </div>
+                  <div style={{ marginBottom: "16px" }}>
+                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
+                    {l.great.map((g: string) => (
+                      <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
+                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom: "18px" }}>
+                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
+                    {l.notFor.map((n: string) => (
+                      <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
+                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: "auto" }}>
+                    <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>Not the right fit?</p>
+                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
+                    </div>
+                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
+                      Apply with {l.name} →
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
-          ))}
+          </div>
+
         </div>
       )}
 
