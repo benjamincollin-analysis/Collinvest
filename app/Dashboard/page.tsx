@@ -7791,7 +7791,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
           </div>
         </div>
       )}
-</div>
+    </div>
   );
 }
 
