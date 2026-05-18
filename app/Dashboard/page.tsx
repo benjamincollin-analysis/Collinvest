@@ -7575,73 +7575,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
             </div>
           </div>
 
-        </div>
-      )}
-          </div>
 
-          {/* PARTNER CARDS */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-              <div style={{ width: "4px", height: "24px", background: "linear-gradient(180deg, #a78bfa, transparent)", borderRadius: "2px" }} />
-              <p style={{ fontSize: "16px", fontWeight: "900", color: "#fff" }}>Verified Legal & LLC Partners</p>
-              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginLeft: "4px" }}>· All 50 states · form your LLC today</p>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-              {([
-                { name: "Northwest", hq: "Sioux Falls, SD · USA", scale: "3M+ businesses formed", icon: "🏔️", color: "#a78bfa", specialty: "LLC · REGISTERED AGENT · PRIVACY", great: ["Best privacy protection", "Registered agent included free", "All 50 states same day filing", "No upsells — flat pricing"], notFor: ["Complex multi-entity structures", "Investors needing legal advice", "International formations"], alt: "ZenBusiness", link: "https://www.northwestregisteredagent.com" },
-                { name: "ZenBusiness", hq: "Austin, TX · USA", scale: "$800M+ valuation", icon: "⚡", color: "#34d399", specialty: "LLC · S-CORP · COMPLIANCE", great: ["First-time LLC formation", "Worry-free compliance tracking", "Affordable annual plans", "Fast turnaround 1–2 days"], notFor: ["Investors needing maximum privacy", "Complex holding structures", "Those who want zero upsells"], alt: "Northwest", link: "https://www.zenbusiness.com" },
-                { name: "Stripe Atlas", hq: "San Francisco, CA · USA", scale: "$50B+ Stripe ecosystem", icon: "🌐", color: "#f59e0b", specialty: "LLC · C-CORP · BANKING SETUP", great: ["Tech-forward investors", "Delaware C-Corp or LLC", "Banking + Stripe account included", "Equity and cap table tools"], notFor: ["Simple single-property LLCs", "Investors outside tech ecosystem", "Those needing registered agent only"], alt: "ZenBusiness", link: "https://stripe.com/atlas" },
-              ] as any[]).map((l) => (
-                <div key={l.name} style={{ background: `linear-gradient(160deg, ${l.color}14, rgba(0,0,0,0.4))`, border: `1px solid ${l.color}40`, borderRadius: "22px", padding: "24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: `0 8px 32px ${l.color}10` }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${l.color}, transparent)` }} />
-                  <div style={{ position: "absolute", top: 0, right: 0, width: "150px", height: "150px", background: `radial-gradient(circle at top right, ${l.color}12, transparent 70%)`, pointerEvents: "none" }} />
-                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
-                    <div style={{ width: "54px", height: "54px", borderRadius: "16px", background: `${l.color}18`, border: `2px solid ${l.color}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>{l.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: "22px", fontWeight: "900", color: l.color, letterSpacing: "-1px", lineHeight: 1 }}>{l.name}</p>
-                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", marginTop: "4px", fontWeight: "600" }}>{l.hq}</p>
-                    </div>
-                    <div style={{ background: `${l.color}20`, border: `1px solid ${l.color}50`, borderRadius: "10px", padding: "6px 12px" }}>
-                      <p style={{ fontSize: "12px", color: l.color, fontWeight: "900", whiteSpace: "nowrap" }}>{l.scale}</p>
-                    </div>
-                  </div>
-                  <div style={{ background: `${l.color}10`, border: `1px solid ${l.color}30`, borderRadius: "10px", padding: "8px 14px", marginBottom: "18px" }}>
-                    <p style={{ fontSize: "12px", color: l.color, fontWeight: "800", letterSpacing: "1px" }}>{l.specialty}</p>
-                  </div>
-                  <div style={{ marginBottom: "16px" }}>
-                    <p style={{ fontSize: "12px", color: "#34d399", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✓ GREAT FOR</p>
-                    {l.great.map((g: string) => (
-                      <div key={g} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", flexShrink: 0 }} />
-                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{g}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginBottom: "18px" }}>
-                    <p style={{ fontSize: "12px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "10px" }}>✗ NOT OPTIMAL FOR</p>
-                    {l.notFor.map((n: string) => (
-                      <div key={n} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", boxShadow: "0 0 6px #f87171", flexShrink: 0 }} />
-                        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>{n}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: "auto" }}>
-                    <div style={{ background: `${l.color}08`, border: `1px solid ${l.color}25`, borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>Not the right fit?</p>
-                      <p style={{ fontSize: "14px", color: l.color, fontWeight: "900" }}>Try {l.alt} →</p>
-                    </div>
-                    <a href={l.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center" as const, padding: "15px", background: `linear-gradient(135deg, ${l.color}30, ${l.color}15)`, border: `1px solid ${l.color}60`, borderRadius: "14px", color: l.color, fontSize: "16px", fontWeight: "900", textDecoration: "none", letterSpacing: "0.3px" }}>
-                      Form with {l.name} →
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      )}
 
       {/* TAX SECTION */}
       {activeSection === "tax" && (
@@ -7702,6 +7636,10 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               ))}
             </div>
           ))}
+        </div>
+      )}
+
+    
         </div>
       )}
 
