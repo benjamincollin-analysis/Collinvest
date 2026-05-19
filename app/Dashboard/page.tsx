@@ -7575,6 +7575,9 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
             </div>
           </div>
 
+              </div>
+      )}
+
       {/* TAX SECTION */}
       {activeSection === "tax" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
@@ -9564,6 +9567,7 @@ function DealLabTab({ user, incomingListing }: { user: any; incomingListing?: an
 }
 
 export default Dashboard;
+
 
 
 
