@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
@@ -7575,7 +7575,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
             </div>
           </div>
 
-{/* TAX SECTION */}
+      {/* TAX SECTION */}
       {activeSection === "tax" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -9564,6 +9564,7 @@ function DealLabTab({ user, incomingListing }: { user: any; incomingListing?: an
 }
 
 export default Dashboard;
+
 
 
 
