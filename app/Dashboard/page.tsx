@@ -395,6 +395,7 @@ function Dashboard() {
 const [incomingFinancing, setIncomingFinancing] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"home" | "finddeals" | "myprojects" | "getfinanced" | "community">("home");
 const [homeSection, setHomeSection] = useState<"score"|"intelligence"|"properties"|"projections"|"finances"|null>("properties");
+  const [manageSection, setManageSection] = useState<"software"|"tenants"|"tax"|"maintenance">("software");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -7216,9 +7217,91 @@ function MyProjectsTab({ user, properties }: { user: any; properties: Property[]
   );
 }
 
+function ManageMaintenance({ propId, propName }: { propId: number; propName: string }) {
+  const [tickets, setTickets] = React.useState<{id:number;task:string;status:string;cost:number;priority:string;color:string}[]>([]);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newTask, setNewTask] = React.useState("");
+  const [newPriority, setNewPriority] = React.useState("Low");
+  const [newCost, setNewCost] = React.useState("");
+  const preventive = [
+    { task: "HVAC Filter Change", due: "Every 3 months", priority: "Low", color: "#34d399" },
+    { task: "Gutter Cleaning", due: "Every 6 months", priority: "Med", color: "#f59e0b" },
+    { task: "Roof Inspection", due: "Annually", priority: "High", color: "#f87171" },
+  ];
+  const openTickets = tickets.filter(t => t.status === "open");
+  const monthCost = tickets.filter(t => t.status === "open").reduce((a,b) => a + b.cost, 0);
+  const IS: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "9px 12px", fontSize: "13px", color: "#fff", outline: "none" };
+  return (
+    <div style={{ display: "flex", flexDirection: "column" as const, gap: "12px" }}>
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginBottom: "2px" }}>Maintenance Tracker</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px" }}>
+        {[
+          { label: "Open Tickets", value: String(openTickets.length), color: openTickets.length === 0 ? "#34d399" : "#f87171" },
+          { label: "Cost This Month", value: `$${monthCost.toLocaleString()}`, color: "#f59e0b" },
+          { label: "Preventive Due", value: String(preventive.length), color: "#60a5fa" },
+        ].map(m => (
+          <div key={m.label} style={{ padding: "14px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", textAlign: "center" as const }}>
+            <p style={{ fontSize: "22px", fontWeight: "900", color: m.color, marginBottom: "4px" }}>{m.value}</p>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase" as const, fontWeight: "700" }}>{m.label}</p>
+          </div>
+        ))}
+      </div>
+      {tickets.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1px" }}>Active Tickets</p>
+          {tickets.map(t => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "14px" }}>??</span>
+                <div>
+                  <p style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>{t.task}</p>
+                  <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{t.cost > 0 ? `$${t.cost}` : "No cost yet"}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", border: `1px solid ${t.color}55`, color: t.color }}>{t.priority}</span>
+                <button onClick={() => setTickets(prev => prev.filter(x => x.id !== t.id))} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", lineHeight: "1" }}>?</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1px" }}>Preventive Schedule</p>
+      {preventive.map(item => (
+        <div key={item.task} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <div>
+            <p style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>{item.task}</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{item.due}</p>
+          </div>
+          <span style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", border: `1px solid ${item.color}55`, color: item.color }}>{item.priority}</span>
+        </div>
+      ))}
+      {showAdd && (
+        <div style={{ padding: "16px", background: "rgba(245,158,11,0.06)", borderRadius: "12px", border: "1px solid rgba(245,158,11,0.2)", display: "flex", flexDirection: "column" as const, gap: "10px" }}>
+          <input placeholder="Describe the issue..." value={newTask} onChange={e => setNewTask(e.target.value)} style={IS} />
+          <div style={{ display: "flex", gap: "8px" }}>
+            <select value={newPriority} onChange={e => setNewPriority(e.target.value)} style={{ ...IS, flex: 1 }}>
+              {["Low","Med","High"].map(p => <option key={p}>{p}</option>)}
+            </select>
+            <input placeholder="Cost $" value={newCost} onChange={e => setNewCost(e.target.value)} style={{ ...IS, flex: 1 }} />
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={() => setShowAdd(false)} style={{ flex: 1, padding: "9px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>Cancel</button>
+            <button onClick={() => { if (!newTask.trim()) return; const color = newPriority === "High" ? "#f87171" : newPriority === "Med" ? "#f59e0b" : "#34d399"; setTickets(prev => [...prev, { id: Date.now(), task: newTask, status: "open", cost: Number(newCost) || 0, priority: newPriority, color }]); setNewTask(""); setNewCost(""); setNewPriority("Low"); setShowAdd(false); }} style={{ flex: 1, padding: "9px", borderRadius: "8px", fontSize: "12px", fontWeight: "800", border: "none", background: "#f59e0b", color: "#000", cursor: "pointer" }}>Log Ticket ?</button>
+          </div>
+        </div>
+      )}
+      {!showAdd && (
+        <button onClick={() => setShowAdd(true)} style={{ padding: "11px", borderRadius: "10px", fontSize: "12px", fontWeight: "800", border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.06)", color: "#f59e0b", cursor: "pointer" }}>+ Log Ticket</button>
+      )}
+    </div>
+  );
+}
+
 function GetFinancedTab({ properties, user, incomingListing }: { properties: Property[]; user: any; incomingListing?: any }) {
   const [mode, setMode] = useState<"start"|"manage"|"exit">("start");
   const [activeSection, setActiveSection] = useState<string>("structure");
+  const [manageSection, setManageSection] = useState<"software"|"tenants"|"tax"|"maintenance">("software");
 
   const modes = [
     { key: "start", icon: "🚀", label: "Start a Project", sub: "Form entity · Get financed · Insure · Close", color: "#a78bfa" },
@@ -7278,6 +7361,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
       </div>
 
       {/* SECTION NAV */}
+      {mode === "start" || mode === "exit" ? (
       <div style={{ display: "flex", gap: "8px", marginBottom: "28px", overflowX: "auto", paddingBottom: "4px" }}>
         {currentSections.map((s, i) => (
           <button key={s.key} onClick={() => setActiveSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: activeSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: activeSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s ease", position: "relative" }}>
@@ -7290,6 +7374,8 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
           </button>
         ))}
       </div>
+
+      ) : null}
 
       {/* ── START MODE SECTIONS ── */}
 
@@ -7777,14 +7863,225 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
 
       {/* ── MANAGE MODE ── */}
       {mode === "manage" && (
-        <div style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: "20px", padding: "40px", textAlign: "center" as const }}>
-          <p style={{ fontSize: "32px", marginBottom: "12px" }}>🏗️</p>
-          <p style={{ fontSize: "20px", fontWeight: "900", color: "#34d399", marginBottom: "8px" }}>Manage Mode — Coming Next</p>
-          <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)" }}>Property management software · Tenant screening · Tax strategy · Maintenance tracking</p>
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: "20px" }}>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "8px", overflowX: "auto", paddingBottom: "4px" }}>
+            {([
+              { key: "software", label: "PM Software", icon: "💻", color: "#a78bfa" },
+              { key: "tenants",  label: "Tenants",     icon: "👥", color: "#34d399" },
+              { key: "tax",      label: "Tax Strategy", icon: "📊", color: "#60a5fa" },
+              { key: "maintenance", label: "Maintenance", icon: "🔧", color: "#f59e0b" },
+            ] as const).map((s, i) => (
+              <button key={s.key} onClick={() => setManageSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: manageSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: manageSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap" as const, transition: "all 0.2s ease", position: "relative" as const }}>
+                {manageSection === s.key && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)`, borderRadius: "12px 12px 0 0" }} />}
+                <span style={{ fontSize: "16px" }}>{s.icon}</span>
+                <div style={{ textAlign: "left" as const }}>
+                  <p style={{ fontSize: "12px", fontWeight: "900", color: manageSection === s.key ? s.color : "rgba(255,255,255,0.5)" }}>{s.label}</p>
+                </div>
+                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "900", flexShrink: 0 }}>{i + 1}</div>
+              </button>
+            ))}
+          </div>
+          {properties.filter(p => p.occupancyStatus !== "sold").length === 0 && (
+            <div style={{ textAlign: "center" as const, padding: "48px", background: "rgba(255,255,255,0.02)", borderRadius: "16px", border: "1px dashed rgba(255,255,255,0.08)" }}>
+              <p style={{ fontSize: "28px", marginBottom: "12px" }}>??</p>
+              <p style={{ fontSize: "15px", fontWeight: "700", color: "rgba(255,255,255,0.4)", marginBottom: "6px" }}>No active properties</p>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.25)" }}>Add properties in your portfolio ? they appear here automatically</p>
+            </div>
+          )}
+          {properties.filter(p => p.occupancyStatus !== "sold").map(prop => {
+            const noi = prop.rent - prop.expenses;
+            const equity = prop.value - prop.mortgage;
+            const healthScore = Math.min(100, Math.round((noi > 0 ? 30 : 0) + (prop.occupancyStatus === "occupied" ? 25 : prop.occupancyStatus === "str" ? 20 : 0) + (equity > 0 ? 25 : 0) + (prop.rent > 0 ? 20 : 0)));
+            const hc = healthScore >= 70 ? "#34d399" : healthScore >= 40 ? "#f59e0b" : "#f87171";
+            return (
+              <div key={prop.id} style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))", border: `1px solid ${hc}33`, borderRadius: "20px", overflow: "hidden", boxShadow: `0 0 40px ${hc}08` }}>
+                {/* Top accent line */}
+                <div style={{ height: "2px", background: `linear-gradient(90deg, transparent, ${hc}, transparent)` }} />
+                
+                {/* Header */}
+                <div style={{ padding: "18px 22px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: `${hc}15`, border: `1px solid ${hc}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
+                      {prop.type === "Apartment" ? "??" : prop.type === "Commercial" ? "??" : prop.type === "STR" ? "???" : "??"}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "15px", fontWeight: "800", color: "#fff", marginBottom: "3px", letterSpacing: "-0.3px" }}>{prop.name}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{prop.address || prop.type}</p>
+                        <span style={{ fontSize: "9px", fontWeight: "800", padding: "2px 8px", borderRadius: "20px", background: `${hc}20`, border: `1px solid ${hc}50`, color: hc, letterSpacing: "0.5px" }}>{prop.occupancyStatus.toUpperCase()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <div style={{ textAlign: "right" as const }}>
+                      <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginBottom: "3px", letterSpacing: "1px", textTransform: "uppercase" as const, fontWeight: "700" }}>Health Score</p>
+                      <p style={{ fontSize: "26px", fontWeight: "900", color: hc, lineHeight: "1", letterSpacing: "-1px" }}>{healthScore}<span style={{ fontSize: "12px", fontWeight: "600", color: "rgba(255,255,255,0.3)" }}>/100</span></p>
+                    </div>
+                    <svg width="48" height="48" viewBox="0 0 48 48">
+                      <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3"/>
+                      <circle cx="24" cy="24" r="20" fill="none" stroke={hc} strokeWidth="3" strokeLinecap="round" strokeDasharray={`${(healthScore/100)*125.6} 125.6`} transform="rotate(-90 24 24)" style={{ filter: `drop-shadow(0 0 4px ${hc})` }}/>
+                      <text x="24" y="28" textAnchor="middle" fill={hc} fontSize="11" fontWeight="800">{healthScore}</text>
+                    </svg>
+                  </div>
+                </div>
+
+                {/* KPI strip */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "rgba(0,0,0,0.2)" }}>
+                  {[
+                    { label: "Monthly NOI", value: `$${noi.toLocaleString()}`, color: noi >= 0 ? "#34d399" : "#f87171", icon: "??" },
+                    { label: "Equity", value: `$${equity.toLocaleString()}`, color: "#a78bfa", icon: "??" },
+                    { label: "Rent / mo", value: `$${prop.rent.toLocaleString()}`, color: "#60a5fa", icon: "??" },
+                    { label: "Expenses / mo", value: `$${prop.expenses.toLocaleString()}`, color: "#f59e0b", icon: "??" },
+                  ].map((k, i) => (
+                    <div key={k.label} style={{ padding: "14px 16px", borderRight: i < 3 ? "1px solid rgba(255,255,255,0.04)" : "none", position: "relative" as const }}>
+                      <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px", fontWeight: "700" }}>{k.label}</p>
+                      <p style={{ fontSize: "16px", fontWeight: "900", color: k.color, letterSpacing: "-0.5px" }}>{k.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Section content */}
+                <div style={{ padding: "18px 22px" }}>
+
+                  {manageSection === "software" && (
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "16px" }}>
+                      {/* Title + flow */}
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "4px" }}>
+                        <div style={{ width: "3px", borderRadius: "999px", background: "#60a5fa", alignSelf: "stretch", flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Connect PM Software</p>
+                          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>Step 1 of 3 ? Pick the right tool for your portfolio size</p>
+                        </div>
+                      </div>
+                      <div style={{ background: "rgba(96,165,250,0.05)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "16px", padding: "20px", marginBottom: "4px" }}>
+                        <p style={{ fontSize: "10px", color: "rgba(96,165,250,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "16px" }}>How it works</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" as const }}>
+                          {["Choose software", "Connect account", "Sync property", "Track everything"].flatMap((step, i, arr) => [
+                            <div key={step} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 14px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", borderRadius: "10px" }}>
+                              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "rgba(96,165,250,0.2)", border: "1px solid rgba(96,165,250,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "900", color: "#60a5fa", flexShrink: 0 }}>{i + 1}</div>
+                              <span style={{ fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.7)", whiteSpace: "nowrap" as const }}>{step}</span>
+                            </div>,
+                            i < arr.length - 1 ? <p key={`arr-${i}`} style={{ color: "rgba(96,165,250,0.4)", fontSize: "16px", margin: "0" }}>→</p> : null
+                          ]).filter(Boolean)}
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+                        {([
+                          { icon: "📊", title: "Buildium", color: "#60a5fa", tag: "Most Popular", desc: "Full-suite property management. Accounting, leasing, maintenance, and tenant portal in one place.", pros: ["Starts at $58/mo", "No unit minimum", "Strong accounting"], cons: ["Hidden transaction fees", "Less powerful at scale"], url: "https://www.buildium.com" },
+                          { icon: "🏢", title: "AppFolio", color: "#a78bfa", tag: "Enterprise", desc: "AI-powered management for serious portfolios. Automated maintenance, smart leasing, deep analytics.", pros: ["AI maintenance dispatch", "Best-in-class analytics", "Mobile-first"], cons: ["$298/mo minimum", "50 unit minimum"], url: "https://www.appfolio.com" },
+                          { icon: "🌐", title: "Hemlane", color: "#34d399", tag: "Best Remote", desc: "Built for remote landlords. Maintenance coordination, tenant portal, and local agent network.", pros: ["Perfect for out-of-state", "Local repair network", "Low cost entry"], cons: ["Less accounting depth", "Smaller feature set"], url: "https://www.hemlane.com" },
+                        ] as any[]).map((s) => (
+                          <div key={s.title} style={{ background: `linear-gradient(135deg, ${s.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${s.color}30`, borderRadius: "20px", padding: "22px", position: "relative" as const, overflow: "hidden", display: "flex", flexDirection: "column" as const }}>
+                            <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />
+                            <div style={{ position: "absolute" as const, top: 0, right: 0, width: "100px", height: "100px", background: `radial-gradient(circle at top right, ${s.color}12, transparent 70%)`, pointerEvents: "none" as const }} />
+                            <div style={{ display: "inline-flex", marginBottom: "12px" }}>
+                              <span style={{ fontSize: "10px", fontWeight: "900", color: s.color, background: `${s.color}18`, border: `1px solid ${s.color}35`, borderRadius: "999px", padding: "3px 10px", letterSpacing: "0.5px" }}>{s.tag}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: `${s.color}18`, border: `1px solid ${s.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{s.icon}</div>
+                              <p style={{ fontSize: "20px", fontWeight: "900", color: s.color, letterSpacing: "-0.5px" }}>{s.title}</p>
+                            </div>
+                            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", lineHeight: "1.6", marginBottom: "14px" }}>{s.desc}</p>
+                            <div style={{ marginBottom: "6px" }}>
+                              <p style={{ fontSize: "9px", color: s.color, fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>Pros</p>
+                              {s.pros.map((p: string) => (
+                                <div key={p} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                  <span style={{ color: s.color, fontSize: "11px" }}>✓</span>
+                                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>{p}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginBottom: "16px" }}>
+                              <p style={{ fontSize: "9px", color: "rgba(255,100,100,0.7)", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>Cons</p>
+                              {s.cons.map((con: string) => (
+                                <div key={con} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                  <span style={{ color: "#f87171", fontSize: "11px" }}>✗</span>
+                                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>{con}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginTop: "auto" }}>
+                              <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", width: "100%", padding: "11px", background: s.color, color: "#000", borderRadius: "10px", fontSize: "12px", fontWeight: "900", textAlign: "center" as const, textDecoration: "none", letterSpacing: "0.3px", boxSizing: "border-box" as const }}>Connect {s.title} →</a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {manageSection === "tenants" && (
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "12px" }}>
+                      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginBottom: "2px" }}>Tenant Management</p>
+                      {prop.occupancyStatus === "occupied" || prop.occupancyStatus === "str" ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                          {[
+                            { label: "Screening", value: "? Verified", color: "#34d399", icon: "???" },
+                            { label: "Lease", value: "Active", color: "#34d399", icon: "??" },
+                            { label: "Payments", value: "On time", color: "#34d399", icon: "??" },
+                            { label: "Open tickets", value: "0", color: "rgba(255,255,255,0.5)", icon: "??" },
+                          ].map(t => (
+                            <div key={t.label} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: "10px" }}>
+                              <span style={{ fontSize: "18px" }}>{t.icon}</span>
+                              <div>
+                                <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "3px", fontWeight: "700" }}>{t.label}</p>
+                                <p style={{ fontSize: "13px", fontWeight: "800", color: t.color }}>{t.value}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ padding: "24px", textAlign: "center" as const, background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px dashed rgba(255,255,255,0.08)" }}>
+                          <p style={{ fontSize: "24px", marginBottom: "8px" }}>???</p>
+                          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.3)" }}>Property is <span style={{ color: "#f59e0b", fontWeight: "800" }}>{prop.occupancyStatus}</span> ? no active tenant</p>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {["?? Screen Tenant", "?? View Lease", "?? Message"].map(a => (
+                          <button key={a} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "11px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>{a}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {manageSection === "tax" && (
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "12px" }}>
+                      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginBottom: "2px" }}>Tax Strategy</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        {[
+                          { label: "Annual Income", value: `$${(prop.rent * 12).toLocaleString()}`, color: "#34d399", icon: "??" },
+                          { label: "Annual Expenses", value: `$${(prop.expenses * 12).toLocaleString()}`, color: "#f87171", icon: "??" },
+                          { label: "Depreciation / yr", value: `$${Math.round(prop.value / 27.5).toLocaleString()}`, color: "#a78bfa", icon: "???" },
+                          { label: "Net Taxable", value: `$${Math.max(0, prop.rent * 12 - prop.expenses * 12 - Math.round(prop.value / 27.5)).toLocaleString()}`, color: "#f59e0b", icon: "??" },
+                        ].map(t => (
+                          <div key={t.label} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: "10px" }}>
+                            <span style={{ fontSize: "18px" }}>{t.icon}</span>
+                            <div>
+                              <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "3px", fontWeight: "700" }}>{t.label}</p>
+                              <p style={{ fontSize: "14px", fontWeight: "900", color: t.color }}>{t.value}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ padding: "14px 16px", background: "rgba(167,139,250,0.06)", borderRadius: "12px", border: "1px solid rgba(167,139,250,0.2)", display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                        <span style={{ fontSize: "20px", flexShrink: 0 }}>??</span>
+                        <div>
+                          <p style={{ fontSize: "12px", fontWeight: "800", color: "#a78bfa", marginBottom: "4px" }}>Depreciation advantage</p>
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: "1.6" }}>${Math.round(prop.value / 27.5).toLocaleString()}/yr depreciation reduces your taxable income. Consider a cost segregation study for accelerated year-1 deductions worth 2?3? more.</p>
+                        </div>
+                      </div>
+                      <button style={{ padding: "11px", borderRadius: "10px", fontSize: "12px", fontWeight: "800", border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)", color: "#a78bfa", cursor: "pointer", letterSpacing: "0.3px" }}>Export Tax Summary ?</button>
+                    </div>
+                  )}
+
+                  {manageSection === "maintenance" && (
+                    <ManageMaintenance propId={prop.id} propName={prop.name} />
+                  )}
+
+                </div>
+              </div>
+            );          })}
         </div>
       )}
-
-      {/* ── EXIT MODE ── */}
       {mode === "exit" && (
         <div style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "40px", textAlign: "center" as const }}>
           <p style={{ fontSize: "32px", marginBottom: "12px" }}>💰</p>
