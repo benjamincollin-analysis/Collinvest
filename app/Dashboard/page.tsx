@@ -7218,11 +7218,11 @@ function MyProjectsTab({ user, properties }: { user: any; properties: Property[]
 }
 
 function ManageMaintenance({ propId, propName }: { propId: number; propName: string }) {
-  const [tickets, setTickets] = React.useState<{id:number;task:string;status:string;cost:number;priority:string;color:string}[]>([]);
-  const [showAdd, setShowAdd] = React.useState(false);
-  const [newTask, setNewTask] = React.useState("");
-  const [newPriority, setNewPriority] = React.useState("Low");
-  const [newCost, setNewCost] = React.useState("");
+  const [tickets, setTickets] = useState<{id:number;task:string;status:string;cost:number;priority:string;color:string}[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTask, setNewTask] = useState("");
+  const [newPriority, setNewPriority] = useState("Low");
+  const [newCost, setNewCost] = useState("");
   const preventive = [
     { task: "HVAC Filter Change", due: "Every 3 months", priority: "Low", color: "#34d399" },
     { task: "Gutter Cleaning", due: "Every 6 months", priority: "Med", color: "#f59e0b" },
@@ -7252,15 +7252,15 @@ function ManageMaintenance({ propId, propName }: { propId: number; propName: str
           {tickets.map(t => (
             <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "14px" }}>??</span>
+                <span style={{ fontSize: "14px" }}>🔧</span>
                 <div>
-                  <p style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>{t.task}</p>
-                  <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{t.cost > 0 ? `$${t.cost}` : "No cost yet"}</p>
+                  <p style={{ fontSize: "15px", fontWeight: "900", color: "#fff", letterSpacing: "-0.3px" }}>{t.task}</p>
+                  <p style={{ fontSize: "13px", color: t.color, fontWeight: "700" }}>{t.cost > 0 ? `$${t.cost.toLocaleString()}` : "No cost logged"}</p>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", border: `1px solid ${t.color}55`, color: t.color }}>{t.priority}</span>
-                <button onClick={() => setTickets(prev => prev.filter(x => x.id !== t.id))} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "16px", lineHeight: "1" }}>?</button>
+                <button onClick={() => setTickets(prev => prev.filter(x => x.id !== t.id))} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "18px", lineHeight: "1", fontWeight: "300" }}>×</button>
               </div>
             </div>
           ))}
@@ -7271,9 +7271,9 @@ function ManageMaintenance({ propId, propName }: { propId: number; propName: str
         <div key={item.task} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.05)" }}>
           <div>
             <p style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>{item.task}</p>
-            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{item.due}</p>
+            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", fontWeight: "500" }}>{item.due}</p>
           </div>
-          <span style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", border: `1px solid ${item.color}55`, color: item.color }}>{item.priority}</span>
+          <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 12px", borderRadius: "20px", border: `1px solid ${item.color}55`, color: item.color, background: `${item.color}12` }}>{item.priority}</span>
         </div>
       ))}
       {showAdd && (
@@ -7902,7 +7902,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                 <div style={{ padding: "18px 22px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                     <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: `${hc}15`, border: `1px solid ${hc}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
-                      {prop.type === "Apartment" ? "??" : prop.type === "Commercial" ? "??" : prop.type === "STR" ? "???" : "??"}
+                      {prop.type === "Apartment" ? "🏢" : prop.type === "Commercial" ? "🏬" : prop.type === "STR" ? "🏖️" : "🏠"}
                     </div>
                     <div>
                       <p style={{ fontSize: "15px", fontWeight: "800", color: "#fff", marginBottom: "3px", letterSpacing: "-0.3px" }}>{prop.name}</p>
@@ -7919,8 +7919,8 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                     </div>
                     <svg width="48" height="48" viewBox="0 0 48 48">
                       <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3"/>
-                      <circle cx="24" cy="24" r="20" fill="none" stroke={hc} strokeWidth="3" strokeLinecap="round" strokeDasharray={`${(healthScore/100)*125.6} 125.6`} transform="rotate(-90 24 24)" style={{ filter: `drop-shadow(0 0 4px ${hc})` }}/>
-                      <text x="24" y="28" textAnchor="middle" fill={hc} fontSize="11" fontWeight="800">{healthScore}</text>
+                      <circle cx="24" cy="24" r="20" fill="none" stroke={hc} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${(healthScore/100)*125.6} 125.6`} transform="rotate(-90 24 24)"/>
+                      <text x="24" y="24" textAnchor="middle" dominantBaseline="central" fill={hc} fontSize="11" fontWeight="900">{healthScore}</text>
                     </svg>
                   </div>
                 </div>
@@ -7928,10 +7928,10 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                 {/* KPI strip */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "rgba(0,0,0,0.2)" }}>
                   {[
-                    { label: "Monthly NOI", value: `$${noi.toLocaleString()}`, color: noi >= 0 ? "#34d399" : "#f87171", icon: "??" },
-                    { label: "Equity", value: `$${equity.toLocaleString()}`, color: "#a78bfa", icon: "??" },
-                    { label: "Rent / mo", value: `$${prop.rent.toLocaleString()}`, color: "#60a5fa", icon: "??" },
-                    { label: "Expenses / mo", value: `$${prop.expenses.toLocaleString()}`, color: "#f59e0b", icon: "??" },
+                    { label: "Monthly NOI", value: `$${noi.toLocaleString()}`, color: noi >= 0 ? "#34d399" : "#f87171", icon: "📈" },
+                    { label: "Equity", value: `$${equity.toLocaleString()}`, color: "#a78bfa", icon: "💎" },
+                    { label: "Rent / mo", value: `$${prop.rent.toLocaleString()}`, color: "#60a5fa", icon: "💰" },
+                    { label: "Expenses / mo", value: `$${prop.expenses.toLocaleString()}`, color: "#f59e0b", icon: "📊" },
                   ].map((k, i) => (
                     <div key={k.label} style={{ padding: "14px 16px", borderRight: i < 3 ? "1px solid rgba(255,255,255,0.04)" : "none", position: "relative" as const }}>
                       <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px", fontWeight: "700" }}>{k.label}</p>
@@ -8015,10 +8015,10 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       {prop.occupancyStatus === "occupied" || prop.occupancyStatus === "str" ? (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                           {[
-                            { label: "Screening", value: "? Verified", color: "#34d399", icon: "???" },
-                            { label: "Lease", value: "Active", color: "#34d399", icon: "??" },
-                            { label: "Payments", value: "On time", color: "#34d399", icon: "??" },
-                            { label: "Open tickets", value: "0", color: "rgba(255,255,255,0.5)", icon: "??" },
+                            { label: "Screening", value: "Verified", color: "#34d399", icon: "✅" },
+                            { label: "Lease", value: "Active", color: "#34d399", icon: "📋" },
+                            { label: "Payments", value: "On time", color: "#34d399", icon: "💳" },
+                            { label: "Open tickets", value: "0", color: "rgba(255,255,255,0.5)", icon: "🔧" },
                           ].map(t => (
                             <div key={t.label} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: "10px" }}>
                               <span style={{ fontSize: "18px" }}>{t.icon}</span>
@@ -8031,12 +8031,12 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                         </div>
                       ) : (
                         <div style={{ padding: "24px", textAlign: "center" as const, background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px dashed rgba(255,255,255,0.08)" }}>
-                          <p style={{ fontSize: "24px", marginBottom: "8px" }}>???</p>
-                          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.3)" }}>Property is <span style={{ color: "#f59e0b", fontWeight: "800" }}>{prop.occupancyStatus}</span> ? no active tenant</p>
+                          <p style={{ fontSize: "24px", marginBottom: "8px" }}>🏚️</p>
+                          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.3)" }}>Property is <span style={{ color: "#f59e0b", fontWeight: "800" }}>{prop.occupancyStatus}</span> — no active tenant</p>
                         </div>
                       )}
                       <div style={{ display: "flex", gap: "8px" }}>
-                        {["?? Screen Tenant", "?? View Lease", "?? Message"].map(a => (
+                        {["🔍 Screen Tenant", "📋 View Lease", "💬 Message"].map(a => (
                           <button key={a} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "11px", fontWeight: "700", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>{a}</button>
                         ))}
                       </div>
@@ -8048,10 +8048,10 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                       <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginBottom: "2px" }}>Tax Strategy</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                         {[
-                          { label: "Annual Income", value: `$${(prop.rent * 12).toLocaleString()}`, color: "#34d399", icon: "??" },
-                          { label: "Annual Expenses", value: `$${(prop.expenses * 12).toLocaleString()}`, color: "#f87171", icon: "??" },
-                          { label: "Depreciation / yr", value: `$${Math.round(prop.value / 27.5).toLocaleString()}`, color: "#a78bfa", icon: "???" },
-                          { label: "Net Taxable", value: `$${Math.max(0, prop.rent * 12 - prop.expenses * 12 - Math.round(prop.value / 27.5)).toLocaleString()}`, color: "#f59e0b", icon: "??" },
+                          { label: "Annual Income", value: `$${(prop.rent * 12).toLocaleString()}`, color: "#34d399", icon: "📈" },
+                          { label: "Annual Expenses", value: `$${(prop.expenses * 12).toLocaleString()}`, color: "#f87171", icon: "📉" },
+                          { label: "Depreciation / yr", value: `$${Math.round(prop.value / 27.5).toLocaleString()}`, color: "#a78bfa", icon: "💸" },
+                          { label: "Net Taxable", value: `$${Math.max(0, prop.rent * 12 - prop.expenses * 12 - Math.round(prop.value / 27.5)).toLocaleString()}`, color: "#f59e0b", icon: "🧾" },
                         ].map(t => (
                           <div key={t.label} style={{ padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: "10px" }}>
                             <span style={{ fontSize: "18px" }}>{t.icon}</span>
@@ -8063,13 +8063,13 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                         ))}
                       </div>
                       <div style={{ padding: "14px 16px", background: "rgba(167,139,250,0.06)", borderRadius: "12px", border: "1px solid rgba(167,139,250,0.2)", display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                        <span style={{ fontSize: "20px", flexShrink: 0 }}>??</span>
+                        <span style={{ fontSize: "20px", flexShrink: 0 }}>💡</span>
                         <div>
                           <p style={{ fontSize: "12px", fontWeight: "800", color: "#a78bfa", marginBottom: "4px" }}>Depreciation advantage</p>
-                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: "1.6" }}>${Math.round(prop.value / 27.5).toLocaleString()}/yr depreciation reduces your taxable income. Consider a cost segregation study for accelerated year-1 deductions worth 2?3? more.</p>
+                          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: "1.6" }}>${Math.round(prop.value / 27.5).toLocaleString()}/yr depreciation reduces your taxable income. Consider a cost segregation study for accelerated year-1 deductions worth 2–3× more.</p>
                         </div>
                       </div>
-                      <button style={{ padding: "11px", borderRadius: "10px", fontSize: "12px", fontWeight: "800", border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)", color: "#a78bfa", cursor: "pointer", letterSpacing: "0.3px" }}>Export Tax Summary ?</button>
+                      <button style={{ padding: "11px", borderRadius: "10px", fontSize: "12px", fontWeight: "800", border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)", color: "#a78bfa", cursor: "pointer", letterSpacing: "0.3px" }}>Export Tax Summary →</button>
                     </div>
                   )}
 
