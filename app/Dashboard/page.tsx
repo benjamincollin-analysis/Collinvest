@@ -395,7 +395,6 @@ function Dashboard() {
 const [incomingFinancing, setIncomingFinancing] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"home" | "finddeals" | "myprojects" | "getfinanced" | "community">("home");
 const [homeSection, setHomeSection] = useState<"score"|"intelligence"|"properties"|"projections"|"finances"|null>("properties");
-  const [manageSection, setManageSection] = useState<"software"|"tenants"|"tax"|"maintenance">("software");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsight, setAiInsight] = useState("");
   const [geocoding, setGeocoding] = useState(false);
@@ -7302,6 +7301,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
   const [mode, setMode] = useState<"start"|"manage"|"exit">("start");
   const [activeSection, setActiveSection] = useState<string>("structure");
   const [manageSection, setManageSection] = useState<"software"|"tenants"|"tax"|"maintenance">("software");
+  const [exitSection, setExitSection] = useState<"timing"|"1031"|"model"|"score">("timing");
 
   const modes = [
     { key: "start", icon: "🚀", label: "Start a Project", sub: "Form entity · Get financed · Insure · Close", color: "#a78bfa" },
@@ -7361,7 +7361,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
       </div>
 
       {/* SECTION NAV */}
-      {mode === "start" || mode === "exit" ? (
+      {mode === "start" ? (
       <div style={{ display: "flex", gap: "8px", marginBottom: "28px", overflowX: "auto", paddingBottom: "4px" }}>
         {currentSections.map((s, i) => (
           <button key={s.key} onClick={() => setActiveSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: activeSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: activeSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s ease", position: "relative" }}>
@@ -8083,13 +8083,318 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
         </div>
       )}
       {mode === "exit" && (
-        <div style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "40px", textAlign: "center" as const }}>
-          <p style={{ fontSize: "32px", marginBottom: "12px" }}>💰</p>
-          <p style={{ fontSize: "20px", fontWeight: "900", color: "#f59e0b", marginBottom: "8px" }}>Exit Mode — Coming Next</p>
-          <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)" }}>1031 Exchange · Sell strategy · Refinance · BRRRR · Capital gains planning</p>
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: "24px" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+            <div style={{ width: "3px", borderRadius: "999px", background: "#f59e0b", alignSelf: "stretch", flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>Exit Intelligence</p>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>Know exactly when to sell, how to exit, and how to protect every dollar</p>
+            </div>
+          </div>
+
+          {/* Exit sub-tabs */}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const }}>
+            {([
+              { key: "timing", label: "Market Timing", icon: "📈", color: "#f59e0b" },
+              { key: "1031",   label: "1031 Exchange", icon: "🔄", color: "#34d399" },
+              { key: "model",  label: "Exit Modeler",  icon: "🧮", color: "#a78bfa" },
+              { key: "score",  label: "Readiness Score", icon: "🎯", color: "#60a5fa" },
+            ] as const).map((s, i) => (
+              <button key={s.key} onClick={() => setExitSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: exitSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: exitSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap" as const, transition: "all 0.2s", position: "relative" as const }}>
+                {exitSection === s.key && <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)`, borderRadius: "12px 12px 0 0" }} />}
+                <span style={{ fontSize: "16px" }}>{s.icon}</span>
+                <p style={{ fontSize: "12px", fontWeight: "900", color: exitSection === s.key ? s.color : "rgba(255,255,255,0.5)" }}>{s.label}</p>
+                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "900" }}>{i + 1}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* MARKET TIMING */}
+          {exitSection === "timing" && (
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: "16px" }}>
+              <div style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "16px", padding: "20px" }}>
+                <p style={{ fontSize: "10px", color: "rgba(245,158,11,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "16px" }}>Market sell signals ? Houston TX</p>
+                {/* Signal bars */}
+                <div style={{ display: "flex", flexDirection: "column" as const, gap: "12px" }}>
+                  {[
+                    { label: "Seasonal Premium", value: 78, detail: "May?June listings earn +13.1% above average", color: "#34d399", verdict: "BUY WINDOW" },
+                    { label: "Inventory Level", value: 62, detail: "Low inventory ? seller-favored market", color: "#34d399", verdict: "FAVORABLE" },
+                    { label: "Days on Market", value: 55, detail: "33 days avg vs 49 in winter ? fast sales", color: "#f59e0b", verdict: "NEUTRAL" },
+                    { label: "Rate Environment", value: 40, detail: "Rising rates suppress buyer pool by up to 57%", color: "#f87171", verdict: "CAUTION" },
+                    { label: "Price Trend", value: 70, detail: "Price/sqft up 4.2% vs 12-month average", color: "#34d399", verdict: "STRONG" },
+                  ].map(s => (
+                    <div key={s.label}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                        <div>
+                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>{s.label}</span>
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginLeft: "10px" }}>{s.detail}</span>
+                        </div>
+                        <span style={{ fontSize: "10px", fontWeight: "900", padding: "2px 10px", borderRadius: "20px", background: `${s.color}20`, border: `1px solid ${s.color}50`, color: s.color, flexShrink: 0 }}>{s.verdict}</span>
+                      </div>
+                      <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${s.value}%`, background: `linear-gradient(90deg, ${s.color}80, ${s.color})`, borderRadius: "999px", boxShadow: `0 0 8px ${s.color}60` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Overall sell score */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                {[
+                  { label: "Overall Sell Score", value: "72/100", color: "#f59e0b", icon: "📊", sub: "Favorable conditions" },
+                  { label: "Optimal Window", value: "Mar / Jun", color: "#34d399", icon: "🗓️", sub: "Best seasonal premium" },
+                  { label: "Premium vs Off-Peak", value: "+$27K", color: "#a78bfa", icon: "💰", sub: "Avg seller gain" },
+                ].map(k => (
+                  <div key={k.label} style={{ background: `linear-gradient(135deg, ${k.color}10, rgba(0,0,0,0.3))`, border: `1px solid ${k.color}30`, borderRadius: "16px", padding: "18px", textAlign: "center" as const, position: "relative" as const, overflow: "hidden" }}>
+                    <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${k.color}, transparent)` }} />
+                    <p style={{ fontSize: "24px", marginBottom: "8px" }}>{k.icon}</p>
+                    <p style={{ fontSize: "22px", fontWeight: "900", color: k.color, letterSpacing: "-0.5px", marginBottom: "4px" }}>{k.value}</p>
+                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "2px" }}>{k.label}</p>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{k.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Property timing cards */}
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px" }}>Your properties ? exit timing</p>
+              {properties.filter(p => p.occupancyStatus !== "sold").map(prop => {
+                const equity = prop.value - prop.mortgage;
+                const holdScore = Math.min(100, Math.round((equity / prop.value) * 100));
+                const timing = holdScore >= 60 ? { label: "Exit Ready", color: "#34d399" } : holdScore >= 35 ? { label: "Building Equity", color: "#f59e0b" } : { label: "Hold Longer", color: "#f87171" };
+                return (
+                  <div key={prop.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: `linear-gradient(135deg, ${timing.color}08, rgba(0,0,0,0.2))`, border: `1px solid ${timing.color}25`, borderRadius: "14px", flexWrap: "wrap" as const, gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${timing.color}15`, border: `1px solid ${timing.color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>🏠</div>
+                      <div>
+                        <p style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>{prop.name}</p>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>${prop.value.toLocaleString()} ? Equity: ${equity.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ textAlign: "right" as const }}>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginBottom: "2px" }}>Equity ratio</p>
+                        <p style={{ fontSize: "18px", fontWeight: "900", color: timing.color }}>{holdScore}%</p>
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: "800", padding: "5px 14px", borderRadius: "20px", background: `${timing.color}20`, border: `1px solid ${timing.color}50`, color: timing.color }}>{timing.label}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 1031 EXCHANGE */}
+          {exitSection === "1031" && (
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: "16px" }}>
+              {/* Critical alert */}
+              <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "16px", padding: "20px", display: "flex", gap: "16px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "28px", flexShrink: 0 }}>⚠️</span>
+                <div>
+                  <p style={{ fontSize: "15px", fontWeight: "900", color: "#f87171", marginBottom: "6px" }}>The 1031 Exchange ? Two Hard Deadlines</p>
+                  <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.6" }}>Miss either deadline and the full capital gains tax hits immediately. No extensions. No appeals. On a $500K gain, that is <span style={{ color: "#f87171", fontWeight: "800" }}>$100,000?$150,000 in taxes due</span>.</p>
+                </div>
+              </div>
+
+              {/* Timeline */}
+              <div style={{ background: "rgba(52,211,153,0.04)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: "16px", padding: "20px" }}>
+                <p style={{ fontSize: "10px", color: "rgba(52,211,153,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "20px" }}>The 1031 timeline ? every day counts</p>
+                <div style={{ display: "flex", flexDirection: "column" as const, gap: "0" }}>
+                  {[
+                    { day: "Day 0", title: "Sale closes", desc: "Both clocks start simultaneously. There is no grace period.", color: "#f59e0b", icon: "🏠" },
+                    { day: "Day 1?45", title: "Identify replacement property", desc: "Name up to 3 replacement properties in writing. Goldstream timestamps this for IRS documentation.", color: "#f87171", icon: "🔍", urgent: true },
+                    { day: "Day 45", title: "Identification window closes", desc: "Hard stop. Your replacement property is locked in. No changes allowed after this.", color: "#f87171", icon: "🔒" },
+                    { day: "Day 46?180", title: "Close the replacement property", desc: "You must close on the identified property. Goldstream opens the new project automatically with capital pre-filled.", color: "#34d399", icon: "📋" },
+                    { day: "Day 180", title: "Exchange complete", desc: "Capital gains deferred. Cycle restarts. Goldstream logs the completed exchange and suggests next move.", color: "#34d399", icon: "✅" },
+                  ].map((step, i, arr) => (
+                    <div key={i} style={{ display: "flex", gap: "16px", position: "relative" as const }}>
+                      <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", flexShrink: 0 }}>
+                        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: `${step.color}20`, border: `2px solid ${step.color}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", zIndex: 1, flexShrink: 0 }}>{step.icon}</div>
+                        {i < arr.length - 1 && <div style={{ width: "2px", flex: 1, background: "rgba(255,255,255,0.06)", margin: "4px 0", minHeight: "32px" }} />}
+                      </div>
+                      <div style={{ paddingBottom: i < arr.length - 1 ? "20px" : "0", flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "10px", fontWeight: "900", color: step.color, background: `${step.color}20`, border: `1px solid ${step.color}40`, padding: "2px 8px", borderRadius: "20px" }}>{step.day}</span>
+                          {step.urgent && <span style={{ fontSize: "9px", fontWeight: "900", color: "#f87171", background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", padding: "2px 8px", borderRadius: "20px", animation: "pulse 2s infinite" }}>CRITICAL</span>}
+                        </div>
+                        <p style={{ fontSize: "14px", fontWeight: "800", color: "#fff", marginBottom: "3px" }}>{step.title}</p>
+                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5" }}>{step.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tax comparison */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "14px", padding: "18px" }}>
+                  <p style={{ fontSize: "11px", fontWeight: "800", color: "#f87171", marginBottom: "12px", textTransform: "uppercase" as const, letterSpacing: "1px" }}>❌ Without 1031</p>
+                  {[
+                    { label: "Sale price", value: "$500,000" },
+                    { label: "Capital gains tax", value: "?$100,000" },
+                    { label: "Net to reinvest", value: "$400,000" },
+                  ].map(r => (
+                    <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>{r.label}</span>
+                      <span style={{ fontSize: "13px", fontWeight: "800", color: r.label === "Capital gains tax" ? "#f87171" : "#fff" }}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "14px", padding: "18px" }}>
+                  <p style={{ fontSize: "11px", fontWeight: "800", color: "#34d399", marginBottom: "12px", textTransform: "uppercase" as const, letterSpacing: "1px" }}>✅ With 1031</p>
+                  {[
+                    { label: "Sale price", value: "$500,000" },
+                    { label: "Tax deferred", value: "$0" },
+                    { label: "Net to reinvest", value: "$500,000" },
+                  ].map(r => (
+                    <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>{r.label}</span>
+                      <span style={{ fontSize: "13px", fontWeight: "800", color: r.label === "Net to reinvest" ? "#34d399" : "#fff" }}>{r.value}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: "8px", padding: "8px", background: "rgba(52,211,153,0.1)", borderRadius: "8px", textAlign: "center" as const }}>
+                    <p style={{ fontSize: "13px", fontWeight: "900", color: "#34d399" }}>+$100,000 more to deploy</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* QI Partners */}
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1.5px" }}>Qualified Intermediaries ? verified partners</p>
+              {[
+                { name: "Accruit", desc: "Nation’s largest 1031 QI · $10B+ in exchanges managed annually", color: "#34d399", badge: "Most Trusted", url: "https://www.accruit.com" },
+                { name: "Realized Holdings", desc: "1031 exchange + DST investments · replacement property marketplace", color: "#60a5fa", badge: "Best for DST", url: "https://www.realized1031.com" },
+                { name: "1031 Crowdfunding", desc: "Fractional replacement properties · ideal for smaller exchanges", color: "#a78bfa", badge: "Best for Fractional", url: "https://www.1031crowdfunding.com" },
+              ].map(p => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: `linear-gradient(135deg, ${p.color}08, rgba(0,0,0,0.2))`, border: `1px solid ${p.color}25`, borderRadius: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${p.color}15`, border: `1px solid ${p.color}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: p.color, boxShadow: `0 0 8px ${p.color}` }} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+                        <p style={{ fontSize: "13px", fontWeight: "800", color: "#fff" }}>{p.name}</p>
+                        <span style={{ fontSize: "9px", padding: "1px 7px", borderRadius: "20px", background: `${p.color}20`, color: p.color, fontWeight: "700" }}>{p.badge}</span>
+                      </div>
+                      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{p.desc}</p>
+                    </div>
+                  </div>
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ padding: "7px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: "800", border: `1px solid ${p.color}50`, background: `${p.color}15`, color: p.color, cursor: "pointer", textDecoration: "none", flexShrink: 0 }}>Start →</a>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* EXIT MODELER */}
+          {exitSection === "model" && (
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: "16px" }}>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: "1.5" }}>Model your exit for each property. Compare net proceeds across every strategy before you decide.</p>
+              {properties.filter(p => p.occupancyStatus !== "sold").map(prop => {
+                const equity = prop.value - prop.mortgage;
+                const agentFee = prop.value * 0.055;
+                const netSell = prop.value - prop.mortgage - agentFee;
+                const capitalGains = equity * 0.20;
+                const netSellAfterTax = netSell - capitalGains;
+                const cashOutRefi = prop.value * 0.75 - prop.mortgage;
+                const brrrrEquity = equity * 0.80;
+                return (
+                  <div key={prop.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "20px", overflow: "hidden" }}>
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: "12px" }}>
+                      <span style={{ fontSize: "20px" }}>🏠</span>
+                      <div>
+                        <p style={{ fontSize: "15px", fontWeight: "800", color: "#fff" }}>{prop.name}</p>
+                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>Value: ${prop.value.toLocaleString()} ? Equity: ${equity.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0" }}>
+                      {[
+                        { strategy: "Sell (w/ agent)", net: netSellAfterTax, color: "#f87171", icon: "🏷️", pro: "Clean exit", con: "Lose 5.5% + tax" },
+                        { strategy: "1031 Exchange", net: netSell, color: "#34d399", icon: "🔄", pro: "Defer all tax", con: "Must reinvest fast" },
+                        { strategy: "Cash-Out Refi", net: cashOutRefi, color: "#60a5fa", icon: "💳", pro: "Keep property", con: "Higher payment" },
+                        { strategy: "BRRRR Pull", net: brrrrEquity, color: "#a78bfa", icon: "🔄", pro: "Recycle capital", con: "Needs renovation" },
+                      ].map((s, i, arr) => (
+                        <div key={s.strategy} style={{ padding: "18px", borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", position: "relative" as const }}>
+                          <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}60, transparent)` }} />
+                          <p style={{ fontSize: "20px", marginBottom: "8px" }}>{s.icon}</p>
+                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: "700", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "4px" }}>{s.strategy}</p>
+                          <p style={{ fontSize: "22px", fontWeight: "900", color: s.color, letterSpacing: "-0.5px", marginBottom: "8px" }}>${Math.round(s.net).toLocaleString()}</p>
+                          <p style={{ fontSize: "11px", color: "#34d399", marginBottom: "2px" }}>✓ {s.pro}</p>
+                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>✗ {s.con}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* READINESS SCORE */}
+          {exitSection === "score" && (
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: "16px" }}>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", lineHeight: "1.5" }}>Your exit readiness score per property ? based on hold period, equity ratio, tax position, and market conditions.</p>
+              {properties.filter(p => p.occupancyStatus !== "sold").map(prop => {
+                const equity = prop.value - prop.mortgage;
+                const equityRatio = prop.value > 0 ? (equity / prop.value) * 100 : 0;
+                const noiScore = prop.rent - prop.expenses > 0 ? 25 : 0;
+                const equityScore = equityRatio >= 40 ? 35 : equityRatio >= 20 ? 20 : 5;
+                const occupancyScore = prop.occupancyStatus === "occupied" ? 20 : prop.occupancyStatus === "str" ? 15 : 0;
+                const marketScore = 15;
+                const totalScore = Math.min(100, noiScore + equityScore + occupancyScore + marketScore);
+                const sc = totalScore >= 70 ? "#34d399" : totalScore >= 45 ? "#f59e0b" : "#f87171";
+                const verdict = totalScore >= 70 ? "Exit Ready" : totalScore >= 45 ? "Almost Ready" : "Hold Longer";
+                return (
+                  <div key={prop.id} style={{ background: `linear-gradient(145deg, ${sc}06, rgba(0,0,0,0.3))`, border: `1px solid ${sc}25`, borderRadius: "20px", overflow: "hidden" }}>
+                    <div style={{ height: "2px", background: `linear-gradient(90deg, transparent, ${sc}, transparent)` }} />
+                    <div style={{ padding: "20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" as const, gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontSize: "20px" }}>🏠</span>
+                          <div>
+                            <p style={{ fontSize: "15px", fontWeight: "800", color: "#fff" }}>{prop.name}</p>
+                            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)" }}>{prop.address || prop.type}</p>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                          <div style={{ textAlign: "right" as const }}>
+                            <p style={{ fontSize: "28px", fontWeight: "900", color: sc, letterSpacing: "-1px", lineHeight: "1" }}>{totalScore}<span style={{ fontSize: "14px", color: "rgba(255,255,255,0.3)", fontWeight: "600" }}>/100</span></p>
+                            <p style={{ fontSize: "11px", fontWeight: "800", color: sc }}>{verdict}</p>
+                          </div>
+                          <svg width="56" height="56" viewBox="0 0 56 56">
+                            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3"/>
+                            <circle cx="28" cy="28" r="24" fill="none" stroke={sc} strokeWidth="3" strokeLinecap="round" strokeDasharray={`${(totalScore/100)*150.8} 150.8`} transform="rotate(-90 28 28)" style={{ filter: `drop-shadow(0 0 4px ${sc})` }}/>
+                          </svg>
+                        </div>
+                      </div>
+                      {/* Score breakdown */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        {[
+                          { label: "Cash Flow", score: noiScore, max: 25, color: "#34d399" },
+                          { label: "Equity Position", score: equityScore, max: 35, color: "#a78bfa" },
+                          { label: "Occupancy", score: occupancyScore, max: 20, color: "#60a5fa" },
+                          { label: "Market Signal", score: marketScore, max: 15, color: "#f59e0b" },
+                        ].map(item => (
+                          <div key={item.label} style={{ padding: "12px 14px", background: "rgba(255,255,255,0.03)", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", fontWeight: "600" }}>{item.label}</span>
+                              <span style={{ fontSize: "11px", fontWeight: "800", color: item.color }}>{item.score}/{item.max}</span>
+                            </div>
+                            <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px" }}>
+                              <div style={{ height: "100%", width: `${(item.score/item.max)*100}%`, background: item.color, borderRadius: "999px", boxShadow: `0 0 6px ${item.color}60` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
         </div>
       )}
-
     </div>
   );
 }
