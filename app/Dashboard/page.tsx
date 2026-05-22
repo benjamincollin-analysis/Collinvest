@@ -7361,7 +7361,6 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
       </div>
 
       {/* SECTION NAV */}
-      {mode === "start" ? (
       <div style={{ display: "flex", gap: "8px", marginBottom: "28px", overflowX: "auto", paddingBottom: "4px" }}>
         {currentSections.map((s, i) => (
           <button key={s.key} onClick={() => setActiveSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: activeSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: activeSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s ease", position: "relative" }}>
@@ -7375,7 +7374,6 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
         ))}
       </div>
 
-      ) : null}
 
       {/* ── START MODE SECTIONS ── */}
 
