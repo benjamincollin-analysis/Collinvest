@@ -7325,10 +7325,10 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
   ] as const;
 
   const exitSections = [
-    { key: "strategy", icon: "🎯", label: "Exit Strategy", sub: "Pick your path", color: "#f59e0b" },
-    { key: "1031", icon: "🔄", label: "1031 Exchange", sub: "Defer taxes forever", color: "#34d399" },
-    { key: "sell", icon: "🏷️", label: "Sell", sub: "Maximize your exit", color: "#f97316" },
-    { key: "refinance", icon: "💳", label: "Refi / BRRRR", sub: "Pull equity out", color: "#a78bfa" },
+    { key: "timing", icon: "📈", label: "Market Timing", sub: "When to sell", color: "#f59e0b" },
+    { key: "1031",   icon: "🔄", label: "1031 Exchange", sub: "Defer taxes forever", color: "#34d399" },
+    { key: "model",  icon: "🧮", label: "Exit Modeler",  sub: "Compare strategies", color: "#a78bfa" },
+    { key: "score",  icon: "🎯", label: "Readiness Score", sub: "Are you ready?", color: "#60a5fa" },
   ] as const;
 
   const currentSections = mode === "start" ? startSections : mode === "manage" ? manageSections : exitSections;
@@ -7363,7 +7363,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
       {/* SECTION NAV */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "28px", overflowX: "auto", paddingBottom: "4px" }}>
         {currentSections.map((s, i) => (
-          <button key={s.key} onClick={() => setActiveSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: activeSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: activeSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s ease", position: "relative" }}>
+          <button key={s.key} onClick={() => { if (mode === "manage") setManageSection(s.key as any); else if (mode === "exit") setExitSection(s.key as any); else setActiveSection(s.key); }} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: (mode === "manage" ? manageSection : mode === "exit" ? exitSection : activeSection) === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: (mode === "manage" ? manageSection : mode === "exit" ? exitSection : activeSection) === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s ease", position: "relative" }}>
             {activeSection === s.key && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />}
             <span style={{ fontSize: "16px" }}>{s.icon}</span>
             <div style={{ textAlign: "left" }}>
@@ -7862,22 +7862,13 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
       {/* ── MANAGE MODE ── */}
       {mode === "manage" && (
         <div style={{ display: "flex", flexDirection: "column" as const, gap: "20px" }}>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "8px", overflowX: "auto", paddingBottom: "4px" }}>
-            {([
-              { key: "software", label: "PM Software", icon: "💻", color: "#a78bfa" },
-              { key: "tenants",  label: "Tenants",     icon: "👥", color: "#34d399" },
-              { key: "tax",      label: "Tax Strategy", icon: "📊", color: "#60a5fa" },
-              { key: "maintenance", label: "Maintenance", icon: "🔧", color: "#f59e0b" },
-            ] as const).map((s, i) => (
-              <button key={s.key} onClick={() => setManageSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: manageSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: manageSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap" as const, transition: "all 0.2s ease", position: "relative" as const }}>
-                {manageSection === s.key && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)`, borderRadius: "12px 12px 0 0" }} />}
-                <span style={{ fontSize: "16px" }}>{s.icon}</span>
-                <div style={{ textAlign: "left" as const }}>
-                  <p style={{ fontSize: "12px", fontWeight: "900", color: manageSection === s.key ? s.color : "rgba(255,255,255,0.5)" }}>{s.label}</p>
-                </div>
-                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "900", flexShrink: 0 }}>{i + 1}</div>
-              </button>
-            ))}
+          {/* Section header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+            <div style={{ width: "4px", height: "32px", background: `linear-gradient(180deg, ${manageSection === "software" ? "#a78bfa" : manageSection === "tenants" ? "#34d399" : manageSection === "tax" ? "#60a5fa" : "#f59e0b"}, transparent)`, borderRadius: "2px" }} />
+            <div>
+              <p style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>{manageSection === "software" ? "PM Software" : manageSection === "tenants" ? "Tenant Management" : manageSection === "tax" ? "Tax Strategy" : "Maintenance Tracker"}</p>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>{manageSection === "software" ? "Connect your property management tool" : manageSection === "tenants" ? "Screen, manage and communicate with tenants" : manageSection === "tax" ? "Keep more of what you earn" : "Track tickets and preventive maintenance"}</p>
+            </div>
           </div>
           {properties.filter(p => p.occupancyStatus !== "sold").length === 0 && (
             <div style={{ textAlign: "center" as const, padding: "48px", background: "rgba(255,255,255,0.02)", borderRadius: "16px", border: "1px dashed rgba(255,255,255,0.08)" }}>
@@ -8093,21 +8084,6 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
           </div>
 
           {/* Exit sub-tabs */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const }}>
-            {([
-              { key: "timing", label: "Market Timing", icon: "📈", color: "#f59e0b" },
-              { key: "1031",   label: "1031 Exchange", icon: "🔄", color: "#34d399" },
-              { key: "model",  label: "Exit Modeler",  icon: "🧮", color: "#a78bfa" },
-              { key: "score",  label: "Readiness Score", icon: "🎯", color: "#60a5fa" },
-            ] as const).map((s, i) => (
-              <button key={s.key} onClick={() => setExitSection(s.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: exitSection === s.key ? `linear-gradient(135deg, ${s.color}20, ${s.color}08)` : "rgba(255,255,255,0.03)", border: exitSection === s.key ? `1px solid ${s.color}50` : "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", cursor: "pointer", whiteSpace: "nowrap" as const, transition: "all 0.2s", position: "relative" as const }}>
-                {exitSection === s.key && <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)`, borderRadius: "12px 12px 0 0" }} />}
-                <span style={{ fontSize: "16px" }}>{s.icon}</span>
-                <p style={{ fontSize: "12px", fontWeight: "900", color: exitSection === s.key ? s.color : "rgba(255,255,255,0.5)" }}>{s.label}</p>
-                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: "900" }}>{i + 1}</div>
-              </button>
-            ))}
-          </div>
 
           {/* MARKET TIMING */}
           {exitSection === "timing" && (
