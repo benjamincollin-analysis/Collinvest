@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import IntelligenceScore from "./IntelligenceScore";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import GroupPortfolio from "./GroupPortfolio";
 import CommunityFeed from "./CommunityFeed";
 import { ReferralPanel } from "./ReferralPanel";
@@ -746,269 +745,6 @@ const [showCompare, setShowCompare] = useState(false);
 
       <div className="gs-main">
         {activeTab === "home" && <>
-
-        {/* ── WEALTH GRAPH ── */}
-          {(() => {
-            const today = new Date();
-            const labels: string[] = [];
-            const portfolioData: (number|null)[] = [];
-            const cashFlowData: (number|null)[] = [];
-            const projBase: (number|null)[] = [];
-            const projCons: (number|null)[] = [];
-            const projAgg: (number|null)[] = [];
-            const projBaseCF: (number|null)[] = [];
-            const projConsCF: (number|null)[] = [];
-            const projAggCF: (number|null)[] = [];
-
-            // Past properties as milestones on historical line
-            const propMilestones = properties.filter(p => p.occupancyStatus !== "sold").slice(0, 4).map((p, i) => ({
-              idx: i + 1,
-              label: p.name.slice(0, 10),
-              color: ["#f59e0b", "#60a5fa", "#34d399", "#a78bfa"][i] || "#f59e0b",
-              value: p.value,
-              isFuture: false,
-            }));
-            // Future projects as milestones after NOW
-            const futureMilestones = properties.filter(p => p.occupancyStatus === "planned").slice(0, 3).map((p, i) => ({
-              idx: 7 + i * 2,
-              label: `+${p.name.slice(0, 8)}`,
-              color: "#a78bfa",
-              value: p.value,
-              isFuture: true,
-            }));
-            const allMilestones = [...propMilestones];
-
-            for (let i = 6; i >= 1; i--) {
-              const d = new Date(today); d.setMonth(d.getMonth() - i);
-              labels.push(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }));
-              portfolioData.push(Math.round(totalValue * (0.55 + (6-i) * 0.075 + Math.sin((6-i) * 0.8) * 0.02)));
-              cashFlowData.push(Math.round(monthlyCashFlow * (0.55 + (6-i) * 0.075)));
-              projBase.push(null); projCons.push(null); projAgg.push(null);
-              projBaseCF.push(null); projConsCF.push(null); projAggCF.push(null);
-            }
-            labels.push("NOW");
-            portfolioData.push(totalValue);
-            cashFlowData.push(monthlyCashFlow);
-            projBase.push(totalValue); projCons.push(totalValue); projAgg.push(totalValue);
-            projBaseCF.push(monthlyCashFlow); projConsCF.push(monthlyCashFlow); projAggCF.push(monthlyCashFlow);
-
-            for (let i = 1; i <= 6; i++) {
-              const d = new Date(today); d.setMonth(d.getMonth() + i);
-              labels.push(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }));
-              portfolioData.push(null); cashFlowData.push(null);
-              projBase.push(Math.round(totalValue * (1 + i * 0.04)));
-              projCons.push(Math.round(totalValue * (1 + i * 0.015)));
-              projAgg.push(Math.round(totalValue * (1 + i * 0.09 + i * i * 0.008)));
-              projBaseCF.push(Math.round(monthlyCashFlow * Math.pow(1.05, i/12)));
-              projConsCF.push(Math.round(monthlyCashFlow * Math.pow(1.02, i/12)));
-              projAggCF.push(Math.round(monthlyCashFlow * Math.pow(1.12, i/12)));
-            }
-
-            const monthsToFreedom = Math.max(1, Math.round((GOAL_CASHFLOW - monthlyCashFlow) / Math.max(1, monthlyCashFlow / 6)));
-            const monthsWithNewProp = Math.max(1, monthsToFreedom - Math.round(monthsToFreedom * 0.15));
-            const avgROI = properties.length > 0 ? properties.reduce((s,p) => s + (p.rent - p.expenses), 0) / properties.length : 500;
-            const extraPerYear = Math.round(avgROI * 12);
-
-            return (
-              <div style={{ marginBottom: "20px" }}>
-
-                {/* YOUR market alerts strip */}
-                <div style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "10px 16px", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" as const }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                      <span style={{ fontSize: "10px", color: "#22c55e", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const }}>YOUR MARKET</span>
-                    </div>
-                    {[
-                      { icon: "📍", text: `${properties.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").length} of ${properties.filter(p=>p.occupancyStatus!=="sold").length} properties occupied`, color: "#34d399" },
-                      { icon: "💰", text: `$${monthlyCashFlow.toLocaleString()}/mo net cash flow`, color: "#f59e0b" },
-                      { icon: "📈", text: `Portfolio up est. ${(3.5).toFixed(1)}% this year`, color: "#60a5fa" },
-                      { icon: "⚠️", text: properties.filter(p=>p.occupancyStatus==="vacant").length > 0 ? `${properties.filter(p=>p.occupancyStatus==="vacant").length} vacant — action needed` : "No vacant properties", color: properties.filter(p=>p.occupancyStatus==="vacant").length > 0 ? "#f87171" : "#34d399" },
-                    ].map((item, i) => (
-                      <span key={i} style={{ fontSize: "12px", color: item.color, fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
-                        {item.icon} {item.text}
-                        {i < 3 && <span style={{ color: "rgba(255,255,255,0.1)", margin: "0 4px" }}>·</span>}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Main graph card */}
-                <div style={{ background: "linear-gradient(160deg, rgba(15,12,8,0.98), rgba(8,8,12,0.99))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "24px", padding: "28px 28px 20px", position: "relative" as const, overflow: "hidden", boxShadow: "0 0 80px rgba(245,158,11,0.05), 0 24px 48px rgba(0,0,0,0.5)" }}>
-                  <div style={{ position: "absolute" as const, top: "-80px", left: "15%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(245,158,11,0.06), transparent 70%)", pointerEvents: "none" as const }} />
-                  <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, rgba(245,158,11,0.6), transparent)" }} />
-
-                  {/* Header */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap" as const, gap: "12px" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "rgba(245,158,11,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const }}>💰 Wealth Trajectory</span>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontWeight: "700" }}>+3.5% projected</span>
-                      </div>
-                      <p style={{ fontSize: "40px", fontWeight: "900", color: "#fff", letterSpacing: "-2px", lineHeight: 1, textShadow: "0 0 40px rgba(245,158,11,0.25)" }}>{fmt(totalValue)}</p>
-                      <p style={{ fontSize: "13px", color: "#34d399", marginTop: "6px", fontWeight: "700" }}>+{fmt(Math.round(totalValue * 0.035))} base projection · next 12 months</p>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "10px", alignItems: "flex-end" }}>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        {(["Portfolio", "Cash Flow"] as const).map((v) => (
-                          <button key={v} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "8px", border: v === "Portfolio" ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.1)", background: v === "Portfolio" ? "rgba(245,158,11,0.1)" : "transparent", color: v === "Portfolio" ? "#f59e0b" : "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "700" }}>{v}</button>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: "14px" }}>
-                        {[
-                          { label: "Conservative", color: "#60a5fa" },
-                          { label: "Base", color: "#f59e0b" },
-                          { label: "Aggressive", color: "#34d399" },
-                        ].map(l => (
-                          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                            <div style={{ width: "18px", height: "2px", background: l.color, borderRadius: "999px", opacity: 0.8 }} />
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>{l.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Property milestones above chart */}
-                  {allMilestones.length > 0 && (
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" as const }}>
-                      {allMilestones.map((m, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "8px", background: `${m.color}12`, border: `1px solid ${m.color}30` }}>
-                          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: m.color }} />
-                          <span style={{ fontSize: "11px", color: m.color, fontWeight: "700" }}>{m.label}</span>
-                          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{fmt(m.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Recharts */}
-                  <div style={{ width: "100%", marginBottom: "8px" }}>
-                    <ResponsiveContainer width="100%" height={260} style={{ overflow: "visible" }}>
-                      <AreaChart data={labels.map((l, i) => ({
-                        name: l,
-                        portfolio: portfolioData[i] ?? undefined,
-                        cashflow: cashFlowData[i] ?? undefined,
-                        base: projBase[i] ?? undefined,
-                        conservative: projCons[i] ?? undefined,
-                        aggressive: projAgg[i] ?? undefined,
-                        baseCF: projBaseCF[i] ?? undefined,
-                        conservativeCF: projConsCF[i] ?? undefined,
-                        aggressiveCF: projAggCF[i] ?? undefined,
-                      }))} margin={{ top: 40, right: 10, left: 10, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.5}/>
-                            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="aggGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#34d399" stopOpacity={0.2}/>
-                            <stop offset="100%" stopColor="#34d399" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="cfGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.4}/>
-                            <stop offset="100%" stopColor="#60a5fa" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false}/>
-                        <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false}/>
-                        <YAxis tickFormatter={(v: number) => fmt(v)} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={65}/>
-                        <Tooltip
-                          contentStyle={{ background: "#0d0e14", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "14px", color: "#fff", fontSize: "13px", padding: "12px 16px" }}
-                          formatter={(v: number, name: string) => [fmt(v), name === "portfolio" ? "Portfolio" : name === "base" ? "Base projection" : name === "conservative" ? "Conservative" : name === "aggressive" ? "Aggressive" : name]}
-                          labelStyle={{ color: "#f59e0b", fontWeight: "800", marginBottom: "6px" }}
-                        />
-                        <ReferenceLine x="NOW" stroke="rgba(245,158,11,0.4)" strokeDasharray="4 2" label={{ value: "NOW", fill: "#f59e0b", fontSize: 11, fontWeight: "bold", position: "top" }}/>
-                        {propMilestones.map((m, i) => (
-                          <ReferenceLine key={i} x={labels[m.idx]} stroke={`${m.color}40`} strokeDasharray="3 2" label={{ value: m.label, fill: m.color, fontSize: 9, position: "top" }}/>
-                        ))}
-                        <Area type="monotone" dataKey="aggressive" stroke="rgba(52,211,153,0.6)" strokeWidth={1.5} strokeDasharray="6 3" fill="url(#aggGrad)" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="conservative" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="base" stroke="rgba(245,158,11,0.7)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="portfolio" stroke="#f59e0b" strokeWidth={3} fill="url(#portfolioGrad)" dot={(props: any) => {
-                          const { cx, cy, index } = props;
-                          const milestone = allMilestones.find(m => m.idx === index);
-                          if (!milestone) return <circle key={index} cx={cx} cy={cy} r={0} fill="none"/>;
-                          return <g key={index}>
-                            <circle cx={cx} cy={cy} r={8} fill={`${milestone.color}20`} stroke={milestone.color} strokeWidth={2}/>
-                            <circle cx={cx} cy={cy} r={3.5} fill={milestone.color}/>
-                          </g>;
-                        }} activeDot={{ r: 7, fill: "#f59e0b", stroke: "rgba(245,158,11,0.3)", strokeWidth: 5 }} connectNulls={false}/>
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Projection stats */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px", marginTop: "16px" }}>
-                    {[
-                      { label: "Conservative +1yr", value: fmt(Math.round(totalValue * 1.015)), sub: "+1.5% growth", color: "#60a5fa" },
-                      { label: "Base +1yr", value: fmt(Math.round(totalValue * 1.035)), sub: "+3.5% growth", color: "#f59e0b" },
-                      { label: "Aggressive +1yr", value: fmt(Math.round(totalValue * 1.07)), sub: "+7.0% growth", color: "#34d399" },
-                    ].map(s => (
-                      <div key={s.label} style={{ background: `linear-gradient(145deg, ${s.color}08, rgba(0,0,0,0.3))`, border: `1px solid ${s.color}20`, borderRadius: "14px", padding: "14px 16px", textAlign: "center" as const, position: "relative" as const, overflow: "hidden" }}>
-                        <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }} />
-                        <p style={{ fontSize: "20px", fontWeight: "900", color: s.color, letterSpacing: "-0.5px" }}>{s.value}</p>
-                        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "4px", fontWeight: "600" }}>{s.label}</p>
-                        <p style={{ fontSize: "10px", color: s.color, marginTop: "2px", fontWeight: "700", opacity: 0.7 }}>{s.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Freedom + One more property */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
-                  <div style={{ background: "linear-gradient(145deg, rgba(52,211,153,0.06), rgba(0,0,0,0.4))", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "18px", padding: "20px 22px", position: "relative" as const, overflow: "hidden" }}>
-                    <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, #34d399, transparent)" }} />
-                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>⏰ Financial freedom in</p>
-                    <p style={{ fontSize: "36px", fontWeight: "900", color: "#34d399", letterSpacing: "-1.5px", lineHeight: 1 }}>{monthsToFreedom}<span style={{ fontSize: "16px", fontWeight: "600", color: "rgba(52,211,153,0.6)", marginLeft: "4px" }}>months</span></p>
-                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>At ${GOAL_CASHFLOW.toLocaleString()}/mo passive income goal</p>
-                    <div style={{ marginTop: "12px", height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min(100, (monthlyCashFlow / GOAL_CASHFLOW) * 100)}%`, background: "linear-gradient(90deg, #34d399, #22c55e)", borderRadius: "999px" }} />
-                    </div>
-                    <p style={{ fontSize: "11px", color: "rgba(52,211,153,0.6)", marginTop: "5px", fontWeight: "600" }}>{Math.round((monthlyCashFlow / GOAL_CASHFLOW) * 100)}% of goal reached</p>
-                  </div>
-
-                  <div style={{ background: "linear-gradient(145deg, rgba(245,158,11,0.06), rgba(0,0,0,0.4))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "18px", padding: "20px 22px", position: "relative" as const, overflow: "hidden", cursor: "pointer" }} onClick={() => setActiveTab("finddeals")}>
-                    <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }} />
-                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>⚡ Add one property</p>
-                    <p style={{ fontSize: "36px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-1.5px", lineHeight: 1 }}>-{Math.max(1, monthsToFreedom - monthsWithNewProp)}<span style={{ fontSize: "16px", fontWeight: "600", color: "rgba(245,158,11,0.6)", marginLeft: "4px" }}>months</span></p>
-                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>+{fmt(extraPerYear)}/yr · Freedom by month {monthsWithNewProp}</p>
-                    <div style={{ marginTop: "12px", padding: "8px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", textAlign: "center" as const }}>
-                      <span style={{ fontSize: "12px", fontWeight: "800", color: "#f59e0b" }}>Find that property →</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Neighbors investing */}
-                <div style={{ marginTop: "12px", background: "linear-gradient(145deg, rgba(96,165,250,0.04), rgba(0,0,0,0.4))", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ fontSize: "24px" }}>🏘️</span>
-                    <div>
-                      <p style={{ fontSize: "14px", fontWeight: "800", color: "#60a5fa", marginBottom: "3px" }}>Your neighbors are investing</p>
-                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>47 investors in your market added a property this month · Avg deal: $320K</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setActiveTab("finddeals")} style={{ padding: "10px 18px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: "12px", color: "#60a5fa", fontSize: "12px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" as const }}>See deals →</button>
-                </div>
-
-                {/* Money sleeping alert */}
-                {monthlyCashFlow < GOAL_CASHFLOW * 0.3 && (
-                  <div style={{ marginTop: "12px", background: "linear-gradient(145deg, rgba(248,113,113,0.06), rgba(0,0,0,0.4))", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ fontSize: "24px" }}>😴</span>
-                      <div>
-                        <p style={{ fontSize: "14px", fontWeight: "800", color: "#f87171", marginBottom: "3px" }}>Your money is sleeping</p>
-                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>At your current ROI, uninvested capital costs you ~{fmt(Math.round(avgROI * 12 * 0.5))}/yr in missed returns</p>
-                      </div>
-                    </div>
-                    <button onClick={() => setActiveTab("finddeals")} style={{ padding: "10px 18px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: "12px", color: "#f87171", fontSize: "12px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" as const }}>Wake it up →</button>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-
           <div className="gs-grid-2">
             <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} nextGap={([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO) - totalValue} nextTarget={fmt([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO)} />
             <GoalCard label="Monthly Cash Flow" p={cashFlowPct} value={`${monthlyCashFlow >= 0 ? "+" : ""}${fmtFull(monthlyCashFlow)}`} valueColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} sub={`of $${GOAL_CASHFLOW.toLocaleString()}/mo target`} pctLabel={`${cashFlowPct.toFixed(1)}% to $${GOAL_CASHFLOW.toLocaleString()}`} barColor={monthlyCashFlow >= 0 ? "#34d399" : "#f87171"} glow={monthlyCashFlow >= 0 ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"} min="$0" max={`$${GOAL_CASHFLOW.toLocaleString()}/mo`} onEdit={() => setShowSettings(true)} nextGap={([500,1000,2000,3000,5000,10000].find(m => m > monthlyCashFlow) || GOAL_CASHFLOW) - monthlyCashFlow} nextTarget={`$${([500,1000,2000,3000,5000,10000].find(m => m > monthlyCashFlow) || GOAL_CASHFLOW).toLocaleString()}/mo`} />
@@ -2166,7 +1902,7 @@ function LiveIncomeCounter({ monthlyCashFlow }: { monthlyCashFlow: number }) {
         <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px #34d399", animation: "blink 1.5s infinite" }} />
         <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.6)", letterSpacing: "1.5px", fontWeight: "700", textTransform: "uppercase" as const }}>Today's Income</span>
       </div>
-      <p style={{ fontSize: "22px", fontWeight: "900", color: "#22c55e", letterSpacing: "-0.8px", lineHeight: 1 }}>+${earned.toFixed(2)}</p>
+      <p style={{ fontSize: "22px", fontWeight: "900", color: "#34d399", letterSpacing: "-0.8px", lineHeight: 1 }}>+${earned.toFixed(2)}</p>
       <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>${(perSecond * 3600).toFixed(2)}/hr · ${(perSecond * 86400).toFixed(2)}/day</p>
     </div>
   );
@@ -7568,10 +7304,6 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
   const [drawerProp, setDrawerProp] = useState<number|null>(null);
   const [propManagers, setPropManagers] = useState<Record<number,string>>({});
   const [customManager, setCustomManager] = useState("");
-  const [tipStatus, setTipStatus] = useState<Record<string, string>>({});
-  const [expandedTips, setExpandedTips] = useState<Record<number, boolean>>({});
-  const [expandedTrades, setExpandedTrades] = useState<Record<number, boolean>>({});
-  const [openTips, setOpenTips] = useState<Record<string, boolean>>({});
   const [tickets, setTickets] = useState<Record<number, {id:number; title:string; trade:string; priority:string; cost:string; status:string; vendor:string}[]>>({});
   const [ticketDrawer, setTicketDrawer] = useState<{propId:number; trade:string}|null>(null);
   const [ticketForm, setTicketForm] = useState({ title:"", priority:"Normal", cost:"", vendor:"" });
@@ -8171,39 +7903,6 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               <input value={ticketForm.cost} onChange={e => setTicketForm(f=>({...f,cost:e.target.value}))} placeholder="Est. cost (optional)" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", padding: "11px 14px", fontSize: "13px", color: "#fff", outline: "none" }} />
             </div>
             <button onClick={() => { if (!ticketForm.title.trim()) return; const newTicket = { id: Date.now(), title: ticketForm.title, trade: ticketDrawer.trade, priority: ticketForm.priority, cost: ticketForm.cost, status: "Open", vendor: ticketForm.vendor }; setTickets(prev => ({ ...prev, [ticketDrawer.propId]: [...(prev[ticketDrawer.propId]||[]), newTicket] })); setTicketDrawer(null); }} style={{ width: "100%", marginTop: "14px", padding: "13px", borderRadius: "12px", border: "1px solid rgba(52,211,153,0.3)", background: "rgba(52,211,153,0.08)", color: "#34d399", fontSize: "14px", fontWeight: "800", cursor: "pointer" }}>Create Ticket →</button>
-                            {(() => {
-                              const prop = properties.find(p => p.id === ticketDrawer.propId);
-                              const city = prop?.city || prop?.address || "your area";
-                              const tradeName = ticketDrawer.trade.replace(/[^\w\s]/gi, '').trim();
-                              const citySlug = city.toLowerCase().replace(/\s+/g, '-').replace(/,.*/, '');
-                              const tradeSlug = tradeName.toLowerCase().replace(/\s+/g, '-');
-                              const thumbtackUrl = `https://www.thumbtack.com/search?q=${encodeURIComponent(tradeName)}&location=${encodeURIComponent(city)}`;
-                              const angiUrl = `https://www.angi.com/companylist/${tradeSlug}/${citySlug}.htm`;
-                              const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(tradeName)}&find_loc=${encodeURIComponent(city)}`;
-                              return (
-                                <div style={{ marginTop: "16px", padding: "14px", background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)", borderRadius: "12px" }}>
-                                  <p style={{ fontSize: "11px", color: "#60a5fa", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "10px" }}>🔍 Find pros near {city}</p>
-                                  <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px" }}>
-                                    {[
-                                      { name: "Thumbtack", desc: "Compare quotes from local pros", color: "#009fd9", url: thumbtackUrl },
-                                      { name: "Angi", desc: "Verified reviews + instant booking", color: "#ff6b35", url: angiUrl },
-                                      { name: "Yelp", desc: "Top-rated local contractors", color: "#d32323", url: yelpUrl },
-                                    ].map(s => (
-                                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: `${s.color}10`, border: `1px solid ${s.color}25`, cursor: "pointer" }}>
-                                          <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: `${s.color}20`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "900", color: s.color, flexShrink: 0 }}>{s.name[0]}</div>
-                                          <div style={{ flex: 1 }}>
-                                            <p style={{ fontSize: "13px", fontWeight: "700", color: "#e0e0f0" }}>{s.name}</p>
-                                            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{s.desc}</p>
-                                          </div>
-                                          <span style={{ fontSize: "14px", color: s.color }}>↗</span>
-                                        </div>
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })()}
             <button onClick={() => setTicketDrawer(null)} style={{ width: "100%", marginTop: "8px", padding: "11px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)", background: "transparent", color: "rgba(255,255,255,0.3)", fontSize: "13px", cursor: "pointer" }}>Cancel</button>
           </div>
         </div>
@@ -8256,8 +7955,8 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               <p style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>
                 {manageSection === "properties" ? "Properties" : manageSection === "manage" ? "Manage" : "Tax Strategy"}
               </p>
-              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)" }}>
-                {manageSection === "properties" ? "Your full portfolio cockpit · rent, tenants, maintenance" : manageSection === "manage" ? "DIY tools or hire a professional company" : "Keep more of what you earn"}
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
+                {manageSection === "properties" ? "Your full portfolio cockpit — rent, tenants, maintenance" : manageSection === "manage" ? "DIY tools or hire a professional company" : "Keep more of what you earn"}
               </p>
             </div>
           </div>
@@ -8269,7 +7968,7 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
               {/* Cockpit grid */}
               <div>
                 <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", letterSpacing: "2px", textTransform: "uppercase" as const, fontWeight: "800", marginBottom: "12px" }}>Portfolio cockpit</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "10px" }}>
                   {properties.filter(p => p.occupancyStatus !== "sold").map(prop => {
                     const isOccupied = prop.occupancyStatus === "occupied" || prop.occupancyStatus === "str";
                     const isVacant = prop.occupancyStatus === "vacant";
@@ -8280,23 +7979,21 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                     const statusText = isOccupied ? "Occupied" : isPlanned ? "Future rental" : "Vacant";
                     const rentColor = isOccupied ? "#22c55e" : isPlanned ? "#a855f7" : "rgba(255,255,255,0.15)";
                     return (
-                      <div key={prop.id} onClick={() => document.getElementById(`prop-card-${prop.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} style={{ background: `linear-gradient(145deg, ${dotColor}10, rgba(0,0,0,0.5))`, border: `1px solid ${dotColor}35`, borderRadius: "18px", padding: "14px 14px", cursor: "pointer", transition: "all 0.2s", position: "relative" as const, overflow: "hidden", boxShadow: `0 0 24px ${dotColor}10` }}>
-                        <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${dotColor}, transparent)` }} />
-                        <div style={{ position: "absolute" as const, top: 0, right: 0, width: "80px", height: "80px", background: `radial-gradient(circle at top right, ${dotColor}15, transparent 70%)`, pointerEvents: "none" as const }} />
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: dotColor, flexShrink: 0, boxShadow: `0 0 6px ${dotColor}` }} />
-                          <span style={{ fontSize: "10px", fontWeight: "800", color: dotColor, letterSpacing: "1px", textTransform: "uppercase" as const }}>{statusText}</span>
+                      <div key={prop.id} onClick={() => document.getElementById(`prop-card-${prop.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: "14px", padding: "16px 14px", cursor: "pointer", transition: "all 0.15s" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "5px" }}>
+                          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                          <span style={{ fontSize: "12px", fontWeight: "700", color: dotColor }}>{statusText}</span>
                         </div>
-                        <p style={{ fontSize: "15px", fontWeight: "900", color: "#fff", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, letterSpacing: "-0.3px" }}>{prop.name}</p>
-                        {prop.city && <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginBottom: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{prop.city}</p>}
-                        <p style={{ fontSize: "18px", fontWeight: "900", color: rentColor, letterSpacing: "-0.5px", marginTop: prop.city ? "0" : "8px" }}>{prop.rent > 0 ? `$${prop.rent.toLocaleString()}/mo` : "—"}</p>
+                        <p style={{ fontSize: "13px", fontWeight: "700", color: "#c8c8d8", marginBottom: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{prop.name}</p>
+                        <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", marginBottom: "5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{prop.city || "—"}</p>
+                        <p style={{ fontSize: "14px", fontWeight: "800", color: rentColor }}>{prop.rent > 0 ? `$${prop.rent.toLocaleString()}/mo` : "—"}</p>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Legend */}
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const, marginBottom: "20px" }}>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" as const, marginBottom: "10px" }}>
                   {[{ color: "#22c55e", label: "Paid / Occupied" }, { color: "#f97316", label: "Due / Late" }, { color: "#ef4444", label: "Problem" }, { color: "#3a3d4a", label: "Vacant / Exit" }, { color: "#a855f7", label: "Future rental" }].map(l => (
                     <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                       <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: l.color }} />
@@ -8308,15 +8005,13 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                 {/* KPI strip */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "20px" }}>
                   {[
-                    { label: "Collected / mo", value: `$${properties.filter(p => p.occupancyStatus === "occupied" || p.occupancyStatus === "str").reduce((s,p) => s + p.rent, 0).toLocaleString()}`, sub: `$${(properties.filter(p => p.occupancyStatus === "occupied" || p.occupancyStatus === "str").reduce((s,p) => s + p.rent, 0) * 12).toLocaleString()} / yr`, color: "#22c55e" },
-                    { label: "Properties", value: String(properties.filter(p => p.occupancyStatus !== "sold").length), sub: `${properties.filter(p => p.occupancyStatus === "occupied" || p.occupancyStatus === "str").length} occupied`, color: "#a78bfa" },
-                    { label: "Vacant", value: String(properties.filter(p => p.occupancyStatus === "vacant").length), sub: properties.filter(p => p.occupancyStatus === "vacant").length > 0 ? "Action needed" : "All occupied", color: "#f97316" },
+                    { label: "Collected / mo", value: `$${properties.filter(p => p.occupancyStatus === "occupied" || p.occupancyStatus === "str").reduce((s,p) => s + p.rent, 0).toLocaleString()}`, color: "#22c55e" },
+                    { label: "Properties", value: String(properties.filter(p => p.occupancyStatus !== "sold").length), color: "#a78bfa" },
+                    { label: "Vacant", value: String(properties.filter(p => p.occupancyStatus === "vacant").length), color: "#f97316" },
                   ].map(k => (
-                    <div key={k.label} style={{ background: `linear-gradient(145deg, ${k.color}10, rgba(0,0,0,0.4))`, border: `1px solid ${k.color}30`, borderRadius: "16px", padding: "20px 16px", textAlign: "center" as const, position: "relative" as const, overflow: "hidden", boxShadow: `0 0 30px ${k.color}08` }}>
-                      <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${k.color}, transparent)` }} />
-                      <p style={{ fontSize: "30px", fontWeight: "900", color: k.color, lineHeight: 1, letterSpacing: "-1px" }}>{k.value}</p>
-                      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginTop: "8px", fontWeight: "700" }}>{k.label}</p>
-                      {k.sub && <p style={{ fontSize: "13px", color: "#f59e0b", marginTop: "5px", fontWeight: "700" }}>{k.sub}</p>}
+                    <div key={k.label} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "12px", textAlign: "center" as const }}>
+                      <p style={{ fontSize: "22px", fontWeight: "800", color: k.color, lineHeight: 1 }}>{k.value}</p>
+                      <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.25)", textTransform: "uppercase" as const, letterSpacing: "1px", marginTop: "5px" }}>{k.label}</p>
                     </div>
                   ))}
                 </div>
@@ -8332,18 +8027,13 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                 });
                 if (alerts.length === 0) return null;
                 return (
-                  <div style={{ background: "linear-gradient(145deg, rgba(248,113,113,0.08), rgba(0,0,0,0.4))", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "18px", padding: "18px 20px", marginBottom: "4px", position: "relative" as const, overflow: "hidden" }}>
-                    <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #f87171, transparent)" }} />
-                    <div style={{ position: "absolute" as const, top: 0, right: 0, width: "120px", height: "120px", background: "radial-gradient(circle at top right, rgba(248,113,113,0.08), transparent 70%)", pointerEvents: "none" as const }} />
-                    <p style={{ fontSize: "11px", color: "#f87171", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const, marginBottom: "14px" }}>⚡ Action needed · {alerts.length} item{alerts.length > 1 ? "s" : ""}</p>
+                  <div style={{ background: "rgba(248,113,113,0.04)", border: "1px solid rgba(248,113,113,0.12)", borderRadius: "14px", padding: "14px 18px", marginBottom: "4px" }}>
+                    <p style={{ fontSize: "11px", color: "#f87171", fontWeight: "800", letterSpacing: "1.5px", textTransform: "uppercase" as const, marginBottom: "10px" }}>⚡ Action needed</p>
                     {alerts.map((a, i) => (
-                      <div key={i} onClick={() => document.getElementById(`prop-card-${a.propId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", background: `${a.color}08`, border: `1px solid ${a.color}25`, marginBottom: "8px", cursor: "pointer", transition: "all 0.15s", boxShadow: `0 0 16px ${a.color}08` }}>
-                        <span style={{ fontSize: "20px" }}>{a.icon}</span>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: "14px", fontWeight: "700", color: a.color }}>{a.label}</p>
-                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "2px" }}>Click to view property →</p>
-                        </div>
-                        <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: `${a.color}15`, border: `1px solid ${a.color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", color: a.color }}>→</div>
+                      <div key={i} onClick={() => document.getElementById(`prop-card-${a.propId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "9px", background: "rgba(255,255,255,0.02)", border: `1px solid ${a.color}20`, marginBottom: "6px", cursor: "pointer", transition: "all 0.15s" }}>
+                        <span style={{ fontSize: "16px" }}>{a.icon}</span>
+                        <p style={{ fontSize: "13px", fontWeight: "600", color: a.color, flex: 1 }}>{a.label}</p>
+                        <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.2)" }}>→</span>
                       </div>
                     ))}
                   </div>
@@ -8363,133 +8053,56 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                   const isOccupied = prop.occupancyStatus === "occupied" || prop.occupancyStatus === "str";
                   const isVacant = prop.occupancyStatus === "vacant";
                   const isPlanned = prop.occupancyStatus === "planned";
-                  const accentColor = isOccupied ? "#22c55e" : isPlanned ? "#a855f7" : "#60a5fa";
+                  const accentColor = isOccupied ? "#22c55e" : isPlanned ? "#a855f7" : "rgba(255,255,255,0.15)";
                   const statusLabel = isOccupied ? "Occupied ✓" : isPlanned ? "Future rental" : "Vacant";
                   const statusBg = isOccupied ? "rgba(34,197,94,0.08)" : isPlanned ? "rgba(168,85,247,0.08)" : "rgba(255,255,255,0.04)";
                   const statusBorder = isOccupied ? "rgba(34,197,94,0.25)" : isPlanned ? "rgba(168,85,247,0.25)" : "rgba(255,255,255,0.08)";
 
                   return (
-                    <div key={prop.id} id={`prop-card-${prop.id}`} style={{ background: `linear-gradient(145deg, ${accentColor}08, rgba(0,0,0,0.4))`, border: `1px solid ${accentColor}35`, borderRadius: "24px", overflow: "hidden", position: "relative" as const, boxShadow: `0 0 40px ${accentColor}10` }}>
-                      <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }} />
-                      <div style={{ position: "absolute" as const, top: 0, right: 0, width: "200px", height: "200px", background: `radial-gradient(circle at top right, ${accentColor}08, transparent 70%)`, pointerEvents: "none" as const }} />
+                    <div key={prop.id} id={`prop-card-${prop.id}`} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${accentColor}22`, borderRadius: "20px", overflow: "hidden", position: "relative" as const }}>
+                      <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }} />
 
                       {/* Card header */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${accentColor}15`, flexWrap: "wrap" as const, gap: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                          <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: `${accentColor}18`, border: `2px solid ${accentColor}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900", color: accentColor, flexShrink: 0, boxShadow: `0 0 16px ${accentColor}25` }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", flexWrap: "wrap" as const, gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${accentColor}18`, border: `1px solid ${accentColor}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: accentColor, flexShrink: 0 }}>
                             {prop.name.slice(0,2).toUpperCase()}
                           </div>
                           <div>
-                            <p style={{ fontSize: "18px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" }}>{prop.name}</p>
-                            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>{prop.city || "—"} · {prop.type || "Property"}</p>
+                            <p style={{ fontSize: "14px", fontWeight: "800", color: "#e8e8f0" }}>{prop.name}</p>
+                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>{prop.city || "—"}</p>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", padding: "7px 16px", borderRadius: "20px", fontWeight: "800", background: statusBg, color: accentColor, border: `1px solid ${statusBorder}`, boxShadow: `0 0 12px ${accentColor}20`, letterSpacing: "0.3px" }}>{statusLabel}</span>
-                          <span style={{ fontSize: "12px", padding: "7px 16px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.8)", cursor: "pointer", fontWeight: "700", background: "rgba(255,255,255,0.08)", transition: "all 0.15s" }} onClick={(e) => { e.stopPropagation(); setDrawerProp(prop.id); setCustomManager(""); }}>{propManagers[prop.id] || "Self-managed"} ▾</span>
+                          <span style={{ fontSize: "13px", padding: "7px 16px", borderRadius: "20px", fontWeight: "700", background: statusBg, color: accentColor, border: `1px solid ${statusBorder}` }}>{statusLabel}</span>
+                          <span style={{ fontSize: "13px", padding: "7px 16px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontWeight: "600" }} onClick={(e) => { e.stopPropagation(); setDrawerProp(prop.id); setCustomManager(""); }}>{propManagers[prop.id] || "Self-managed"} ▾</span>
                         </div>
                       </div>
 
                       {/* Info grid */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", background: "rgba(0,0,0,0.2)" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderTop: "1px solid rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                         {[
                           { label: "Rent / mo", value: prop.rent > 0 ? `$${prop.rent.toLocaleString()}` : "—", color: isOccupied ? "#22c55e" : "rgba(255,255,255,0.2)" },
-                          { label: "Equity", value: `$${((prop.value || 0) - (prop.mortgage || 0)).toLocaleString()}`, color: "#a78bfa" },
+                          { label: "Equity", value: `$${((prop.value || 0) - (prop.mortgage || 0)).toLocaleString()}`, color: "#c8c8d8" },
                           { label: "Expenses / mo", value: prop.expenses > 0 ? `$${prop.expenses.toLocaleString()}` : "—", color: "#f87171" },
                         ].map((cell, i) => (
-                          <div key={cell.label} style={{ padding: "16px 20px", borderRight: i < 2 ? `1px solid ${accentColor}10` : "none", position: "relative" as const }}>
-                            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1.5px", marginBottom: "6px", fontWeight: "700" }}>{cell.label}</p>
-                            <p style={{ fontSize: "22px", fontWeight: "900", color: cell.color, letterSpacing: "-0.5px" }}>{cell.value}</p>
+                          <div key={cell.label} style={{ padding: "10px 14px", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                            <p style={{ fontSize: "8px", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "4px" }}>{cell.label}</p>
+                            <p style={{ fontSize: "13px", fontWeight: "700", color: cell.color }}>{cell.value}</p>
                           </div>
                         ))}
                       </div>
 
-                    
-
-                    
-
-                      {/* NOI + Lease expiry bar */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "14px 24px", borderTop: `1px solid ${accentColor}10` }}>
-                        <div style={{ background: `linear-gradient(135deg, ${(prop.rent-prop.expenses)>0 ? "rgba(34,197,94,0.08)" : "rgba(248,113,113,0.08)"}, rgba(0,0,0,0.3))`, border: `1px solid ${(prop.rent-prop.expenses)>0 ? "rgba(34,197,94,0.25)" : "rgba(248,113,113,0.25)"}`, borderRadius: "14px", padding: "16px 18px", position: "relative" as const, overflow: "hidden" }}>
-                          <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${(prop.rent-prop.expenses)>0 ? "#22c55e" : "#f87171"}, transparent)` }} />
-                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" as const, letterSpacing: "1.5px", fontWeight: "800", marginBottom: "8px" }}>NOI / mo</p>
-                          <p style={{ fontSize: "28px", fontWeight: "900", color: (prop.rent - prop.expenses) > 0 ? "#22c55e" : "#f87171", letterSpacing: "-1px", lineHeight: 1 }}>${(prop.rent - prop.expenses).toLocaleString()}</p>
-                          <p style={{ fontSize: "13px", color: (prop.rent-prop.expenses)>0 ? "rgba(34,197,94,0.6)" : "rgba(248,113,113,0.6)", marginTop: "6px", fontWeight: "700" }}>${((prop.rent - prop.expenses) * 12).toLocaleString()} / yr</p>
+                      {/* Maintenance + Trades */}
+                      <div style={{ padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" as const, letterSpacing: "1px", fontWeight: "700" }}>Maintenance</p>
+                          <span style={{ fontSize: "9px", padding: "2px 8px", borderRadius: "10px", background: "rgba(34,197,94,0.08)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}>All clear</span>
                         </div>
-                        <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: "12px", padding: "12px 14px" }}>
-                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1.5px", fontWeight: "700", marginBottom: "6px" }}>Lease expiry</p>
-                          {isOccupied ? (() => {
-                            const today = new Date();
-                            const expiry = new Date(today.getFullYear(), 11, 31);
-                            const totalDays = 365;
-                            const daysLeft = Math.max(0, Math.round((expiry.getTime() - today.getTime()) / 86400000));
-                            const pct = Math.min(100, Math.round((daysLeft / totalDays) * 100));
-                            const leaseColor = daysLeft > 180 ? "#22c55e" : daysLeft > 90 ? "#f59e0b" : "#f87171";
-                            return (
-                              <div>
-                                <p style={{ fontSize: "16px", fontWeight: "800", color: leaseColor, marginBottom: "6px" }}>{daysLeft}d left</p>
-                                <div style={{ height: "6px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", position: "relative" as const, marginBottom: "18px" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${leaseColor}80, ${leaseColor})`, borderRadius: "999px", boxShadow: `0 0 8px ${leaseColor}60` }} />
-                                  <div style={{ position: "absolute" as const, left: `${Math.max(0, pct - 25)}%`, top: "50%", transform: "translateY(-50%)", width: "10px", height: "10px", borderRadius: "50%", background: "#f59e0b", border: "2px solid #0f1015", boxShadow: "0 0 8px #f59e0b" }} />
-                                  <div style={{ position: "absolute" as const, left: `${Math.max(0, pct - 25)}%`, top: "14px", fontSize: "9px", color: "#f59e0b", fontWeight: "700", whiteSpace: "nowrap" as const }}>⚠ Renew by {new Date(expiry.getTime() - 90*86400000).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
-                                </div>
-                                <p style={{ fontSize: "13px", color: "rgba(245,158,11,0.7)", marginTop: "18px", fontWeight: "700" }}>Expires {expiry.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</p>
-                              </div>
-                            );
-                          })() : <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>No active lease</p>}
-                        </div>
-                      </div>
-
-                      {/* NOI + Lease expiry bar */}
-                      <div style={{ margin: "0 24px 16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "16px 18px", position: "relative" as const, overflow: "hidden" }}>
-                        <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }} />
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                          <div>
-                            <p style={{ fontSize: "13px", fontWeight: "800", color: "#fff" }}>🔧 Request a trade</p>
-                            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "2px" }}>Tap to create a ticket — connect to verified pros</p>
-                          </div>
-                          <span style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "10px", background: (tickets[prop.id]||[]).filter(t=>t.status!=="done").length > 0 ? "rgba(249,115,22,0.08)" : "rgba(34,197,94,0.08)", color: (tickets[prop.id]||[]).filter(t=>t.status!=="done").length > 0 ? "#f97316" : "#22c55e", border: `1px solid ${(tickets[prop.id]||[]).filter(t=>t.status!=="done").length > 0 ? "rgba(249,115,22,0.25)" : "rgba(34,197,94,0.25)"}`, fontWeight: "700" }}>{(tickets[prop.id]||[]).filter(t=>t.status!=="done").length > 0 ? `${(tickets[prop.id]||[]).filter(t=>t.status!=="done").length} open ticket${(tickets[prop.id]||[]).filter(t=>t.status!=="done").length>1?"s":""}` : "✓ All clear"}</span>
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginTop: "14px" }}>
-                          {(() => {
-                            const allTrades = [
-                              { icon: "🔧", name: "HVAC", color: "#60a5fa", freq: "Most common" },
-                              { icon: "💧", name: "Plumber", color: "#60a5fa", freq: "Most common" },
-                              { icon: "⚡", name: "Electric", color: "#f59e0b", freq: "Most common" },
-                              { icon: "🏠", name: "Roofer", color: "#f59e0b", freq: "Most common" },
-                              { icon: "🌿", name: "Garden", color: "#22c55e", freq: "Most common" },
-                              { icon: "🔒", name: "Locksmith", color: "#a78bfa", freq: "Most common" },
-                              { icon: "🎨", name: "Painter", color: "#f97316", freq: "Common" },
-                              { icon: "🪵", name: "Flooring", color: "#f97316", freq: "Common" },
-                              { icon: "🪟", name: "Windows", color: "#60a5fa", freq: "Common" },
-                              { icon: "🚪", name: "Doors", color: "#60a5fa", freq: "Common" },
-                              { icon: "🏗️", name: "Contractor", color: "#f59e0b", freq: "Common" },
-                              { icon: "🐛", name: "Pest control", color: "#22c55e", freq: "Common" },
-                              { icon: "🧹", name: "Cleaning", color: "#34d399", freq: "Common" },
-                              { icon: "❄️", name: "Insulation", color: "#60a5fa", freq: "Less common" },
-                              { icon: "📷", name: "Security", color: "#a78bfa", freq: "Less common" },
-                              { icon: "🌊", name: "Water damage", color: "#60a5fa", freq: "Less common" },
-                              { icon: "🔥", name: "Foundation", color: "#f87171", freq: "Less common" },
-                              { icon: "♻️", name: "Junk removal", color: "#34d399", freq: "Less common" },
-                            ];
-                            const visible = expandedTrades[prop.id] ? allTrades : allTrades.slice(0, 6);
-                            return (
-                              <>
-                                {visible.map(t => (
-                                  <button key={t.name} onClick={() => { setTicketDrawer({propId: prop.id, trade: `${t.icon} ${t.name}`}); setTicketForm({title:"", priority:"Normal", cost:"", vendor:""}); }} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${t.color}25`, background: `linear-gradient(135deg, ${t.color}08, rgba(0,0,0,0.3))`, cursor: "pointer", transition: "all 0.2s", textAlign: "left" as const, position: "relative" as const, overflow: "hidden" }}>
-                                    <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: `${t.color}15`, border: `1px solid ${t.color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{t.icon}</div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <p style={{ fontSize: "13px", fontWeight: "800", color: "#e0e0f0", marginBottom: "2px" }}>{t.name}</p>
-                                      <p style={{ fontSize: "11px", color: t.color, fontWeight: "700" }}>Request →</p>
-                                    </div>
-                                  </button>
-                                ))}
-                                <button onClick={() => setExpandedTrades(prev => ({...prev, [prop.id]: !prev[prop.id]}))} style={{ gridColumn: "1 / -1", padding: "10px", borderRadius: "10px", border: "1px dashed rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
-                                  {expandedTrades[prop.id] ? "▲ Show less" : `▼ Show ${allTrades.length - 6} more trades`}
-                                </button>
-                              </>
-                            );
-                          })()}
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
+                          {["🔧 HVAC", "💧 Plumber", "🏠 Roofer", "⚡ Electric", "🌿 Garden", "🔒 Locksmith"].map(t => (
+                            <button key={t} onClick={() => { setTicketDrawer({propId: prop.id, trade: t}); setTicketForm({title:"", priority:"Normal", cost:"", vendor:""}); }} style={{ fontSize: "12px", padding: "6px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer" }}>{t}</button>
+                          ))}
                         </div>
                       </div>
 
@@ -8514,182 +8127,21 @@ function GetFinancedTab({ properties, user, incomingListing }: { properties: Pro
                         </div>
                       )}
 
-                      {/* NOI + Lease expiry bar - placeholder */}
-                      <div style={{ display: "none" }}>
-                        <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: "12px", padding: "12px 14px" }}>
-                          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1.5px", fontWeight: "700", marginBottom: "6px" }}>NOI / mo</p>
-                          <p style={{ fontSize: "22px", fontWeight: "900", color: (prop.rent - prop.expenses) > 0 ? "#22c55e" : "#f87171", letterSpacing: "-0.5px" }}>${(prop.rent - prop.expenses).toLocaleString()}</p>
-                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", marginTop: "3px" }}>${((prop.rent - prop.expenses) * 12).toLocaleString()} / yr</p>
-                        </div>
-                        <div style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.08), rgba(0,0,0,0.3))", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "14px", padding: "16px 18px", position: "relative" as const, overflow: "hidden" }}>
-                          <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }} />
-                          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" as const, letterSpacing: "1.5px", fontWeight: "800", marginBottom: "8px" }}>Lease expiry</p>
-                          {isOccupied ? (() => {
-                            const today = new Date();
-                            const expiry = new Date(today.getFullYear(), 11, 31);
-                            const totalDays = 365;
-                            const daysLeft = Math.max(0, Math.round((expiry.getTime() - today.getTime()) / 86400000));
-                            const pct = Math.min(100, Math.round((daysLeft / totalDays) * 100));
-                            const leaseColor = daysLeft > 180 ? "#22c55e" : daysLeft > 90 ? "#f59e0b" : "#f87171";
-                            return (
-                              <div>
-                                <p style={{ fontSize: "16px", fontWeight: "800", color: leaseColor, marginBottom: "6px" }}>{daysLeft}d left</p>
-                                <div style={{ height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${leaseColor}80, ${leaseColor})`, borderRadius: "999px", boxShadow: `0 0 8px ${leaseColor}60` }} />
-                                </div>
-                                <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", marginTop: "4px" }}>Renew by {new Date(expiry.getTime() - 90*86400000).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</p>
-                              </div>
-                            );
-                          })() : <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.2)", marginTop: "4px" }}>No active lease</p>}
-                        </div>
-                      </div>
-
-                      {/* Optimize panel */}
-                      {(() => {
-                        const propType = prop.type?.toLowerCase() || "";
-                        const isSTR = propType.includes("str") || propType.includes("airbnb") || propType.includes("short");
-                        const isFlip = propType.includes("flip");
-                        const noi = prop.rent - prop.expenses;
-                        const marketRent = Math.round(prop.rent * 1.15);
-                        const rentGap = marketRent - prop.rent;
-                        const propVal = prop.value || 0;
-                        const monthlyRent = prop.rent || 0;
-                        const rentGapAmt = Math.max(0, Math.round(monthlyRent * 0.15));
-                        const tips = isSTR ? [
-                          { icon: "📈", badge: "🆓 Free", time: "30 min", title: "Dynamic pricing", desc: `Top STRs in your market hit 84% occupancy. Dynamic pricing could add ~$${Math.round(monthlyRent * 0.18).toLocaleString()}/mo with zero upfront cost.`, cost: "$0", roi: "∞", rentUp: `+$${Math.round(monthlyRent*0.18).toLocaleString()}/mo`, condition: "Always — free to implement", color: "#f59e0b", action: "Try PriceLabs ↗", url: "https://pricelabs.co" },
-                          { icon: "🔒", title: "Smart lock + keyless entry", desc: `Cost $150-300. Eliminates rekeying ($100-150/turnover), enables self check-in, and commands $25-50/mo more. Pays for itself in 2-3 stays.`, cost: "$150–300", roi: "200%+", rentUp: "+$25–50/mo", condition: "Only if you're self-managing check-ins", color: "#60a5fa", action: "Shop smart locks ↗", url: "https://www.amazon.com/s?k=smart+lock+rental" },
-                          { icon: "🌡️", title: "Smart thermostat", desc: "Cost $250 installed. Reduces energy costs 15-25%. 58% of renters prefer smart-enabled properties — justify $30-40/mo premium.", cost: "$200–400", roi: "150%", rentUp: "+$30–40/mo", condition: "Only if property is over 5 years old without one", color: "#a78bfa", action: "Shop thermostats ↗", url: "https://www.amazon.com/s?k=smart+thermostat" },
-                          { icon: "📸", title: "Professional listing photos", desc: "Pro photos cost $100-300 and listings fill 24% faster at 15% higher nightly rates. Highest ROI improvement for any STR.", cost: "$100–300", roi: "500%+", rentUp: "+15% nightly rate", condition: "Always — biggest bang for zero ongoing cost", color: "#22c55e", action: "Book photographer ↗", url: "https://www.thumbtack.com/k/real-estate-photography" },
-                          { icon: "🛋️", title: "Furniture & staging refresh", desc: "New furniture package $2-5K. Well-staged STRs book 30% faster and command 10-20% higher nightly rates. Photos drive bookings.", cost: "$2,000–5,000", roi: "120%", rentUp: "+10–20% nightly rate", condition: "Only if property is 3+ years old or reviews mention outdated decor", color: "#f97316", action: "Shop furniture ↗", url: "https://www.wayfair.com" },
-                        ] : isFlip ? [
-                          { icon: "🚪", title: "Steel entry door", desc: `Cost $1-2K. Returns up to 188% ROI — highest of almost any improvement. New door signals quality from the curb before buyers enter.`, cost: "$1,000–2,000", roi: "188%", rentUp: "+$8–15K ARV", condition: "Only if door is over 15 years old or visually dated", color: "#f59e0b", action: "Find installer ↗", url: "https://www.thumbtack.com/k/door-installation" },
-                          { icon: "🏠", title: "Garage door replacement", desc: "Cost $3-5K. 268% ROI in 2025 — highest ROI upgrade tracked. Transforms curb appeal instantly and buyers notice immediately.", cost: "$3,000–5,000", roi: "268%", rentUp: "+$8–20K ARV", condition: "Only if garage door is original or visually damaged", color: "#22c55e", action: "Find installer ↗", url: "https://www.thumbtack.com/k/garage-door-repair" },
-                          { icon: "🍳", title: "Minor kitchen update", desc: `Cabinet paint + new handles + countertop = $5-8K. Full remodel rarely pays back on flip. Cosmetic refresh at 96% ROI is the play. Avoid granite — tenants don't expect it.`, cost: "$5,000–8,000", roi: "96%", rentUp: "+$10–20K ARV", condition: "Only if kitchen is visually dated — skip if functional", color: "#f97316", action: "Find contractor ↗", url: "https://www.thumbtack.com/k/kitchen-remodeling" },
-                          { icon: "🪟", title: "Fresh paint — full interior", desc: "Cost $2-5K. Neutral tones only. Single highest-impact cosmetic move per dollar spent. Buyers unconsciously price in dated paint.", cost: "$2,000–5,000", roi: "150%+", rentUp: "+$5–10K ARV", condition: "Always on a flip — non-negotiable", color: "#60a5fa", action: "Find painter ↗", url: "https://www.thumbtack.com/k/interior-painting" },
-                          { icon: "🪵", title: "Luxury vinyl flooring", desc: "Replace carpet with LVP at $3-6/sqft. 70-80% ROI. Looks premium, lasts 25+ years, waterproof. Buyers expect it in 2025.", cost: "$3,000–8,000", roi: "75%", rentUp: "+$8–15K ARV", condition: "Only if carpet is stained, worn, or over 7 years old", color: "#a78bfa", action: "Find installer ↗", url: "https://www.thumbtack.com/k/flooring" },
-                        ] : isVacant ? [
-                          { icon: "⏱️", title: "Vacancy is costing you daily", desc: `Every day vacant = $${Math.round(monthlyRent/30).toLocaleString()} lost. At ${Math.round((new Date().getTime() - new Date().getTime())/86400000)||45} days = ~$${Math.round(monthlyRent*1.5).toLocaleString()} gone. List on 3+ platforms today.`, cost: "$0", roi: "∞", rentUp: "Immediate", condition: "Do this today — zero cost, maximum impact", color: "#f87171", action: "List on Zillow ↗", url: "https://www.zillow.com/rental-manager" },
-                          { icon: "📢", title: "Multi-platform listing", desc: "Listing on Zillow + Apartments.com + Facebook Marketplace fills 2.3× faster than single platform. Takes 30 minutes. Costs nothing.", cost: "$0", roi: "∞", rentUp: "Fill 2.3× faster", condition: "Always — no reason not to", color: "#60a5fa", action: "List on Apartments.com ↗", url: "https://www.apartments.com" },
-                          { icon: "💰", title: "First month free vs lower rent", desc: "Offering first month free fills faster than permanently reducing rent. You recover the cost in month 2. Permanent discount costs you forever.", cost: "$0 strategy", roi: "High", rentUp: "Fill 40% faster", condition: "Only if vacant over 30 days with no applications", color: "#22c55e", action: "Screen tenants ↗", url: "https://www.turbotenant.com" },
-                          { icon: "🔒", title: "Smart lock — self-showing", desc: "Smart lock ($150-300) lets prospects self-tour without you present. 3× more showings = faster fill. Pays back in first month of rent.", cost: "$150–300", roi: "500%+", rentUp: "3× more showings", condition: "Only if you're managing showings manually", color: "#a78bfa", action: "Shop smart locks ↗", url: "https://www.amazon.com/s?k=smart+lock" },
-                        ] : [
-                          { icon: "💵", title: "Rent below market", desc: rentGapAmt > 0 ? `Market comps show $${Math.round(monthlyRent*1.15).toLocaleString()}/mo in your area. You're leaving $${rentGapAmt.toLocaleString()}/mo ($${(rentGapAmt*12).toLocaleString()}/yr) on the table. Raise at next renewal.` : "Your rent is at or above market. Strong position — focus on tenant retention.", cost: "$0", roi: "∞", rentUp: rentGapAmt > 0 ? `+$${rentGapAmt.toLocaleString()}/mo` : "Already optimized", condition: "Only raise at lease renewal — never mid-lease", color: rentGapAmt > 0 ? "#f59e0b" : "#22c55e", action: "Check comps ↗", url: "https://www.rentometer.com" },
-                          { icon: "🔒", title: "Smart lock + thermostat", desc: `Total cost ~$400-700. Smart locks save $100-150/turnover in rekeying. Smart thermostat reduces energy 15-25%. Tenants pay $30-40/mo more for smart-enabled homes.`, cost: "$400–700", roi: "200%", rentUp: "+$30–40/mo", condition: `Only if property is over 5 years old. Skip if value under $${Math.round(propVal*0.005).toLocaleString()} in annual rent increase`, color: "#60a5fa", action: "Shop now ↗", url: "https://www.amazon.com/s?k=smart+home+rental" },
-                          { icon: "🪵", title: "Replace carpet with LVP flooring", desc: `Cost $3-8K depending on sqft. 70-80% ROI. Waterproof, lasts 25 years, looks premium. Tenants stay longer in nicer properties. Deductible over 27.5 years.`, cost: "$3,000–8,000", roi: "75%", rentUp: "+$50–100/mo", condition: "Only if carpet is stained, old, or damaged. Skip if floors are functional.", color: "#a78bfa", action: "Find installer ↗", url: "https://www.thumbtack.com/k/flooring" },
-                          { icon: "🚪", title: "Steel entry door", desc: `Cost $1-2K, 188% ROI — best single upgrade per dollar. New door signals quality. Security feature tenants value. Tax deductible.`, cost: "$1,000–2,000", roi: "188%", rentUp: "+$25–50/mo", condition: "Only if door is over 15 years old or visually dated", color: "#f59e0b", action: "Find installer ↗", url: "https://www.thumbtack.com/k/door-installation" },
-                          { icon: "⚡", title: "Energy Star appliances", desc: `Cost ~$3,500 for full package. Saves $400/yr in repairs + $120/yr electricity. Rent premium $60/mo. ROI 18.4% on rent alone, 31.7% including savings.`, cost: "$2,000–4,000", roi: "32%", rentUp: "+$60/mo", condition: `Only if appliances are over 10 years old. Skip if property value under $${Math.round(propVal * 0.02).toLocaleString()} — not worth it.`, color: "#22c55e", action: "Shop appliances ↗", url: "https://www.energystar.gov/productfinder" },
-                          { icon: "🏠", title: "Garage door replacement", desc: "Cost $3-5K. Highest ROI upgrade tracked in 2025 at 268%. If you have a garage and the door is dated, this is the single best dollar you can spend.", cost: "$3,000–5,000", roi: "268%", rentUp: "+$50–75/mo", condition: "Only if garage door is original or damaged. Skip if no garage.", color: "#f97316", action: "Find installer ↗", url: "https://www.thumbtack.com/k/garage-door-repair" },
-                          { icon: "📊", title: "Refinance opportunity", desc: `Current NOI: $${(prop.rent-prop.expenses).toLocaleString()}/mo. A 1% rate drop on your mortgage saves real money monthly. Only refinance if you plan to hold 3+ more years — closing costs are $3-6K.`, cost: "$3,000–6,000 closing", roi: "Varies", rentUp: "Saves $200–500/mo", condition: "Only if current rate is 1%+ above market AND you plan to hold 3+ years", color: "#a78bfa", action: "Compare rates ↗", url: "https://www.lendingtree.com" },
-                          { icon: "🪴", title: "Curb appeal — paint + landscaping", desc: "Fresh exterior paint $2-4K + basic landscaping $500-1K. Fills vacancies faster, justifies higher rent. First impression drives 40% of tenant decisions.", cost: "$1,500–5,000", roi: "100%+", rentUp: "Fills 25% faster", condition: "Only if exterior is visibly dated or property has been vacant 30+ days", color: "#34d399", action: "Find landscaper ↗", url: "https://www.thumbtack.com/k/landscaping" },
-                        ];
-                        return (
-                          <div style={{ margin: "0 24px 16px", background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.15)", borderRadius: "20px", padding: "20px 20px", position: "relative" as const, overflow: "hidden" }}>
-                            <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }} />
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span style={{ fontSize: "18px" }}>🚀</span>
-                                <p style={{ fontSize: "13px", color: "#f59e0b", fontWeight: "900", letterSpacing: "1.5px", textTransform: "uppercase" as const }}>Optimize this property</p>
-                              </div>
-                              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", padding: "4px 10px", borderRadius: "20px" }}>{tips.length} suggestions</span>
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px" }}>
-                              {(expandedTips[prop.id] ? tips : tips.slice(0,3)).map((tip, i) => {
-                                const tipKey = `${prop.id}-${i}`;
-                                const status = tipStatus[tipKey] || "todo";
-                                return (
-                                  <div key={i} style={{ borderRadius: "16px", background: status === "done" ? "rgba(52,211,153,0.05)" : `${tip.color}06`, border: `1px solid ${status === "done" ? "rgba(52,211,153,0.25)" : tip.color + "25"}`, marginBottom: "10px", overflow: "hidden", transition: "all 0.2s" }}>
-                                    
-                                    {/* Tip header */}
-                                    <div onClick={() => setOpenTips(prev => ({...prev, [tipKey]: !prev[tipKey]}))} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderBottom: !openTips[tipKey] ? `1px solid ${tip.color}10` : "none", cursor: "pointer" }}>
-                                      <span style={{ fontSize: "22px", flexShrink: 0 }}>{tip.icon}</span>
-                                      <div style={{ flex: 1 }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" as const, marginBottom: "3px", flex: 1 }}>
-                                          <p style={{ fontSize: "15px", fontWeight: "900", color: status === "done" ? "#34d399" : tip.color }}>{tip.title}</p>
-                                          {tip.badge && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "6px", background: tip.badge === "🆓 Free" ? "rgba(52,211,153,0.15)" : tip.badge === "⚡ Quick win" ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.06)", color: tip.badge === "🆓 Free" ? "#34d399" : tip.badge === "⚡ Quick win" ? "#f59e0b" : "rgba(255,255,255,0.4)", fontWeight: "700", border: `1px solid ${tip.badge === "🆓 Free" ? "rgba(52,211,153,0.3)" : tip.badge === "⚡ Quick win" ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.1)"}` }}>{tip.badge}</span>}
-                                          {status === "done" && <span style={{ fontSize: "10px", color: "#34d399", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", padding: "2px 8px", borderRadius: "6px", fontWeight: "700" }}>✓ Done</span>}
-                                          {status === "inprogress" && <span style={{ fontSize: "10px", color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", padding: "2px 8px", borderRadius: "6px", fontWeight: "700" }}>⏳ In progress</span>}
-                                        </div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                          {tip.time && <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: "600" }}>⏱ {tip.time}</span>}
-                                        </div>
-                                      </div>
-                                      <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{!openTips[tipKey] ? "▲" : "▼"}</span>
-                                    </div>
-
-                                    {!openTips[tipKey] && (
-                                    <div style={{ padding: "12px 16px 0" }}>
-                                      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.75)", lineHeight: "1.6", marginBottom: "12px" }}>{tip.desc}</p>
-                                    </div>
-                                    )}
-                                    {!openTips[tipKey] && (
-                                    <div>
-                                    {/* Visual schema: Cost → Return → Payback */}
-                                    {(tip.cost || tip.roi || tip.rentUp) && (
-                                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", gap: "4px", alignItems: "center", padding: "10px 16px", margin: "0 16px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "12px", border: `1px solid ${tip.color}15` }}>
-                                        <div style={{ textAlign: "center" as const }}>
-                                          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "4px", fontWeight: "700" }}>💰 Cost</p>
-                                          <p style={{ fontSize: "14px", fontWeight: "900", color: "#f87171" }}>{tip.cost || "—"}</p>
-                                        </div>
-                                        <p style={{ fontSize: "18px", color: `${tip.color}60`, textAlign: "center" as const }}>→</p>
-                                        <div style={{ textAlign: "center" as const }}>
-                                          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "4px", fontWeight: "700" }}>📈 Return</p>
-                                          <p style={{ fontSize: "14px", fontWeight: "900", color: "#22c55e" }}>{tip.rentUp || "—"}</p>
-                                        </div>
-                                        <p style={{ fontSize: "18px", color: `${tip.color}60`, textAlign: "center" as const }}>→</p>
-                                        <div style={{ textAlign: "center" as const }}>
-                                          <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", textTransform: "uppercase" as const, letterSpacing: "1px", marginBottom: "4px", fontWeight: "700" }}>⏰ ROI</p>
-                                          <p style={{ fontSize: "14px", fontWeight: "900", color: tip.color }}>{tip.roi || "—"}</p>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Condition box */}
-                                    {tip.condition && (
-                                      <div style={{ margin: "0 16px 12px", padding: "9px 12px", background: "rgba(0,0,0,0.25)", borderRadius: "9px", borderLeft: `3px solid ${tip.color}60`, display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                                        <span style={{ fontSize: "12px", flexShrink: 0 }}>✓</span>
-                                        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", lineHeight: "1.5" }}><span style={{ color: tip.color, fontWeight: "700" }}>Only do this if: </span>{tip.condition}</p>
-                                      </div>
-                                    )}
-
-                                    </div>
-                                    )}
-                                    {!openTips[tipKey] && (<div style={{ display: "flex", gap: "8px", padding: "0 16px 14px", flexWrap: "wrap" as const }}>
-                                      <a href={tip.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                        <div style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "9px", background: `${tip.color}15`, border: `1px solid ${tip.color}35`, color: tip.color, fontWeight: "800", cursor: "pointer" }}>{tip.action}</div>
-                                      </a>
-                                      {status !== "inprogress" && status !== "done" && <button onClick={() => setTipStatus(prev => ({...prev, [tipKey]: "inprogress"}))} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "9px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", color: "#f59e0b", fontWeight: "700", cursor: "pointer" }}>⏳ Start</button>}
-                                      {status === "inprogress" && <button onClick={() => setTipStatus(prev => ({...prev, [tipKey]: "done"}))} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "9px", background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)", color: "#34d399", fontWeight: "800", cursor: "pointer" }}>✓ Mark done</button>}
-                                      {status === "done" && <button onClick={() => setTipStatus(prev => ({...prev, [tipKey]: "todo"}))} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", fontWeight: "700", cursor: "pointer" }}>↩ Reset</button>}
-                                    </div>)}
-                                  </div>
-                                );
-                              })}
-                              {tips.length > 3 && (
-                                <button onClick={() => setExpandedTips(prev => ({...prev, [prop.id]: !prev[prop.id]}))} style={{ width: "100%", padding: "9px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
-                                  {expandedTips[prop.id] ? "Show less ↑" : `Show ${tips.length - 3} more tips ↓`}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-
                       {/* Actions */}
-                      <div style={{ display: "flex", gap: "8px", padding: "0 24px 18px", flexWrap: "wrap" as const }}>
+                      <div style={{ display: "flex", gap: "10px", padding: "14px 22px" }}>
                         {isOccupied ? (
                           <>
-                            <button onClick={() => { setMessageDrawer(prop.id); setMessageText(""); }} style={{ flex: 1, padding: "11px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s" }}>📨 Message tenant</button>
-                            <button style={{ flex: 1, padding: "11px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s" }}>📁 Documents</button>
-                            <button style={{ flex: 1, padding: "11px 8px", background: "linear-gradient(135deg, rgba(52,211,153,0.15), rgba(52,211,153,0.05))", border: "1px solid rgba(52,211,153,0.35)", borderRadius: "12px", color: "#34d399", fontSize: "12px", fontWeight: "800", cursor: "pointer", boxShadow: "0 0 16px rgba(52,211,153,0.15)", transition: "all 0.15s" }}>🔄 Renew lease</button>
+                            <button style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", color: "rgba(255,255,255,0.4)", fontSize: "11px", fontWeight: "700", cursor: "pointer" }} onClick={() => { setMessageDrawer(prop.id); setMessageText(""); }}>Message</button>
+                            <button style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", color: "rgba(255,255,255,0.4)", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Docs</button>
+                            <button style={{ flex: 1, padding: "9px", background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)", borderRadius: "10px", color: "#34d399", fontSize: "11px", fontWeight: "800", cursor: "pointer" }}>Renew lease</button>
                           </>
                         ) : isVacant ? (
                           <>
-                            <button style={{ flex: 1, padding: "11px 8px", background: "linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.05))", border: "1px solid rgba(96,165,250,0.35)", borderRadius: "12px", color: "#60a5fa", fontSize: "12px", fontWeight: "800", cursor: "pointer", boxShadow: "0 0 16px rgba(96,165,250,0.15)", transition: "all 0.15s" }}>🔍 Find tenant ↗</button>
-                            <button style={{ flex: 1, padding: "11px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s" }}>📋 Screen applicant</button>
-                            <button style={{ flex: 1, padding: "11px 8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s" }}>📢 List property</button>
+                            <button style={{ flex: 1, padding: "9px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: "10px", color: "#60a5fa", fontSize: "11px", fontWeight: "800", cursor: "pointer" }}>Find tenant ↗</button>
+                            <button style={{ flex: 1, padding: "9px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", color: "rgba(255,255,255,0.4)", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Screen applicant</button>
                           </>
                         ) : (
-                          <button style={{ flex: 1, padding: "11px 8px", background: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(168,85,247,0.05))", border: "1px solid rgba(168,85,247,0.35)", borderRadius: "12px", color: "#a855f7", fontSize: "12px", fontWeight: "800", cursor: "pointer", boxShadow: "0 0 16px rgba(168,85,247,0.15)", transition: "all 0.15s" }}>📐 View project →</button>
+                          <button style={{ flex: 1, padding: "9px", background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.25)", borderRadius: "10px", color: "#a855f7", fontSize: "11px", fontWeight: "800", cursor: "pointer" }}>View project →</button>
                         )}
                       </div>
                     </div>
@@ -9672,8 +9124,7 @@ function FinancingTab({ properties, user, incomingListing, forcedSubTab }: { pro
                       <p style={{ fontSize: "14px", fontWeight: "800", color: alt.color }}>{alt.name}</p>
                       <a href={`https://${alt.url}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", padding: "4px 10px", background: `${alt.color}12`, border: `1px solid ${alt.color}30`, borderRadius: "6px", color: alt.color, textDecoration: "none", fontWeight: "700" }}>Apply ↗</a>
                     </div>
-                    <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", lineHeight: "1.5", marginBottom: "8px" }}>{tip.desc}</p>
-                                    <a href={tip.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", fontSize: "11px", padding: "4px 10px", borderRadius: "6px", background: `${tip.color}15`, border: `1px solid ${tip.color}30`, color: tip.color, fontWeight: "700", textDecoration: "none", cursor: "pointer" }}>{tip.action}</a>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5" }}>{alt.why}</p>
                   </div>
                 ))}
               </div>

@@ -776,7 +776,7 @@ const [showCompare, setShowCompare] = useState(false);
               value: p.value,
               isFuture: true,
             }));
-            const allMilestones = [...propMilestones];
+            const allMilestones = [...propMilestones, ...futureMilestones];
 
             for (let i = 6; i >= 1; i--) {
               const d = new Date(today); d.setMonth(d.getMonth() - i);
@@ -849,11 +849,6 @@ const [showCompare, setShowCompare] = useState(false);
                       <p style={{ fontSize: "13px", color: "#34d399", marginTop: "6px", fontWeight: "700" }}>+{fmt(Math.round(totalValue * 0.035))} base projection · next 12 months</p>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column" as const, gap: "10px", alignItems: "flex-end" }}>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        {(["Portfolio", "Cash Flow"] as const).map((v) => (
-                          <button key={v} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "8px", border: v === "Portfolio" ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.1)", background: v === "Portfolio" ? "rgba(245,158,11,0.1)" : "transparent", color: v === "Portfolio" ? "#f59e0b" : "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "700" }}>{v}</button>
-                        ))}
-                      </div>
                       <div style={{ display: "flex", gap: "14px" }}>
                         {[
                           { label: "Conservative", color: "#60a5fa" },
@@ -864,6 +859,11 @@ const [showCompare, setShowCompare] = useState(false);
                             <div style={{ width: "18px", height: "2px", background: l.color, borderRadius: "999px", opacity: 0.8 }} />
                             <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>{l.label}</span>
                           </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        {(["Portfolio", "Cash Flow"] as const).map((v) => (
+                          <button key={v} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "8px", border: v === "Portfolio" ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.1)", background: v === "Portfolio" ? "rgba(245,158,11,0.1)" : "transparent", color: v === "Portfolio" ? "#f59e0b" : "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "700" }}>{v}</button>
                         ))}
                       </div>
                     </div>
@@ -884,7 +884,7 @@ const [showCompare, setShowCompare] = useState(false);
 
                   {/* Recharts */}
                   <div style={{ width: "100%", marginBottom: "8px" }}>
-                    <ResponsiveContainer width="100%" height={260} style={{ overflow: "visible" }}>
+                    <ResponsiveContainer width="100%" height={260}>
                       <AreaChart data={labels.map((l, i) => ({
                         name: l,
                         portfolio: portfolioData[i] ?? undefined,
@@ -919,21 +919,14 @@ const [showCompare, setShowCompare] = useState(false);
                           labelStyle={{ color: "#f59e0b", fontWeight: "800", marginBottom: "6px" }}
                         />
                         <ReferenceLine x="NOW" stroke="rgba(245,158,11,0.4)" strokeDasharray="4 2" label={{ value: "NOW", fill: "#f59e0b", fontSize: 11, fontWeight: "bold", position: "top" }}/>
-                        {propMilestones.map((m, i) => (
+                        {/* Property milestone reference lines */}
+                        {allMilestones.map((m, i) => (
                           <ReferenceLine key={i} x={labels[m.idx]} stroke={`${m.color}40`} strokeDasharray="3 2" label={{ value: m.label, fill: m.color, fontSize: 9, position: "top" }}/>
                         ))}
                         <Area type="monotone" dataKey="aggressive" stroke="rgba(52,211,153,0.6)" strokeWidth={1.5} strokeDasharray="6 3" fill="url(#aggGrad)" dot={false} connectNulls/>
                         <Area type="monotone" dataKey="conservative" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
                         <Area type="monotone" dataKey="base" stroke="rgba(245,158,11,0.7)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="portfolio" stroke="#f59e0b" strokeWidth={3} fill="url(#portfolioGrad)" dot={(props: any) => {
-                          const { cx, cy, index } = props;
-                          const milestone = allMilestones.find(m => m.idx === index);
-                          if (!milestone) return <circle key={index} cx={cx} cy={cy} r={0} fill="none"/>;
-                          return <g key={index}>
-                            <circle cx={cx} cy={cy} r={8} fill={`${milestone.color}20`} stroke={milestone.color} strokeWidth={2}/>
-                            <circle cx={cx} cy={cy} r={3.5} fill={milestone.color}/>
-                          </g>;
-                        }} activeDot={{ r: 7, fill: "#f59e0b", stroke: "rgba(245,158,11,0.3)", strokeWidth: 5 }} connectNulls={false}/>
+                        <Area type="monotone" dataKey="portfolio" stroke="#f59e0b" strokeWidth={3} fill="url(#portfolioGrad)" dot={{ fill: "#f59e0b", r: 4, strokeWidth: 0 }} activeDot={{ r: 7, fill: "#f59e0b", stroke: "rgba(245,158,11,0.3)", strokeWidth: 5 }} connectNulls={false}/>
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>

@@ -747,7 +747,7 @@ const [showCompare, setShowCompare] = useState(false);
       <div className="gs-main">
         {activeTab === "home" && <>
 
-        {/* ── WEALTH GRAPH ── */}
+          {/* ── WEALTH GRAPH ── */}
           {(() => {
             const today = new Date();
             const labels: string[] = [];
@@ -756,53 +756,59 @@ const [showCompare, setShowCompare] = useState(false);
             const projBase: (number|null)[] = [];
             const projCons: (number|null)[] = [];
             const projAgg: (number|null)[] = [];
-            const projBaseCF: (number|null)[] = [];
-            const projConsCF: (number|null)[] = [];
-            const projAggCF: (number|null)[] = [];
 
-            // Past properties as milestones on historical line
-            const propMilestones = properties.filter(p => p.occupancyStatus !== "sold").slice(0, 4).map((p, i) => ({
-              idx: i + 1,
-              label: p.name.slice(0, 10),
-              color: ["#f59e0b", "#60a5fa", "#34d399", "#a78bfa"][i] || "#f59e0b",
-              value: p.value,
-              isFuture: false,
-            }));
-            // Future projects as milestones after NOW
-            const futureMilestones = properties.filter(p => p.occupancyStatus === "planned").slice(0, 3).map((p, i) => ({
-              idx: 7 + i * 2,
-              label: `+${p.name.slice(0, 8)}`,
-              color: "#a78bfa",
-              value: p.value,
-              isFuture: true,
-            }));
-            const allMilestones = [...propMilestones];
+            // Milestones on timeline
+            const milestones = [
+              { idx: 1, label: "First property", color: "#f59e0b" },
+              { idx: 3, label: "Refinanced", color: "#60a5fa" },
+              { idx: 5, label: "Portfolio hit $1M", color: "#34d399" },
+            ];
 
             for (let i = 6; i >= 1; i--) {
               const d = new Date(today); d.setMonth(d.getMonth() - i);
               labels.push(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }));
-              portfolioData.push(Math.round(totalValue * (0.55 + (6-i) * 0.075 + Math.sin((6-i) * 0.8) * 0.02)));
-              cashFlowData.push(Math.round(monthlyCashFlow * (0.55 + (6-i) * 0.075)));
+              portfolioData.push(Math.round(totalValue * (0.65 + (6-i) * 0.058)));
+              cashFlowData.push(Math.round(monthlyCashFlow * (0.6 + (6-i) * 0.065)));
               projBase.push(null); projCons.push(null); projAgg.push(null);
-              projBaseCF.push(null); projConsCF.push(null); projAggCF.push(null);
             }
             labels.push("NOW");
             portfolioData.push(totalValue);
             cashFlowData.push(monthlyCashFlow);
             projBase.push(totalValue); projCons.push(totalValue); projAgg.push(totalValue);
-            projBaseCF.push(monthlyCashFlow); projConsCF.push(monthlyCashFlow); projAggCF.push(monthlyCashFlow);
 
             for (let i = 1; i <= 6; i++) {
               const d = new Date(today); d.setMonth(d.getMonth() + i);
               labels.push(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }));
               portfolioData.push(null); cashFlowData.push(null);
-              projBase.push(Math.round(totalValue * (1 + i * 0.04)));
-              projCons.push(Math.round(totalValue * (1 + i * 0.015)));
-              projAgg.push(Math.round(totalValue * (1 + i * 0.09 + i * i * 0.008)));
-              projBaseCF.push(Math.round(monthlyCashFlow * Math.pow(1.05, i/12)));
-              projConsCF.push(Math.round(monthlyCashFlow * Math.pow(1.02, i/12)));
-              projAggCF.push(Math.round(monthlyCashFlow * Math.pow(1.12, i/12)));
+              projBase.push(Math.round(totalValue * Math.pow(1.035, i/12)));
+              projCons.push(Math.round(totalValue * Math.pow(1.015, i/12)));
+              projAgg.push(Math.round(totalValue * Math.pow(1.07, i/12)));
             }
+
+            const nowIdx = 6;
+            const W = 100; const H = 160;
+            const pad = { l: 2, r: 2, t: 24, b: 20 };
+            const gW = W - pad.l - pad.r; const gH = H - pad.t - pad.b;
+            const allVals = [...portfolioData, ...projAgg, ...projCons].filter(Boolean) as number[];
+            const maxV = Math.max(...allVals) * 1.08;
+            const minV = Math.min(...(portfolioData.filter(Boolean) as number[])) * 0.92;
+            const range = maxV - minV;
+            const n = labels.length;
+            function gx(i: number) { return pad.l + (i / (n - 1)) * gW; }
+            function gy(v: number) { return pad.t + gH - ((v - minV) / range) * gH; }
+
+            const histPts = portfolioData.map((v,i) => v !== null ? {x: gx(i), y: gy(v), v, i} : null).filter(Boolean) as any[];
+            const basePts = projBase.map((v,i) => v !== null ? {x: gx(i), y: gy(v)} : null).filter(Boolean) as any[];
+            const consPts = projCons.map((v,i) => v !== null ? {x: gx(i), y: gy(v)} : null).filter(Boolean) as any[];
+            const aggPts = projAgg.map((v,i) => v !== null ? {x: gx(i), y: gy(v)} : null).filter(Boolean) as any[];
+
+            const histPath = `M ${histPts.map((p:any) => `${p.x},${p.y}`).join(" L ")}`;
+            const basePath = `M ${basePts.map((p:any) => `${p.x},${p.y}`).join(" L ")}`;
+            const conePath = `M ${aggPts.map((p:any) => `${p.x},${p.y}`).join(" L ")} L ${[...consPts].reverse().map((p:any) => `${p.x},${p.y}`).join(" L ")} Z`;
+            const histArea = `${histPath} L ${gx(nowIdx)},${pad.t+gH} L ${gx(0)},${pad.t+gH} Z`;
+
+            const nowX = gx(nowIdx);
+            const nowY = gy(totalValue);
 
             const monthsToFreedom = Math.max(1, Math.round((GOAL_CASHFLOW - monthlyCashFlow) / Math.max(1, monthlyCashFlow / 6)));
             const monthsWithNewProp = Math.max(1, monthsToFreedom - Math.round(monthsToFreedom * 0.15));
@@ -812,134 +818,106 @@ const [showCompare, setShowCompare] = useState(false);
             return (
               <div style={{ marginBottom: "20px" }}>
 
-                {/* YOUR market alerts strip */}
-                <div style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "10px 16px", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" as const }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                      <span style={{ fontSize: "10px", color: "#22c55e", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const }}>YOUR MARKET</span>
+                {/* Live deal ticker */}
+                <div style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "10px 16px", marginBottom: "12px", overflow: "hidden", position: "relative" as const }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", flexShrink: 0, animation: "pulse 2s infinite" }} />
+                    <span style={{ fontSize: "10px", color: "#22c55e", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" as const, flexShrink: 0 }}>LIVE</span>
+                    <div style={{ display: "flex", gap: "20px", overflowX: "auto" as const, scrollbarWidth: "none" as const }}>
+                      {[
+                        "James · Houston added $340K duplex · +$2,100/mo",
+                        "Maria · Miami closed STR at 28% ROI",
+                        "47 investors in TX added property this month",
+                        "Alex · Denver hit $1M portfolio milestone 🎉",
+                        "Avg deal size this week: $285K",
+                      ].map((item, i) => (
+                        <span key={i} style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" as const, fontWeight: "500" }}>
+                          {item} <span style={{ color: "rgba(255,255,255,0.15)", margin: "0 8px" }}>·</span>
+                        </span>
+                      ))}
                     </div>
-                    {[
-                      { icon: "📍", text: `${properties.filter(p=>p.occupancyStatus==="occupied"||p.occupancyStatus==="str").length} of ${properties.filter(p=>p.occupancyStatus!=="sold").length} properties occupied`, color: "#34d399" },
-                      { icon: "💰", text: `$${monthlyCashFlow.toLocaleString()}/mo net cash flow`, color: "#f59e0b" },
-                      { icon: "📈", text: `Portfolio up est. ${(3.5).toFixed(1)}% this year`, color: "#60a5fa" },
-                      { icon: "⚠️", text: properties.filter(p=>p.occupancyStatus==="vacant").length > 0 ? `${properties.filter(p=>p.occupancyStatus==="vacant").length} vacant — action needed` : "No vacant properties", color: properties.filter(p=>p.occupancyStatus==="vacant").length > 0 ? "#f87171" : "#34d399" },
-                    ].map((item, i) => (
-                      <span key={i} style={{ fontSize: "12px", color: item.color, fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
-                        {item.icon} {item.text}
-                        {i < 3 && <span style={{ color: "rgba(255,255,255,0.1)", margin: "0 4px" }}>·</span>}
-                      </span>
-                    ))}
                   </div>
                 </div>
 
                 {/* Main graph card */}
-                <div style={{ background: "linear-gradient(160deg, rgba(15,12,8,0.98), rgba(8,8,12,0.99))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "24px", padding: "28px 28px 20px", position: "relative" as const, overflow: "hidden", boxShadow: "0 0 80px rgba(245,158,11,0.05), 0 24px 48px rgba(0,0,0,0.5)" }}>
-                  <div style={{ position: "absolute" as const, top: "-80px", left: "15%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(245,158,11,0.06), transparent 70%)", pointerEvents: "none" as const }} />
-                  <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, rgba(245,158,11,0.6), transparent)" }} />
+                <div style={{ background: "linear-gradient(160deg, rgba(15,12,8,0.95), rgba(8,8,12,0.98))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "24px", padding: "28px 28px 20px", position: "relative" as const, overflow: "hidden", boxShadow: "0 0 60px rgba(245,158,11,0.06), 0 20px 40px rgba(0,0,0,0.4)" }}>
 
-                  {/* Header */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap" as const, gap: "12px" }}>
+                  {/* Ambient glow */}
+                  <div style={{ position: "absolute" as const, top: "-60px", left: "20%", width: "200px", height: "200px", background: "radial-gradient(circle, rgba(245,158,11,0.08), transparent 70%)", pointerEvents: "none" as const }} />
+                  <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)" }} />
+
+                  {/* Header row */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px", flexWrap: "wrap" as const, gap: "16px" }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "rgba(245,158,11,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const }}>💰 Wealth Trajectory</span>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontWeight: "700" }}>+3.5% projected</span>
+                        <span style={{ fontSize: "12px", color: "rgba(245,158,11,0.7)", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" as const }}>💰 Wealth Trajectory</span>
+                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontWeight: "700" }}>+{((totalValue * 0.035 / totalValue) * 100).toFixed(1)}% projected</span>
                       </div>
-                      <p style={{ fontSize: "40px", fontWeight: "900", color: "#fff", letterSpacing: "-2px", lineHeight: 1, textShadow: "0 0 40px rgba(245,158,11,0.25)" }}>{fmt(totalValue)}</p>
-                      <p style={{ fontSize: "13px", color: "#34d399", marginTop: "6px", fontWeight: "700" }}>+{fmt(Math.round(totalValue * 0.035))} base projection · next 12 months</p>
+                      <p style={{ fontSize: "42px", fontWeight: "900", color: "#fff", letterSpacing: "-2px", lineHeight: 1, textShadow: "0 0 40px rgba(245,158,11,0.3)" }}>{fmt(totalValue)}</p>
+                      <p style={{ fontSize: "14px", color: "#34d399", marginTop: "6px", fontWeight: "700" }}>+{fmt(Math.round(totalValue * 0.035))} base projection · next 12 months</p>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "10px", alignItems: "flex-end" }}>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        {(["Portfolio", "Cash Flow"] as const).map((v) => (
-                          <button key={v} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "8px", border: v === "Portfolio" ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.1)", background: v === "Portfolio" ? "rgba(245,158,11,0.1)" : "transparent", color: v === "Portfolio" ? "#f59e0b" : "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "700" }}>{v}</button>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: "14px" }}>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px", alignItems: "flex-end" }}>
+                      <div style={{ display: "flex", gap: "16px" }}>
                         {[
-                          { label: "Conservative", color: "#60a5fa" },
-                          { label: "Base", color: "#f59e0b" },
-                          { label: "Aggressive", color: "#34d399" },
+                          { label: "Conservative", color: "#60a5fa", dash: "4,2" },
+                          { label: "Base", color: "#f59e0b", dash: "none" },
+                          { label: "Aggressive", color: "#34d399", dash: "4,2" },
                         ].map(l => (
-                          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                            <div style={{ width: "18px", height: "2px", background: l.color, borderRadius: "999px", opacity: 0.8 }} />
-                            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>{l.label}</span>
+                          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke={l.color} strokeWidth="2" strokeDasharray={l.dash} strokeLinecap="round"/></svg>
+                            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: "600" }}>{l.label}</span>
                           </div>
                         ))}
                       </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {["Portfolio", "Cash Flow"].map((v) => (
+                          <button key={v} style={{ fontSize: "11px", padding: "5px 12px", borderRadius: "8px", border: v === "Portfolio" ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(255,255,255,0.1)", background: v === "Portfolio" ? "rgba(245,158,11,0.1)" : "transparent", color: v === "Portfolio" ? "#f59e0b" : "rgba(255,255,255,0.35)", cursor: "pointer", fontWeight: "700" }}>{v}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Property milestones above chart */}
-                  {allMilestones.length > 0 && (
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" as const }}>
-                      {allMilestones.map((m, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "8px", background: `${m.color}12`, border: `1px solid ${m.color}30` }}>
-                          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: m.color }} />
-                          <span style={{ fontSize: "11px", color: m.color, fontWeight: "700" }}>{m.label}</span>
-                          <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>{fmt(m.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Recharts */}
+                  {/* Recharts graph */}
                   <div style={{ width: "100%", marginBottom: "8px" }}>
-                    <ResponsiveContainer width="100%" height={260} style={{ overflow: "visible" }}>
-                      <AreaChart data={labels.map((l, i) => ({
+                    {(() => {
+                  
+                      const chartData = labels.map((l, i) => ({
                         name: l,
                         portfolio: portfolioData[i] ?? undefined,
-                        cashflow: cashFlowData[i] ?? undefined,
                         base: projBase[i] ?? undefined,
                         conservative: projCons[i] ?? undefined,
                         aggressive: projAgg[i] ?? undefined,
-                        baseCF: projBaseCF[i] ?? undefined,
-                        conservativeCF: projConsCF[i] ?? undefined,
-                        aggressiveCF: projAggCF[i] ?? undefined,
-                      }))} margin={{ top: 40, right: 10, left: 10, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.5}/>
-                            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="aggGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#34d399" stopOpacity={0.2}/>
-                            <stop offset="100%" stopColor="#34d399" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="cfGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.4}/>
-                            <stop offset="100%" stopColor="#60a5fa" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false}/>
-                        <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false}/>
-                        <YAxis tickFormatter={(v: number) => fmt(v)} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={65}/>
-                        <Tooltip
-                          contentStyle={{ background: "#0d0e14", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "14px", color: "#fff", fontSize: "13px", padding: "12px 16px" }}
-                          formatter={(v: number, name: string) => [fmt(v), name === "portfolio" ? "Portfolio" : name === "base" ? "Base projection" : name === "conservative" ? "Conservative" : name === "aggressive" ? "Aggressive" : name]}
-                          labelStyle={{ color: "#f59e0b", fontWeight: "800", marginBottom: "6px" }}
-                        />
-                        <ReferenceLine x="NOW" stroke="rgba(245,158,11,0.4)" strokeDasharray="4 2" label={{ value: "NOW", fill: "#f59e0b", fontSize: 11, fontWeight: "bold", position: "top" }}/>
-                        {propMilestones.map((m, i) => (
-                          <ReferenceLine key={i} x={labels[m.idx]} stroke={`${m.color}40`} strokeDasharray="3 2" label={{ value: m.label, fill: m.color, fontSize: 9, position: "top" }}/>
-                        ))}
-                        <Area type="monotone" dataKey="aggressive" stroke="rgba(52,211,153,0.6)" strokeWidth={1.5} strokeDasharray="6 3" fill="url(#aggGrad)" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="conservative" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="base" stroke="rgba(245,158,11,0.7)" strokeWidth={1.5} strokeDasharray="6 3" fill="none" dot={false} connectNulls/>
-                        <Area type="monotone" dataKey="portfolio" stroke="#f59e0b" strokeWidth={3} fill="url(#portfolioGrad)" dot={(props: any) => {
-                          const { cx, cy, index } = props;
-                          const milestone = allMilestones.find(m => m.idx === index);
-                          if (!milestone) return <circle key={index} cx={cx} cy={cy} r={0} fill="none"/>;
-                          return <g key={index}>
-                            <circle cx={cx} cy={cy} r={8} fill={`${milestone.color}20`} stroke={milestone.color} strokeWidth={2}/>
-                            <circle cx={cx} cy={cy} r={3.5} fill={milestone.color}/>
-                          </g>;
-                        }} activeDot={{ r: 7, fill: "#f59e0b", stroke: "rgba(245,158,11,0.3)", strokeWidth: 5 }} connectNulls={false}/>
-                      </AreaChart>
-                    </ResponsiveContainer>
+                      }));
+                      return (
+                        <ResponsiveContainer width="100%" height={240}>
+                          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="aggGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#34d399" stopOpacity={0.15}/>
+                                <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false}/>
+                            <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false}/>
+                            <YAxis tickFormatter={(v: number) => fmt(v)} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={60}/>
+                            <Tooltip contentStyle={{ background: "#0f1015", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "12px", color: "#fff", fontSize: "13px" }} formatter={(v: number) => [fmt(v), ""]} labelStyle={{ color: "#f59e0b", fontWeight: "800" }}/>
+                            <ReferenceLine x="NOW" stroke="rgba(255,255,255,0.25)" strokeDasharray="4 2" label={{ value: "NOW", fill: "#f59e0b", fontSize: 11, fontWeight: "bold" }}/>
+                            <Area type="monotone" dataKey="aggressive" stroke="rgba(52,211,153,0.5)" strokeWidth={1.5} strokeDasharray="5 3" fill="url(#aggGrad)" dot={false} connectNulls/>
+                            <Area type="monotone" dataKey="conservative" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} strokeDasharray="5 3" fill="none" dot={false} connectNulls/>
+                            <Area type="monotone" dataKey="base" stroke="rgba(245,158,11,0.6)" strokeWidth={1.5} strokeDasharray="5 3" fill="none" dot={false} connectNulls/>
+                            <Area type="monotone" dataKey="portfolio" stroke="#f59e0b" strokeWidth={2.5} fill="url(#portfolioGrad)" dot={{ fill: "#f59e0b", r: 3, strokeWidth: 0 }} activeDot={{ r: 6, fill: "#f59e0b", stroke: "rgba(245,158,11,0.4)", strokeWidth: 4 }} connectNulls={false}/>
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      );
+                    })()}
                   </div>
 
                   {/* Projection stats */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px", marginTop: "16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "10px", marginTop: "20px" }}>
                     {[
                       { label: "Conservative +1yr", value: fmt(Math.round(totalValue * 1.015)), sub: "+1.5% growth", color: "#60a5fa" },
                       { label: "Base +1yr", value: fmt(Math.round(totalValue * 1.035)), sub: "+3.5% growth", color: "#f59e0b" },
@@ -955,40 +933,27 @@ const [showCompare, setShowCompare] = useState(false);
                   </div>
                 </div>
 
-                {/* Freedom + One more property */}
+                {/* Freedom countdown + one more property */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+
+                  {/* Freedom timer */}
                   <div style={{ background: "linear-gradient(145deg, rgba(52,211,153,0.06), rgba(0,0,0,0.4))", border: "1px solid rgba(52,211,153,0.2)", borderRadius: "18px", padding: "20px 22px", position: "relative" as const, overflow: "hidden" }}>
                     <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, #34d399, transparent)" }} />
                     <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>⏰ Financial freedom in</p>
                     <p style={{ fontSize: "36px", fontWeight: "900", color: "#34d399", letterSpacing: "-1.5px", lineHeight: 1 }}>{monthsToFreedom}<span style={{ fontSize: "16px", fontWeight: "600", color: "rgba(52,211,153,0.6)", marginLeft: "4px" }}>months</span></p>
                     <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>At ${GOAL_CASHFLOW.toLocaleString()}/mo passive income goal</p>
-                    <div style={{ marginTop: "12px", height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min(100, (monthlyCashFlow / GOAL_CASHFLOW) * 100)}%`, background: "linear-gradient(90deg, #34d399, #22c55e)", borderRadius: "999px" }} />
-                    </div>
-                    <p style={{ fontSize: "11px", color: "rgba(52,211,153,0.6)", marginTop: "5px", fontWeight: "600" }}>{Math.round((monthlyCashFlow / GOAL_CASHFLOW) * 100)}% of goal reached</p>
                   </div>
 
+                  {/* One more property */}
                   <div style={{ background: "linear-gradient(145deg, rgba(245,158,11,0.06), rgba(0,0,0,0.4))", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "18px", padding: "20px 22px", position: "relative" as const, overflow: "hidden", cursor: "pointer" }} onClick={() => setActiveTab("finddeals")}>
                     <div style={{ position: "absolute" as const, top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }} />
                     <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" as const, marginBottom: "6px" }}>⚡ Add one property</p>
-                    <p style={{ fontSize: "36px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-1.5px", lineHeight: 1 }}>-{Math.max(1, monthsToFreedom - monthsWithNewProp)}<span style={{ fontSize: "16px", fontWeight: "600", color: "rgba(245,158,11,0.6)", marginLeft: "4px" }}>months</span></p>
+                    <p style={{ fontSize: "36px", fontWeight: "900", color: "#f59e0b", letterSpacing: "-1.5px", lineHeight: 1 }}>-{monthsToFreedom - monthsWithNewProp}<span style={{ fontSize: "16px", fontWeight: "600", color: "rgba(245,158,11,0.6)", marginLeft: "4px" }}>months</span></p>
                     <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "8px" }}>+{fmt(extraPerYear)}/yr · Freedom by month {monthsWithNewProp}</p>
                     <div style={{ marginTop: "12px", padding: "8px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", textAlign: "center" as const }}>
                       <span style={{ fontSize: "12px", fontWeight: "800", color: "#f59e0b" }}>Find that property →</span>
                     </div>
                   </div>
-                </div>
-
-                {/* Neighbors investing */}
-                <div style={{ marginTop: "12px", background: "linear-gradient(145deg, rgba(96,165,250,0.04), rgba(0,0,0,0.4))", border: "1px solid rgba(96,165,250,0.15)", borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ fontSize: "24px" }}>🏘️</span>
-                    <div>
-                      <p style={{ fontSize: "14px", fontWeight: "800", color: "#60a5fa", marginBottom: "3px" }}>Your neighbors are investing</p>
-                      <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>47 investors in your market added a property this month · Avg deal: $320K</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setActiveTab("finddeals")} style={{ padding: "10px 18px", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.3)", borderRadius: "12px", color: "#60a5fa", fontSize: "12px", fontWeight: "800", cursor: "pointer", whiteSpace: "nowrap" as const }}>See deals →</button>
                 </div>
 
                 {/* Money sleeping alert */}
@@ -1007,7 +972,6 @@ const [showCompare, setShowCompare] = useState(false);
               </div>
             );
           })()}
-
 
           <div className="gs-grid-2">
             <GoalCard label="Portfolio Value" p={portfolioPct} milestonePct={milestonePct} value={fmt(totalValue)} sub={`of ${fmt(GOAL_PORTFOLIO)} vision`} pctLabel={`${portfolioPct.toFixed(1)}% to ${fmt(GOAL_PORTFOLIO)}`} barColor="#f59e0b" glow="rgba(245,158,11,0.4)" min="$0" mid={fmt(MILESTONE)} max={fmt(GOAL_PORTFOLIO)} onEdit={() => setShowSettings(true)} nextGap={([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO) - totalValue} nextTarget={fmt([250000,500000,750000,1000000,1500000,2000000,3000000,5000000].find(m => m > totalValue) || GOAL_PORTFOLIO)} />

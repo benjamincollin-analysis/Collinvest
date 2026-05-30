@@ -1,0 +1,785 @@
+﻿
+    const annualRent = properties.reduce((s, p) => s + 
+p.rent * 12, 0);
+    const annualExpenses = properties.reduce((s, p) => s + 
+p.expenses * 12, 0);
+    const noi = annualRent - annualExpenses;
+  
+    const US_STRUCTURES = [
+>     { name: "LLC (Single-Member)", icon: "🏢", color: 
+"#60a5fa", when: "1–3 properties", benefit: "Asset 
+protection, pass-through taxation, no corporate tax", tax: 
+"Taxed as personal income. Deduct: depreciation, mortgage 
+interest, repairs, management.", annual_cost: 
+"$200–500/yr", best_for: "Most investors starting out" },
+      { name: "LLC + S-Corp Election", icon: "⚡", color: 
+"#f59e0b", when: "High cash flow ($80K+ net)", benefit: 
+"Reduce self-employment tax by 15.3% on distributions", 
+tax: "Pay yourself salary. Take rest as distributions — no 
+FICA on distributions.", annual_cost: "$800–2,000/yr", 
+best_for: "Active real estate investors" },
+      { name: "1031 Exchange", icon: "🔄", color: 
+"#34d399", when: "Selling appreciated property", benefit: 
+"Defer ALL capital gains tax — indefinitely", tax: `On 
+${fmt(totalValue)} portfolio: avoid 
+~${fmt(Math.round(totalValue * 0.2 * 0.20))} in capital 
+gains tax`, annual_cost: "QI fee: $800–1,200 per 
+exchange", best_for: "Selling to upgrade — most powerful 
+tool in US RE tax code" },
+      { name: "Cost Segregation", icon: "📊", color: 
+"#a78bfa", when: "$500K+ property value", benefit: 
+"Front-load depreciation — massive first-year deductions", 
+tax: `On ${fmt(totalValue)}: typically generates 
+${fmt(Math.round(totalValue * 
+0.08))}–${fmt(Math.round(totalValue * 0.15))} in Y1 
+deductions`, annual_cost: "$5,000–15,000 study", best_for: 
+"High income earners — eliminate tax bill year 1" },
+>     { name: "Opportunity Zone Fund", icon: "🌆", color: 
+"#f87171", when: "Capital gains to deploy", benefit: 
+"Invest gains in OZ → defer tax + 0% tax after 10yr", tax: 
+"On $100K gain: defer tax now, potentially owe $0 after 10 
+years", annual_cost: "Fund management fees 1–2%/yr", 
+best_for: "Investors with large capital gains" },
+    ];
+  
+    const FR_STRUCTURES = [
+      { name: "LMNP (Meublé non professionnel)", icon: 
+"🛋", color: "#60a5fa", when: "Locations meublées, 
+<23K€/yr", benefit: "Micro-BIC: 50% abattement 
+automatique. Réel: amortissement complet.", tax: "Réel 
+simplifié: amortissement sur 25–30 ans. Zéro impôt pendant 
+8–12 ans typiquement.", annual_cost: "Comptable: 
+500–1,500€/an", best_for: "Investisseurs meublés — régime 
+le plus avantageux" },
+      { name: "SCI à l'IS", icon: "🏛", color: "#f59e0b", 
+when: "Patrimoine > 500K€, transmission", benefit: "IS à 
+15% jusqu'à 42,500€. Amortissement du bien.", tax: `Sur 
+${fmt(noi)} NOI: IS 15% = ${fmt(Math.round(noi * 0.15))} 
+vs TMI personnel 30–45%`, annual_cost: "Comptable: 
+1,500–3,000€/an", best_for: "Transmission patrimoniale, 
+gros portfolios" },
+    ];
+  
+    const structures = jurisdiction === "US" ? 
+US_STRUCTURES : FR_STRUCTURES;
+  
+    const STRATEGY_COMPARE = {
+>     hold:  { label: "Hold & Rent", color: "#34d399", us: 
+`Deduct annually: depreciation $${Math.round(totalValue / 
+27.5).toLocaleString()}, mortgage interest, repairs, 
+management. Effective tax rate: 15–25%.`, fr: "LMNP réel: 
+amortissement + charges → impôt souvent nul 8–12 ans. SCI 
+IS si transmission patrimoniale." },
+      brrrr: { label: "BRRRR", color: "#a78bfa", us: 
+"Cash-out refi proceeds are NOT taxable (it's a loan, not 
+income). New interest is fully deductible. Most 
+tax-efficient growth strategy.", fr: "Refinancement non 
+imposable. Nouveaux intérêts déductibles. Idéal en LMNP ou 
+SCI IS." },
+      sell:  { label: "Sell", color: "#f59e0b", us: 
+`Long-term capital gains: 0/15/20%. On ${fmt(totalValue)}: 
+est. ${fmt(Math.round(totalValue * 0.15 * 0.20))} tax. Use 
+1031 Exchange to defer 100% — legally.`, fr: "Plus-value: 
+19% IR + 17.2% PS = 36.2%. Abattement progressif → 
+exonération après 22 ans (IR) / 30 ans (PS)." },
+      str:   { label: "STR / Airbnb", color: "#60a5fa", 
+us: "Augusta Rule: first 14 days free — zero tax. Above 
+that: deduct all STR expenses proportionally. Active = 
+self-employment tax applies.", fr: "LMNP meublé: micro-BIC 
+50% abattement ou réel (amortissement). Seuil micro-BIC: 
+77,700€/an." },
+    };
+  
+    const [expenseErrors, setExpenseErrors] = 
+useState<Record<string, boolean>>({});
+    const [editingExpenseId, setEditingExpenseId] = 
+useState<number | null>(null);
+    const [expandedProps, setExpandedProps] = 
+useState<Set<number>>(new Set());
+    const [filterYear, setFilterYear] = 
+useState(currentYear);
+  
+>   const CATEGORIES = ["Mortgage", "Insurance", "Property 
+Tax", "Repairs", "Management", "Utilities", "CapEx", 
+"Other"];
+>   const CAT_COLORS: Record<string, string> = { Mortgage: 
+"#f59e0b", Insurance: "#60a5fa", "Property Tax": 
+"#a78bfa", Repairs: "#f87171", Management: "#34d399", 
+Utilities: "#fb923c", CapEx: "#e879f9", Other: 
+"rgba(255,255,255,0.4)" };
+    const IS: React.CSSProperties = { width: "100%", 
+background: "#1a1a1a", border: "1px solid 
+rgba(255,255,255,0.12)", borderRadius: "10px", padding: 
+"10px 14px", fontSize: "13px", color: "#fff", outline: 
+"none", boxSizing: "border-box", fontFamily: "inherit" };
+  
+    // Number formatting — max 2 decimals, clear K/M labels
+    function fmtMoney(n: number) {
+      const abs = Math.abs(n);
+      "Systems": 14, "Certificate": 14, "Design": 21, 
+"Feasibility": 30,
+      "Fit-Out": 21, "Opening": 7, "Handover": 5, 
+"Launch": 3,
+      "Due Diligence": 21, "Site Prep": 14, 
+"Infrastructure": 30,
+      "Lot Sales": 60, "Unit Setup": 14, "HOA Setup": 21,
+      "Photography": 2, "Listing Setup": 3, "Execution": 
+30,
+>     "Review": 7, "Construction": 60, "Management": 30,
+    };
+    const PHASE_ICONS: Record<string, string> = {
+      "Planning": "🗺️", "Permits": "📋", "Demo": "🔨", 
+"Foundation": "🏗️",
+      "Framing": "🪵", "MEP": "⚙️", "Plumbing": "🔧", 
+"Electrical": "⚡",
+      "HVAC": "🌀", "Insulation": "🧱", "Drywall": "🪣", 
+"Flooring": "🟫",
+      "Systems": "🔌", "Certificate": "📜", "Design": 
+"✏️", "Feasibility": "📈",
+      "Fit-Out": "🪑", "Opening": "🎉", "Handover": "🤝", 
+"Launch": "🚀",
+      "Due Diligence": "🔎", "Site Prep": "🚜", 
+"Infrastructure": "🛣️",
+      "Lot Sales": "💰", "Unit Setup": "🏘️", "HOA Setup": 
+"📝",
+      "Photography": "📸", "Listing Setup": "💻", 
+"Execution": "▶️",
+>     "Review": "👁️", "Construction": "🏗️", 
+"Management": "👷",
+    };
+    const PHASE_TEMPLATES: Record<string, string[]> = {
+      "Renovation":            ["Planning", "Permits", 
+"Demo", "Construction", "Finishing", "Inspection", 
+"Delivery"],
+      "Rehabilitation":        ["Assessment", "Planning", 
+"Permits", "Structural", "Systems", "Finishing", 
+"Certificate"],
+      "Flip":                  ["Acquisition", "Planning", 
+"Demo", "Construction", "Staging", "Listing", "Closing"],
+      "in_progress": { color: "#f59e0b", bg: 
+"rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
+      "done":        { color: "#34d399", bg: 
+"rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.2)" },
+      "delayed":     { color: "#f87171", bg: 
+"rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" 
+},
+    };
+    const STATUS_LABELS: Record<string, string> = { 
+not_started: "⬜ Not Started", in_progress: "🟡 In 
+Progress", done: "✅ Done", delayed: "🔴 Delayed" };
+>   const TEAM_ROLES = ["Architect", "Contractor", 
+"Project Manager", "Accountant", "Engineer", "Designer", 
+"Inspector"];
+    const TRADE_CATEGORIES = ["Architecture", 
+"Engineering", "Permits", "Demo", "Foundation", "Framing", 
+"Plumbing", "Electrical", "HVAC", "Insulation", "Drywall", 
+"Flooring", "Painting", "Roofing", "Windows", "Finishing", 
+"Landscaping", "Other"];
+  
+    const [projects, setProjects] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
+    const AVG: Record<string, number> = {
+      "Planning":14,"Permits":30,"Demo":7,"Foundation":21,"
+Framing":21,"MEP":14,"Plumbing":10,
+      "Electrical":10,"HVAC":7,"Insulation":5,"Drywall":10,
+"Flooring":7,"Painting":7,"Roofing":10,
+      "Windows":5,"Finishing":14,"Inspection":7,"Delivery":
+3,"Staging":5,"Listing":14,"Closing":30,
+      "Acquisition":45,"Assessment":14,"Structural":21,"Sys
+tems":14,"Certificate":14,"Design":21,
+>     "Feasibility":30,"Construction":60,"Management":30,"E
+xecution":30,"Review":7,
+    };
+  
+    function getPhaseEst(project: any, phaseIdx: number) {
+      const base = project.start_date ? new 
+Date(project.start_date) : (() => { const d = new Date(); 
+d.setDate(d.getDate() - 30); return d; })();
+      let cum = 0;
+  };
+  
+  const PROJECTS = [
+    { id:"reit",    tier:"p" as DealTier, name:"REIT 
+investment",          roi:"8–12%",  cap:"$1k min",   
+time:"0h/wk",   risk:"Low",      fill:55, desc:"Buy shares 
+in a publicly traded real estate investment trust. Fully 
+hands-off, liquid like a stock, quarterly dividends.", 
+chips:["Dividends","Liquid","Tax-advantaged"], 
+riskDetail:"Low — publicly regulated, diversified, can 
+lose value in downturns" },
+    { id:"note",    tier:"p" as DealTier, name:"Mortgage 
+note",            roi:"8–13%",  cap:"$50k min",  
+time:"1h/wk",   risk:"Low",      fill:60, desc:"Buy an 
+existing mortgage at a discount. You collect monthly 
+interest secured by real property.", chips:["Monthly 
+income","Secured","No tenants"], riskDetail:"Low — secured 
+by deed, defaults can be slow/costly" },
+>   { id:"crowd",   tier:"p" as DealTier, 
+name:"Crowdfunding LP",          roi:"7–14%",  cap:"$5k 
+min",   time:"1h/wk",   risk:"Low-Med",  fill:52, 
+desc:"Invest as LP in large deals via Fundrise or 
+CrowdStreet. Platform manages everything.", 
+chips:["Diversified","Platform-managed","Quarterly 
+reports"], riskDetail:"Low-Med — platform risk, 
+illiquidity, project-specific" },
+    { id:"land",    tier:"p" as DealTier, name:"Land 
+banking",             roi:"10–30%", cap:"$20k min",  
+time:"2h/wk",   risk:"Med",      fill:58, desc:"Buy 
+undeveloped land in the path of growth. No tenants, 
+minimal maintenance. Long-term play.", chips:["Long-term 
+hold","No maintenance","Appreciation"], riskDetail:"Med — 
+illiquid, no income stream, zoning risk" },
+>   { id:"turnkey", tier:"p" as DealTier, name:"Turnkey 
+rental",           roi:"8–11%",  cap:"$80k min",  
+time:"3h/wk",   risk:"Low",      fill:62, desc:"Buy fully 
+renovated, tenant-occupied property managed by a PM. Cash 
+flow from day one.", chips:["Fully managed","Cash flow day 
+1","Remote-friendly"], riskDetail:"Low — PM fees reduce 
+returns, turnkey premiums thin margins" },
+    { id:"syndlp",  tier:"p" as DealTier, 
+name:"Syndication LP",           roi:"12–18%", cap:"$50k 
+min",  time:"2h/wk",   risk:"Med",      fill:65, 
+desc:"Silent LP in large apartment/commercial deals. GP 
+runs everything. 5–7yr lockup.", chips:["Big deals 
+access","Tax benefits","5–7yr lockup"], riskDetail:"Med — 
+capital locked, depends entirely on GP competence" },
+>   { id:"dscr",    tier:"p" as DealTier, name:"DSCR 
+rental + PM",         roi:"9–13%",  cap:"$70k min",  
+time:"3h/wk",   risk:"Low-Med",  fill:59, desc:"DSCR loan 
+(qualified by rental income) + property manager. Scalable 
+portfolio model.", chips:["Leverage","PM handles 
+ops","Scalable"], riskDetail:"Low-Med — PM fees 8–10%, 
+vacancy still hurts" },
+>   { id:"str",     tier:"a" as DealTier, name:"Short-term 
+rental",        roi:"20–35%", cap:"$80k min",  
+time:"10h/wk",  risk:"Med",      fill:88, 
+desc:"Airbnb/VRBO. High nightly rates, active management, 
+dynamic pricing, guest comms.", chips:["High 
+yield","Dynamic pricing","Regulation risk"], 
+riskDetail:"Med — regulation risk high, seasonality, high 
+turnover costs" },
+    { id:"brrrr",   tier:"a" as DealTier, name:"BRRRR 
+strategy",           roi:"25–40%", cap:"$60k min",  
+time:"15h/wk",  risk:"Med",      fill:82, desc:"Buy 
+distressed, Rehab, Rent, Refinance, Repeat. Recycle 
+capital to fund next deal.", chips:["Capital 
+recycling","Forced appreciation","Contractors required"], 
+riskDetail:"Med — rehab cost overruns, appraisal risk at 
+refinance" },
+    { id:"hack",    tier:"a" as DealTier, name:"House 
+hacking",            roi:"15–25%", cap:"$50k min",  
+time:"6h/wk",   risk:"Low",      fill:79, desc:"Live in 
+one unit of a multi-family, rent the others. 
+Offset/eliminate housing cost.", chips:["Low entry","FHA 
+eligible","Live-in required"], riskDetail:"Low — must live 
+on site, proximity to tenants" },
+    { id:"midterm", tier:"a" as DealTier, name:"Mid-term 
+rental",          roi:"18–28%", cap:"$75k min",  
+time:"8h/wk",   risk:"Low-Med",  fill:84, desc:"Furnished 
+1–6 month rentals for nurses, contractors. Higher than 
+LTR, less reg than STR.", chips:["Stable demand","Less 
+regulation","Furnished premium"], riskDetail:"Low-Med — 
+furnished costs more upfront, vacancy between stays" },
+    { id:"flip",    tier:"a" as DealTier, name:"Fix & 
+flip",               roi:"30–50%", cap:"$100k min", 
+time:"20h/wk",  risk:"High",     fill:71, desc:"Buy 
+distressed, renovate fast, sell at market. Short-cycle 
+project income.", chips:["Short cycle","High 
+profit","Execution risk"], riskDetail:"High — holding 
+costs, overruns, market timing critical" },
+    { id:"small",   tier:"a" as DealTier, name:"Small 
+multifamily (2–4)",  roi:"12–20%", cap:"$100k min", 
+time:"8h/wk",   risk:"Low-Med",  fill:80, 
+desc:"Duplex/triplex/quad. Multiple income streams, 
+residential financing, scalable.", chips:["Residential 
+loans","Scalable","Multiple incomes"], riskDetail:"Low-Med 
+— one vacancy hurts proportionally more" },
+>   { id:"colive",  tier:"a" as DealTier, name:"Co-living 
+house",          roi:"20–35%", cap:"$80k min",  
+time:"10h/wk",  risk:"Med",      fill:76, desc:"Rent 
+individual bedrooms. 2–3× rent of single tenant, 20–30% 
+below studio per room.", chips:["High yield/sqft","Young 
+professionals","High turnover"], riskDetail:"Med — high 
+tenant turnover, house rules management" },
+    { id:"sto",     tier:"a" as DealTier, name:"Storage 
+unit facility",    roi:"15–25%", cap:"$200k min", 
+time:"8h/wk",   risk:"Low-Med",  fill:77, 
+desc:"Recession-resistant. Low maintenance, no live-in 
+tenants, automatable with gate tech.", 
+chips:["Recession-proof","Low tenant issues","Scalable"], 
+riskDetail:"Low-Med — competition from REITs, location is 
+everything" },
+    { id:"large",   tier:"b" as DealTier, name:"Large 
+multifamily (5+)",   roi:"15–25%", cap:"$500k min", 
+time:"20h/wk",  risk:"Med",      fill:72, desc:"Apartment 
+buildings with commercial financing. Economies of scale.", 
+chips:["Commercial financing","Scale","Team required"], 
+riskDetail:"Med — larger capital at risk, commercial 
+financing stricter" },
+    { id:"boutique",tier:"b" as DealTier, name:"Boutique 
+hotel",           roi:"25–45%", cap:"$500k min", 
+time:"30h/wk",  risk:"High",     fill:65, desc:"6–30 room 
+premium property. Unique experience drives RevPAR above 
+chain hotels.", chips:["Brand value","High 
+RevPAR","Operational complexity"], riskDetail:"High — 
+hospitality complex, event risks crush revenue" },
+    { id:"venue",   tier:"b" as DealTier, name:"Wedding / 
+event venue",    roi:"40–90%", cap:"$300k min", 
+time:"35h/wk",  risk:"Med-High", fill:80, desc:"Weekend 
+bookings drive high per-event revenue. Built 18–24mo in 
+advance.", chips:["Weekend model","High 
+per-event","Seasonal"], riskDetail:"Med-High — seasonal, 
+weather-dependent, permits required" },
+    { id:"student", tier:"b" as DealTier, name:"Student 
+housing",          roi:"20–35%", cap:"$200k min", 
+time:"20h/wk",  risk:"Med",      fill:74, 
+desc:"High-density near universities. Annual demand cycle. 
+Lease by room.", chips:["Consistent demand","Annual 
+leases","High density"], riskDetail:"Med — high turnover, 
+university enrollment changes" },
+        {sub === "projects" && <ProjectsTab user={user} />}
+      </div>
+    );
+  }
+  
+> function ManageMaintenance({ propId, propName }: { 
+propId: number; propName: string }) {
+    const [tickets, setTickets] = useState<{id:number;task:
+string;status:string;cost:number;priority:string;color:stri
+ng}[]>([]);
+    const [showAdd, setShowAdd] = useState(false);
+    const [newTask, setNewTask] = useState("");
+    const [newPriority, setNewPriority] = useState("Low");
+    const [newCost, setNewCost] = useState("");
+      </div>
+    );
+  }
+  
+  function GetFinancedTab({ properties, user, 
+incomingListing }: { properties: Property[]; user: any; 
+incomingListing?: any }) {
+>   const [mode, setMode] = 
+useState<"start"|"manage"|"exit">("start");
+    const [activeSection, setActiveSection] = 
+useState<string>("structure");
+>   const [manageSection, setManageSection] = useState<"sof
+tware"|"tenants"|"tax"|"maintenance">("software");
+    const [exitSection, setExitSection] = 
+useState<"timing"|"1031"|"model"|"score">("timing");
+  
+    const modes = [
+      { key: "start", icon: "🚀", label: "Start a 
+Project", sub: "Form entity · Get financed · Insure · 
+Close", color: "#a78bfa" },
+>     { key: "manage", icon: "🏗️", label: "Manage", sub: 
+"Track · Screen · Maintain · Optimize", color: "#34d399" },
+      { key: "exit", icon: "💰", label: "Exit", sub: "Sell 
+· 1031 · Refinance · BRRRR", color: "#f59e0b" },
+    ] as const;
+  
+    const startSections = [
+      { key: "structure", icon: "🏛️", label: "Structure", 
+sub: "Form your entity", color: "#a78bfa" },
+      { key: "insurance", icon: "🛡️", label: "Insurance", 
+sub: "Protect your asset", color: "#60a5fa" },
+      { key: "financing", icon: "💰", label: "Financing", 
+sub: "Find your loan", color: "#f59e0b" },
+      { key: "title", icon: "📋", label: "Title & Close", 
+sub: "Cross the finish line", color: "#f97316" },
+    ] as const;
+  
+>   const manageSections = [
+>     { key: "software", icon: "💻", label: "PM Software", 
+sub: "Track everything", color: "#a78bfa" },
+>     { key: "tenants", icon: "👥", label: "Tenants", sub: 
+"Screen & manage", color: "#34d399" },
+      { key: "tax", icon: "📊", label: "Tax Strategy", 
+sub: "Keep more of what you earn", color: "#60a5fa" },
+      { key: "maintenance", icon: "🔧", label: 
+"Maintenance", sub: "Protect your asset", color: "#f59e0b" 
+},
+    ] as const;
+  
+    const exitSections = [
+      { key: "1031",   icon: "🔄", label: "1031 Exchange", 
+sub: "Defer taxes forever", color: "#34d399" },
+      { key: "model",  icon: "🧮", label: "Exit Modeler",  
+sub: "Compare strategies", color: "#a78bfa" },
+      { key: "score",  icon: "🎯", label: "Readiness 
+Score", sub: "Are you ready?", color: "#60a5fa" },
+    ] as const;
+  
+>   const currentSections = mode === "start" ? 
+startSections : mode === "manage" ? manageSections : 
+exitSections;
+  
+    // Reset section when mode changes
+>   const handleModeChange = (m: "start"|"manage"|"exit") 
+=> {
+      setMode(m);
+>     setActiveSection(m === "start" ? "structure" : m === 
+"manage" ? "software" : "strategy");
+    };
+  
+    const currentColor = currentSections.find(s => s.key 
+=== activeSection)?.color || "#a78bfa";
+  
+    return (
+        </div>
+  
+        {/* SECTION NAV */}
+        <div style={{ display: "flex", gap: "8px", 
+marginBottom: "28px", overflowX: "auto", paddingBottom: 
+"4px" }}>
+          {currentSections.map((s, i) => (
+>           <button key={s.key} onClick={() => { if (mode 
+=== "manage") setManageSection(s.key as any); else if 
+(mode === "exit") setExitSection(s.key as any); else 
+setActiveSection(s.key); }} style={{ display: "flex", 
+alignItems: "center", gap: "8px", padding: "10px 16px", 
+background: (mode === "manage" ? manageSection : mode === 
+"exit" ? exitSection : activeSection) === s.key ? 
+`linear-gradient(135deg, ${s.color}20, ${s.color}08)` : 
+"rgba(255,255,255,0.03)", border: (mode === "manage" ? 
+manageSection : mode === "exit" ? exitSection : 
+activeSection) === s.key ? `1px solid ${s.color}50` : "1px 
+solid rgba(255,255,255,0.06)", borderRadius: "12px", 
+cursor: "pointer", whiteSpace: "nowrap", transition: "all 
+0.2s ease", position: "relative" }}>
+              {activeSection === s.key && <div style={{ 
+position: "absolute", top: 0, left: 0, right: 0, height: 
+"2px", background: `linear-gradient(90deg, transparent, 
+${s.color}, transparent)` }} />}
+              <span style={{ fontSize: "16px" 
+}}>{s.icon}</span>
+              <div style={{ textAlign: "left" }}>
+                <p style={{ fontSize: "12px", fontWeight: 
+"900", color: activeSection === s.key ? s.color : 
+"rgba(255,255,255,0.5)" }}>{s.label}</p>
+              </div>
+              ))}
+            </div>
+          </div>
+        )}
+  
+>       {/* ── MANAGE MODE ── */}
+>       {mode === "manage" && (
+          <div style={{ display: "flex", flexDirection: 
+"column" as const, gap: "20px" }}>
+            {/* Section header */}
+            <div style={{ display: "flex", alignItems: 
+"center", gap: "12px", marginBottom: "4px" }}>
+>             <div style={{ width: "4px", height: "32px", 
+background: `linear-gradient(180deg, ${manageSection === 
+"software" ? "#a78bfa" : manageSection === "tenants" ? 
+"#34d399" : manageSection === "tax" ? "#60a5fa" : 
+"#f59e0b"}, transparent)`, borderRadius: "2px" }} />
+              <div>
+>               <p style={{ fontSize: "22px", fontWeight: 
+"900", color: "#fff", letterSpacing: "-0.5px" 
+}}>{manageSection === "software" ? "PM Software" : 
+manageSection === "tenants" ? "Tenant Management" : 
+manageSection === "tax" ? "Tax Strategy" : "Maintenance 
+Tracker"}</p>
+>               <p style={{ fontSize: "13px", color: 
+"rgba(255,255,255,0.4)" }}>{manageSection === "software" ? 
+"Connect your property management tool" : manageSection 
+=== "tenants" ? "Screen, manage and communicate with 
+tenants" : manageSection === "tax" ? "Keep more of what 
+you earn" : "Track tickets and preventive maintenance"}</p>
+              </div>
+            </div>
+            {properties.filter(p => p.occupancyStatus !== 
+"sold").length === 0 && (
+              <div style={{ textAlign: "center" as const, 
+padding: "48px", background: "rgba(255,255,255,0.02)", 
+borderRadius: "16px", border: "1px dashed 
+rgba(255,255,255,0.08)" }}>
+                <p style={{ fontSize: "28px", 
+marginBottom: "12px" }}>??</p>
+                  </div>
+  
+                  {/* Section content */}
+                  <div style={{ padding: "18px 22px" }}>
+  
+>                   {manageSection === "software" && (
+                      <div style={{ display: "flex", 
+flexDirection: "column" as const, gap: "16px" }}>
+                        {/* Title + flow */}
+                        <div style={{ display: "flex", 
+alignItems: "flex-start", gap: "14px", marginBottom: "4px" 
+}}>
+                          <div style={{ width: "3px", 
+borderRadius: "999px", background: "#60a5fa", alignSelf: 
+"stretch", flexShrink: 0 }} />
+                          <div>
+>                           <p style={{ fontSize: "22px", 
+fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" 
+}}>Connect PM Software</p>
+                            <p style={{ fontSize: "13px", 
+color: "rgba(255,255,255,0.4)" }}>Step 1 of 3 ? Pick the 
+right tool for your portfolio size</p>
+                          </div>
+                        </div>
+                        <div style={{ background: 
+"rgba(96,165,250,0.05)", border: "1px solid 
+rgba(96,165,250,0.15)", borderRadius: "16px", padding: 
+"20px", marginBottom: "4px" }}>
+                          <p style={{ fontSize: "10px", 
+color: "rgba(96,165,250,0.7)", fontWeight: "900", 
+letterSpacing: "2px", textTransform: "uppercase" as const, 
+marginBottom: "16px" }}>How it works</p>
+                            ]).filter(Boolean)}
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", 
+gridTemplateColumns: "repeat(auto-fit, minmax(220px, 
+1fr))", gap: "14px" }}>
+                          {([
+>                           { icon: "📊", title: 
+"Buildium", color: "#60a5fa", tag: "Most Popular", desc: 
+"Full-suite property management. Accounting, leasing, 
+maintenance, and tenant portal in one place.", pros: 
+["Starts at $58/mo", "No unit minimum", "Strong 
+accounting"], cons: ["Hidden transaction fees", "Less 
+powerful at scale"], url: "https://www.buildium.com" },
+>                           { icon: "🏢", title: 
+"AppFolio", color: "#a78bfa", tag: "Enterprise", desc: 
+"AI-powered management for serious portfolios. Automated 
+maintenance, smart leasing, deep analytics.", pros: ["AI 
+maintenance dispatch", "Best-in-class analytics", 
+"Mobile-first"], cons: ["$298/mo minimum", "50 unit 
+minimum"], url: "https://www.appfolio.com" },
+                            { icon: "🌐", title: 
+"Hemlane", color: "#34d399", tag: "Best Remote", desc: 
+"Built for remote landlords. Maintenance coordination, 
+tenant portal, and local agent network.", pros: ["Perfect 
+for out-of-state", "Local repair network", "Low cost 
+entry"], cons: ["Less accounting depth", "Smaller feature 
+set"], url: "https://www.hemlane.com" },
+                          ] as any[]).map((s) => (
+                            <div key={s.title} style={{ 
+background: `linear-gradient(135deg, ${s.color}10, 
+rgba(0,0,0,0.3))`, border: `1px solid ${s.color}30`, 
+borderRadius: "20px", padding: "22px", position: 
+"relative" as const, overflow: "hidden", display: "flex", 
+flexDirection: "column" as const }}>
+                              <div style={{ position: 
+"absolute" as const, top: 0, left: 0, right: 0, height: 
+"2px", background: `linear-gradient(90deg, transparent, 
+${s.color}, transparent)` }} />
+                              <div style={{ position: 
+"absolute" as const, top: 0, right: 0, width: "100px", 
+height: "100px", background: `radial-gradient(circle at 
+top right, ${s.color}12, transparent 70%)`, pointerEvents: 
+"none" as const }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+  
+>                   {manageSection === "tenants" && (
+                      <div style={{ display: "flex", 
+flexDirection: "column" as const, gap: "12px" }}>
+>                       <p style={{ fontSize: "10px", 
+color: "rgba(255,255,255,0.3)", fontWeight: "700", 
+textTransform: "uppercase" as const, letterSpacing: 
+"1.5px", marginBottom: "2px" }}>Tenant Management</p>
+                        {prop.occupancyStatus === 
+"occupied" || prop.occupancyStatus === "str" ? (
+                          <div style={{ display: "grid", 
+gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                            {[
+                              { label: "Screening", value: 
+"Verified", color: "#34d399", icon: "✅" },
+                              { label: "Lease", value: 
+"Active", color: "#34d399", icon: "📋" },
+                          ))}
+                        </div>
+                      </div>
+                    )}
+  
+>                   {manageSection === "tax" && (
+                      <div style={{ display: "flex", 
+flexDirection: "column" as const, gap: "12px" }}>
+                        <p style={{ fontSize: "10px", 
+color: "rgba(255,255,255,0.3)", fontWeight: "700", 
+textTransform: "uppercase" as const, letterSpacing: 
+"1.5px", marginBottom: "2px" }}>Tax Strategy</p>
+                        <div style={{ display: "grid", 
+gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                          {[
+                            { label: "Annual Income", 
+value: `$${(prop.rent * 12).toLocaleString()}`, color: 
+"#34d399", icon: "📈" },
+                        </div>
+                        <button style={{ padding: "11px", 
+borderRadius: "10px", fontSize: "12px", fontWeight: "800", 
+border: "1px solid rgba(167,139,250,0.3)", background: 
+"rgba(167,139,250,0.08)", color: "#a78bfa", cursor: 
+"pointer", letterSpacing: "0.3px" }}>Export Tax Summary 
+→</button>
+                      </div>
+                    )}
+  
+>                   {manageSection === "maintenance" && (
+>                     <ManageMaintenance propId={prop.id} 
+propName={prop.name} />
+                    )}
+  
+                  </div>
+                </div>
+              );          })}
+                </div>
+  
+                {/* QI Partners */}
+                <p style={{ fontSize: "10px", color: 
+"rgba(255,255,255,0.3)", fontWeight: "700", textTransform: 
+"uppercase" as const, letterSpacing: "1.5px" }}>Qualified 
+Intermediaries ? verified partners</p>
+                {[
+>                 { name: "Accruit", desc: "Nation’s 
+largest 1031 QI · $10B+ in exchanges managed annually", 
+color: "#34d399", badge: "Most Trusted", url: 
+"https://www.accruit.com" },
+                  { name: "Realized Holdings", desc: "1031 
+exchange + DST investments · replacement property 
+marketplace", color: "#60a5fa", badge: "Best for DST", 
+url: "https://www.realized1031.com" },
+                  { name: "1031 Crowdfunding", desc: 
+"Fractional replacement properties · ideal for smaller 
+exchanges", color: "#a78bfa", badge: "Best for 
+Fractional", url: "https://www.1031crowdfunding.com" },
+                ].map(p => (
+                  <div key={p.name} style={{ display: 
+"flex", alignItems: "center", justifyContent: 
+"space-between", padding: "14px 18px", background: 
+`linear-gradient(135deg, ${p.color}08, rgba(0,0,0,0.2))`, 
+border: `1px solid ${p.color}25`, borderRadius: "12px" }}>
+                    <div style={{ display: "flex", 
+alignItems: "center", gap: "12px" }}>
+      { id:203, name:"Estate Sale", addr:"2241 Ranch 
+Road", city:"Houston, TX", price:445000, equity:390000, 
+equityPct:88, motivation:"Estate sale — no liens", 
+color:"#f59e0b",
+        photos:["https://images.unsplash.com/photo-16005851
+54340-be6161a56a0c?w=800&q=80"], ...calcMetrics(445000) },
+    ];
+  
+    const BUSINESSES = [
+>     { id:301, name:"Property Management Co.", 
+location:"Houston, TX", price:285000, revenue:420000, 
+annualCF:89000, type:"Property Management", employees:6, 
+years:8, multiple:3.2, color:"#60a5fa",
+        photos:["https://images.unsplash.com/photo-14864061
+46926-c627a92ad1ab?w=800&q=80"] },
+      { id:302, name:"RE Photography Studio", 
+location:"Houston, TX", price:95000, revenue:180000, 
+annualCF:68000, type:"RE Services", employees:2, years:4, 
+multiple:1.4, color:"#34d399",
+        photos:["https://images.unsplash.com/photo-14973662
+16548-37526070297c?w=800&q=80"] },
+      { id:303, name:"STR Portfolio — 14 units", 
+location:"Houston, TX", price:520000, revenue:890000, 
+annualCF:195000, type:"Short-Term Rental", employees:3, 
+years:5, multiple:2.7, color:"#f59e0b",
+        photos:["https://images.unsplash.com/photo-15710031
+23894-1f0594d2b5d9?w=800&q=80"] },
+      const defaultChecklist = [
+        {label:"Exit strategy defined",done:false},
+        {label:"Zoning confirmed",done:false},
+        {label:"Comparable rents researched",done:false},
+        {label:"Financing source confirmed",done:false},
+>       {label:"Property manager identified",done:false},
+        {label:"Market analysis complete",done:false},
+        {label:"Legal review done",done:false},
+        {label:"Decision deadline set",done:false},
+      ];
+      const row = { user_id:user.id, name:f.name, 
+project_type:f.project_type, tier:f.tier, 
+capital:addForm.capital, geography:addForm.geography, 
+risk:addForm.risk, notes:addForm.notes, 
+deadline:addForm.deadline, completeness:0, 
+status:"active", 
+checklist:JSON.stringify(defaultChecklist), deal_score:0 };
+        {label:"Cash flow verified positive", 
+done:result.cashFlow>0},
+        {label:"Cap rate above 6%", 
+done:result.capRate>=6},
+        {label:"DSCR above 1.25", done:result.dscr>=1.25},
+        {label:"Comparable rents researched", done:false},
+        {label:"Financing source confirmed", done:false},
+>       {label:"Property manager identified", done:false},
+        {label:"Legal review done", done:false},
+      ];
+      const donePct = Math.round((checklist.filter(c=>c.don
+e).length/checklist.length)*100);
+      const row = { user_id:user.id, name:`Analyzed Deal 
+(${result.verdict})`, project_type:"From Analyzer", 
+tier:"a" as DealTier, capital:`$${Math.round(inputs.downPay
+ment+inputs.closingCosts+inputs.rehabCost).toLocaleString()
+}`, geography:"", 
+risk:result.score>=70?"Low":result.score>=50?"Med":"High", 
+notes:`Score: ${result.score}/100 · Cap Rate: 
+${result.capRate.toFixed(1)}% · CoC: 
+${result.cocReturn.toFixed(1)}%`, deadline:"", 
+completeness:donePct, status:"active", 
+checklist:JSON.stringify(checklist), 
+deal_score:result.score, 
+analyzer_data:JSON.stringify({...inputs, result}) };
+      const { data, error } = await 
+supabase.from("deal_lab").insert(row).select().single();
+                {name:"DSCR Mortgage Broker", 
+role:"Investment loans, no income verification", 
+badge:"NMLS licensed", note:"Qualification based on rental 
+income, not your salary.", geo:"US · Nationwide"},
+                {name:"Hard Money Lender", role:"Fast 
+short-term financing for flips", badge:"State licensed", 
+note:"Close in 7–14 days. Critical for competitive 
+markets.", geo:"US · Multi-state"},
+                {name:"Private Equity Intro", role:"JV 
+partnerships, syndication capital", badge:"SEC 
+accredited", note:"Access deals above your budget via 
+strategic partnerships.", geo:"US · Nationwide"},
+              ]},
+              {label:"Construction & Renovation", 
+color:"#f59e0b", pros:[
+>               {name:"General Contractor", role:"Full 
+renovation management", badge:"Licensed & insured", 
+note:"Ask for 3 references on projects matching your 
+scope.", geo:"Local market"},
+                {name:"Property Inspector", 
+role:"Pre-purchase & pre-listing inspections", 
+badge:"InterNACHI certified", note:"Never skip this. 
+Uncovers hidden costs before you buy.", geo:"Local 
+market"},
+                {name:"Cost Segregation Specialist", 
+role:"Tax depreciation optimization", badge:"CPA 
+certified", note:"Typically generates $50K+ in first-year 
+deductions on a $500K property.", geo:"US · Nationwide"},
+              ]},
+>             {label:"Property Management", 
+color:"#34d399", pros:[
+>               {name:"STR Concierge Manager", 
+role:"Airbnb co-hosting, guest management", 
+badge:"Platform certified", note:"Takes 15–25% but enables 
+truly passive STR income.", geo:"Local market"},
+                {name:"Long-Term PM Company", 
+role:"Leasing, rent collection, maintenance", badge:"NARPM 
+member", note:"8–10% of rent. Evaluate by vacancy rate and 
+response time.", geo:"Local market"},
+>               {name:"Virtual PM Service", role:"Remote 
+portfolio management", badge:"Tech-enabled", note:"Ideal 
+for out-of-state investors. Full dashboard access.", 
+geo:"US · Nationwide"},
+              ]},
+            ].map(section => (
+              <div key={section.label} style={{ 
+marginBottom:"24px" }}>
+                <div style={{ display:"flex", 
+alignItems:"center", gap:"8px", marginBottom:"12px" }}>
+                  <div style={{ width:"6px", height:"6px", 
+borderRadius:"50%", background:section.color }}/>
+
+
